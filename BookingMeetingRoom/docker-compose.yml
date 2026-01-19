@@ -1,0 +1,77 @@
+services:
+#  spring-app:
+#    restart: always
+#    container_name: pet-project
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    ports:
+#      - "8080:8080"
+#    networks:
+#      - final-project
+#    depends_on:
+#      - mail
+#      - redis
+#      - postgres
+#    environment:
+#      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/finalproject
+#      - SPRING_DATASOURCE_USERNAME=postgres
+#      - SPRING_DATASOURCE_PASSWORD=tiendat1409
+#      - SPRING_REDIS_HOST=redis--pet-project
+#      - SPRING_REDIS_PORT=6379
+#      - SPRING_MAIL_HOST=mail-dev-pet-project
+#      - SPRING_MAIL_PORT=1025
+#      - SPRING_RABBITMQ_HOST=rabbitmq-dev-pet-project
+#      - SPRING_RABBITMQ_PORT=5672
+#      - APPLICATION_MAILING_FRONTEND_ACTIVATION_URL=http://172.27.112.1:1080/activate-account
+
+  redis:
+    container_name: redis--final-project
+    image: redis:7.2
+    ports:
+      - "6379:6379"
+    networks:
+      - final-project
+
+  mysql:
+    container_name: mysql
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: finalproject
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_USER: sa
+      MYSQL_PASSWORD: 123456
+    ports:
+      - "3306:3306"
+    networks:
+      - final-project
+    volumes:
+      - mysql-data:/var/lib/mysql
+    #      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  mail:
+    container_name: mail-dev-final-project
+    image: maildev/maildev
+    ports:
+      - "1080:1080"
+      - "1025:1025"
+    networks:
+      - final-project
+
+  rabbitmq:
+    container_name: rabbitmq-dev-pet-project
+    image: rabbitmq:3.11-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - final-project
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+networks:
+  final-project:
+    driver: bridge
+
+volumes:
+  mysql-data:
