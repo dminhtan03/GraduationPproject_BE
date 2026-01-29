@@ -19,7 +19,7 @@ public enum ResponseCode {
     INVALID_PASSWORD("USR_401", "Invalid password", HttpStatus.UNAUTHORIZED),
     PASSWORD_CONFIRM_NOT_MATCH("USR_400", "New password and confirm password do not match", HttpStatus.BAD_REQUEST),
     USER_DISABLE("USR_401", "User disabled" , HttpStatus.UNAUTHORIZED),
-
+    ACCOUNT_LOCKED("USR_401", "Account locked" , HttpStatus.UNAUTHORIZED),
     // ======= Validation Errors =======
     VALIDATION_FAILED("VAL_422", "Validation failed", HttpStatus.UNPROCESSABLE_ENTITY),
     // ======= OTP Errors =======

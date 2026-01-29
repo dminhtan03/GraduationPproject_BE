@@ -56,10 +56,10 @@ public class UserController {
         return ResponseEntity.ok(Response.ofSucceeded("Activate account successfully"));
     }
 
-    @GetMapping
-    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
-    public ResponseEntity<?> getAllUser() {
-        return ResponseEntity.ok(userService.getAllUser());
-    }
+//    @GetMapping
+//    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
+//    public ResponseEntity<?> getAllUser() {
+//        return ResponseEntity.ok(userService.getAllUser());
+//    }
 
 }

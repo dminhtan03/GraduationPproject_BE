@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.config;
+package com.finalProject.BookingMeetingRoom.common.config;
 
 import com.finalProject.BookingMeetingRoom.common.filter.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;

@@ -10,11 +10,11 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -39,11 +39,14 @@ public class User implements UserDetails {
     @Column(name = "IS_LOCKED")
     private boolean isLocked;
 
-    @Column(name = "IS_DELETED")
-    private boolean isDeleted;
+    @Column(name = "IS_RESET")
+    private boolean isReset;
 
-    @Column(name = "STATUS")
-    private int status;
+    @Column(name = "CREATED_AT")
+    private LocalDateTime createdAt;
+
+    @Column(name = "UPDATED_AT")
+    private LocalDateTime updatedAt;
 
     @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(name = "USER_INFO_ID", referencedColumnName = "ID")
@@ -61,12 +64,23 @@ public class User implements UserDetails {
     @JsonManagedReference
     private List<RefreshToken> refreshTokens;
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<Reservation> reservations;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles.stream()
-                .flatMap(role -> role.getPermissions().stream())
-                .map(permission -> new SimpleGrantedAuthority("ROLE_" + permission.getName()))
-                .collect(Collectors.toSet());
+        Set<GrantedAuthority> authorities = new HashSet<>();
+
+        for (Role role : roles) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
+
+            for (Permission permission : role.getPermissions()) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + permission.getName()));
+            }
+        }
+
+        return authorities;
     }
 
     @Override

@@ -19,6 +19,7 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -42,7 +43,7 @@ public class AuthServiceImpl implements AuthService {
 
     public AuthResponse doLogin(LoginRequest request, HttpServletResponse response) {
         try {
-            var user = userRepository.findByEmailAndIsDeleted(request.getEmail())
+            var user = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
 
             if (!user.isEnabled()) {
@@ -50,12 +51,25 @@ public class AuthServiceImpl implements AuthService {
             }
 
             if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+                user.setLoginCount(user.getLoginCount() + 1);
+                if (user.getLoginCount() == 3) {
+                    user.setLocked(true);
+                    userRepository.save(user);
+                    throw new CustomException(ResponseCode.ACCOUNT_LOCKED);
+                }
+                userRepository.save(user);
                 throw new CustomException(ResponseCode.INVALID_PASSWORD);
+            } else {
+                user.setLoginCount(0);
+                userRepository.save(user);
             }
 
             var authentication = authManager.authenticate(new UsernamePasswordAuthenticationToken(
                     request.getEmail(), request.getPassword())
             );
+
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            logger.info("User {} logged in with roles {}", userDetails.getUsername(), userDetails.getAuthorities());
 
             var claims = new HashMap<String, Object>();
             claims.put("user", user.getUserInfo().getFullName());
@@ -63,15 +77,16 @@ public class AuthServiceImpl implements AuthService {
             String accessToken = jwtUtils.generateToken(claims, (User) authentication.getPrincipal());
             String refreshToken = jwtUtils.generateRefreshToken(user);
 
-            // Set refresh token in HttpOnly cookie
             var refreshTokenCookies = new Cookie("refreshToken", refreshToken);
             refreshTokenCookies.setHttpOnly(true);
             refreshTokenCookies.setSecure(true);
             refreshTokenCookies.setPath("/");
-            refreshTokenCookies.setMaxAge((int) (refreshTokenExpiration/1000));
+            refreshTokenCookies.setMaxAge((int) (refreshTokenExpiration / 1000));
             response.addCookie(refreshTokenCookies);
 
             return new AuthResponse(accessToken, refreshToken);
+        } catch (CustomException e) {
+            throw e;
         } catch (Exception e) {
             logger.error(e.getMessage());
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);

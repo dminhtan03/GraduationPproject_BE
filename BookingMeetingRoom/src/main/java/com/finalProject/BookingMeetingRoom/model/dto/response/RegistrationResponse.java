@@ -14,6 +14,8 @@ public class RegistrationResponse {
 
     private String address;
 
+    private String department;
+
     private String email;
 
     private String gender;

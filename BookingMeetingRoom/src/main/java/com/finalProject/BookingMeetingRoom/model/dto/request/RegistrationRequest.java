@@ -19,6 +19,9 @@ public class RegistrationRequest {
     @NotBlank(message = "Address is mandatory")
     private String address;
 
+    @NotBlank(message = "Department is mandatory")
+    private String department;
+
     @NotBlank(message = "Email is mandatory")
     @Email
     private String email;

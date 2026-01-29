@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.config;
+package com.finalProject.BookingMeetingRoom.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

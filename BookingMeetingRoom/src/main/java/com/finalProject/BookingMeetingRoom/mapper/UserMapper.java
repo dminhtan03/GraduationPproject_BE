@@ -18,8 +18,6 @@ public interface UserMapper {
     @Mapping(target = "enabled", constant = "false")
     @Mapping(target = "loginCount", constant = "0")
     @Mapping(target = "locked", constant = "false")
-    @Mapping(target = "deleted", constant = "false")
-    @Mapping(target = "status", constant = "1")
     @Mapping(target = "userInfo", source = "registrationRequest")
     @Mapping(target = "roles", ignore = true)
     @Mapping(target = "refreshTokens", ignore = true)

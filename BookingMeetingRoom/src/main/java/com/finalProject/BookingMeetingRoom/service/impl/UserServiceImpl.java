@@ -1,15 +1,12 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import com.finalProject.BookingMeetingRoom.common.enums.EmailTemplateName;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.mapper.UserMapper;
-import com.finalProject.BookingMeetingRoom.model.dto.request.ChangePasswordRequest;
-import com.finalProject.BookingMeetingRoom.model.dto.request.ForgotPasswordRequest;
-import com.finalProject.BookingMeetingRoom.model.dto.request.ForgotPasswordVerifyRequest;
-import com.finalProject.BookingMeetingRoom.model.dto.request.RegistrationRequest;
+import com.finalProject.BookingMeetingRoom.model.dto.request.*;
 import com.finalProject.BookingMeetingRoom.model.dto.response.RegistrationResponse;
 import com.finalProject.BookingMeetingRoom.model.dto.response.UserResponse;
-import com.finalProject.BookingMeetingRoom.model.entity.EmailTemplateName;
 import com.finalProject.BookingMeetingRoom.model.entity.User;
 import com.finalProject.BookingMeetingRoom.model.entity.UserInfo;
 import com.finalProject.BookingMeetingRoom.model.entity.UserOtp;
@@ -64,7 +61,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public RegistrationResponse register(RegistrationRequest request) {
         try {
-            var user = userRepository.findByEmailAndIsDeleted(request.getEmail());
+            var user = userRepository.findByEmail(request.getEmail());
             if (user.isPresent()) {
                 throw new CustomException(ResponseCode.EMAIL_ALREADY_EXISTS);
             }
@@ -75,12 +72,30 @@ public class UserServiceImpl implements UserService {
             }
 
             var userInfo = userMapper.toUserInfo(request);
+            if (userInfo == null) {
+                log.error("Failed to map registration request to UserInfo");
+                throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+            }
+            userInfo.setId(UUID.randomUUID().toString());
+            userInfo.setCreatedAt(LocalDateTime.now());
             userInfoRepository.save(userInfo);
 
             var newUser = userMapper.toUser(request);
+            if (newUser == null) {
+                log.error("Failed to map registration request to User");
+                throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+            }
             newUser.setId(UUID.randomUUID().toString());
             newUser.setPassword(passwordEncoder.encode(request.getPassword()));
+            newUser.setEnabled(false);
+            newUser.setLoginCount(0);
+            newUser.setLocked(false);
+            newUser.setReset(false);
             newUser.setRoles(Set.of(role.get()));
+            newUser.setUserInfo(userInfo);
+            newUser.setCreatedAt(LocalDateTime.now());
+            newUser.setUpdatedAt(LocalDateTime.now());
+
             userRepository.save(newUser);
 
             sendValidationEmail(newUser);
@@ -92,6 +107,7 @@ public class UserServiceImpl implements UserService {
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
+
 
     @Transactional
     public void changePassword(ChangePasswordRequest request, Authentication authentication) {
@@ -129,11 +145,15 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void handleForgotPassword(ForgotPasswordRequest request) {
         try {
-            var user = userRepository.findByEmailAndIsDeleted(request.getEmail())
+            var user = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
 
+            if (user.getUserInfo() == null || user.getUserInfo().getEmail() == null) {
+                throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+            }
+
             String otp = generateAndActivateCode(user);
-            redisService.setValue("otp:" + user.getUserInfo().getEmail(), otp, 1, TimeUnit.MINUTES);
+            redisService.setValue("otp:" + user.getUserInfo().getEmail(), otp, 5, TimeUnit.MINUTES);
 
             sendValidationEmail(user);
         } catch (CustomException e) {
@@ -147,25 +167,23 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void verifyForgotPassword(ForgotPasswordVerifyRequest request) {
         try {
-            var userOpt = userRepository.findByEmailAndIsDeleted(request.getEmail())
+            var userOpt = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
 
             var userEmail = userOpt.getUserInfo().getEmail();
             var otpKey = "otp:" + userEmail;
             var otpInput = request.getOtp();
 
-            var otpInRedis = redisService.getValue(otpKey).toString();
+            Object redisOtp = redisService.getValue(otpKey);
 
-            // B3: Xác thực OTP
-            if (otpInRedis != null) {
-                // So sánh OTP nhập vào với Redis
+            if (redisOtp != null) {
+                String otpInRedis = redisOtp.toString();
                 if (!otpInRedis.equals(otpInput)) {
                     throw new CustomException(ResponseCode.INVALID_OTP);
                 }
-                // Nếu đúng → xóa Redis (tránh reuse)
+
                 redisService.delete(otpKey);
             } else {
-                // Nếu Redis đã hết TTL → fallback kiểm tra DB
                 var otpInDbOpt = userOtpRepository.findValidOtp(userEmail, otpKey)
                         .orElseThrow(() -> new CustomException(ResponseCode.INVALID_OTP));
 
@@ -180,7 +198,6 @@ public class UserServiceImpl implements UserService {
                 if (!otpInDbOpt.getOtpCode().equals(otpInput)) {
                     throw new CustomException(ResponseCode.INVALID_OTP);
                 }
-
                 otpInDbOpt.setUsed(true);
                 otpInDbOpt.setValidatedAt(LocalDateTime.now());
                 userOtpRepository.save(otpInDbOpt);
@@ -188,11 +205,13 @@ public class UserServiceImpl implements UserService {
 
             var newPassword = generateRandomPassword();
             userOpt.setPassword(passwordEncoder.encode(newPassword));
+            userOpt.setLocked(false);
+            userOpt.setReset(true);
             userRepository.save(userOpt);
 
             sendChangePasswordEmail(userOpt, newPassword);
         } catch (CustomException e) {
-            throw e ;
+            throw e;
         } catch (Exception e) {
             log.error("Unexpected error during forgot password verification", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
@@ -309,5 +328,24 @@ public class UserServiceImpl implements UserService {
         }
 
         return codeBuilder.toString();
+    }
+
+    /**
+     * Resends the OTP for account activation to the user's email.
+     *
+     * @param request the request containing the user's email
+     */
+    public void resendOtp(ResendOtpRequest request) {
+        try {
+            var user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            sendValidationEmail(user);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during OTP resend", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
     }
 }

@@ -13,5 +13,7 @@ public interface UserRepository extends JpaRepository<User, String> {
             "where ui.email = :username\n";
 
     @Query(nativeQuery = true, value = findUserEmail)
-    Optional<User> findByEmailAndIsDeleted(String username);
+    Optional<User> findByEmail(String username);
+
+    int countByEnabled(boolean isEnabled);
 }

@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.config;
+package com.finalProject.BookingMeetingRoom.common.config;
 
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Value;

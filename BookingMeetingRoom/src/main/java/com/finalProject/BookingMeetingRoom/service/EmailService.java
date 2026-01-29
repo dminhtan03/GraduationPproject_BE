@@ -1,10 +1,11 @@
 package com.finalProject.BookingMeetingRoom.service;
 
-import com.finalProject.BookingMeetingRoom.model.entity.EmailTemplateName;
+import com.finalProject.BookingMeetingRoom.common.enums.EmailTemplateName;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -23,6 +24,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class EmailService {
     private final JavaMailSender javaMailSender;
     private final SpringTemplateEngine emailTemplateEngine;
+
+    @Value("${spring.mail.username}")
+    private String fromAddress;
 
     @Async
     public void sendEmail(
@@ -56,7 +60,7 @@ public class EmailService {
         Context context = new Context();
         context.setVariables(properties);
 
-        helper.setFrom("ntdat14092003@gmail.com");
+        helper.setFrom(fromAddress);
         helper.setTo(to);
         helper.setSubject(subject);
 

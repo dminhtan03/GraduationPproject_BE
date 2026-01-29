@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.config;
+package com.finalProject.BookingMeetingRoom.common.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -16,6 +16,12 @@ public class MailConfig {
 
     @Value("${spring.mail.port}")
     public int port;
+
+    @Value("${spring.mail.username}")
+    public String username;
+
+    @Value("${spring.mail.password}")
+    public String password;
 
     @Value("${spring.mail.properties.mail.smtp.auth}")
     public String auth;
@@ -38,6 +44,14 @@ public class MailConfig {
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
         mailSender.setHost(host);
         mailSender.setPort(port);
+
+        // set username/password so JavaMailSender can authenticate with the SMTP server
+        mailSender.setUsername(username);
+        mailSender.setPassword(password);
+
+        // optional sensible defaults
+        mailSender.setDefaultEncoding("UTF-8");
+        mailSender.setProtocol("smtp");
 
         Properties props = mailSender.getJavaMailProperties();
         props.put("mail.smtp.auth", auth);

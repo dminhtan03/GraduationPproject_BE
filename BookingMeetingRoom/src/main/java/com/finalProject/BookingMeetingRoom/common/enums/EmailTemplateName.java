@@ -1,11 +1,12 @@
-package com.finalProject.BookingMeetingRoom.model.entity;
+package com.finalProject.BookingMeetingRoom.common.enums;
 
 import lombok.Getter;
 
 @Getter
 public enum EmailTemplateName {
 
-    ACTIVATE_ACCOUNT("activate_account");
+    ACTIVATE_ACCOUNT("activate_account"),
+    RESERVATION_STATUS("reservation-status");
 
     private final String name;
     EmailTemplateName(String name) {
