@@ -34,7 +34,7 @@ public class UserController {
         return ResponseEntity.ok(Response.ofSucceeded("Password changed successfully"));
     }
 
-    @PreAuthorize("hasAnyAuthority(@authorityConstant.MAKE)")
+//    @PreAuthorize("hasAnyAuthority(@authorityConstant.MAKE)")
     @PostMapping("/forgot-password")
     public ResponseEntity<?> handleForgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
