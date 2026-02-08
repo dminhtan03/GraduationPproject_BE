@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.model.dto.request;
+package com.finalProject.BookingMeetingRoom.model.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

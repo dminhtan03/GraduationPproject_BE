@@ -46,8 +46,8 @@ public class Reservation {
     private LocalDateTime updatedAt;
 
     @ManyToOne
-    @JoinColumn(name = "seat_id")
-    private Room seat;
+    @JoinColumn(name = "room_id")
+    private Room room;
 
     @ManyToOne
     @JoinColumn(name = "user_id")

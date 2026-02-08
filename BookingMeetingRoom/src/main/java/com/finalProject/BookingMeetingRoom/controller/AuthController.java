@@ -1,7 +1,7 @@
 package com.finalProject.BookingMeetingRoom.controller;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
-import com.finalProject.BookingMeetingRoom.model.dto.request.LoginRequest;
+import com.finalProject.BookingMeetingRoom.model.request.LoginRequest;
 import com.finalProject.BookingMeetingRoom.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

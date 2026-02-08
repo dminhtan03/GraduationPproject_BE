@@ -1,8 +1,7 @@
 package com.finalProject.BookingMeetingRoom.service;
 
-import com.finalProject.BookingMeetingRoom.model.dto.request.*;
-import com.finalProject.BookingMeetingRoom.model.dto.response.RegistrationResponse;
-import com.finalProject.BookingMeetingRoom.model.dto.response.UserResponse;
+import com.finalProject.BookingMeetingRoom.model.response.RegistrationResponse;
+import com.finalProject.BookingMeetingRoom.model.request.*;
 import org.springframework.security.core.Authentication;
 
 

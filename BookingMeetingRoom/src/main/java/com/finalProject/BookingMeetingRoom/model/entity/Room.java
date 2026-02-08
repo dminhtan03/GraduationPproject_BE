@@ -41,7 +41,7 @@ public class Room {
     @JoinColumn(name = "floor_id")
     private Floor floor;
 
-    @OneToMany(mappedBy = "seat")
+    @OneToMany(mappedBy = "room")
     private List<Reservation> reservations;
 
     public Double getScore() {

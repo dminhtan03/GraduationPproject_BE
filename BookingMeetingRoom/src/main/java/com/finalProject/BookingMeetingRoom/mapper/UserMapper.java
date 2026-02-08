@@ -1,8 +1,8 @@
 package com.finalProject.BookingMeetingRoom.mapper;
 
-import com.finalProject.BookingMeetingRoom.model.dto.request.RegistrationRequest;
-import com.finalProject.BookingMeetingRoom.model.dto.response.RegistrationResponse;
-import com.finalProject.BookingMeetingRoom.model.dto.response.UserResponse;
+import com.finalProject.BookingMeetingRoom.model.request.RegistrationRequest;
+import com.finalProject.BookingMeetingRoom.model.response.RegistrationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.UserResponse;
 import com.finalProject.BookingMeetingRoom.model.entity.User;
 import com.finalProject.BookingMeetingRoom.model.entity.UserInfo;
 import org.mapstruct.Mapper;

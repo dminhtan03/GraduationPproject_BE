@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.model.dto.request;
+package com.finalProject.BookingMeetingRoom.model.request;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ReservationRequest {
     @NotNull
-    private String seatId;
+    private String roomId;
 
     @NotNull
     private LocalDateTime startTime;

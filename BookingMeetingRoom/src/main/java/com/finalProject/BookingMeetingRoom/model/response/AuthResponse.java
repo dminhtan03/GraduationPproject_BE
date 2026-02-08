@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.model.dto.response;
+package com.finalProject.BookingMeetingRoom.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

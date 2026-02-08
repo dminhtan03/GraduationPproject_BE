@@ -1,4 +1,12 @@
 package com.finalProject.BookingMeetingRoom.service;
 
-public class ReservationService {
+import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import org.springframework.security.core.Authentication;
+
+public interface ReservationService {
+
+
+    ReservationResponse reserveRoom(ReservationRequest request, Authentication connectedUser);
+
 }
