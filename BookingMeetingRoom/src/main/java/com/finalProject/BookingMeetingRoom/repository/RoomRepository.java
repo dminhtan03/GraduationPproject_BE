@@ -16,17 +16,17 @@ import java.util.List;
 public interface RoomRepository extends JpaRepository<Room, String> {
 
     @Query(nativeQuery = true, value = """
-            SELECT ts.id as seatId,
+            SELECT ts.id as roomId,
                    ts.location_code as locationCode,
                    ts.status,
                    ts.score
-            FROM tbl_seat ts
+            FROM tbl_room ts
             JOIN tbl_floor tf ON ts.floor_id = tf.id
             WHERE tf.id = :floorId
             AND tf.is_deleted = false
             ORDER BY locationCode
             """)
-    List<Room> findSeats(String floorId);
+    List<Room> findRooms(String floorId);
 
     List<Room> findByFloorOrderByLocationCode(Floor floor);
 
@@ -39,27 +39,27 @@ public interface RoomRepository extends JpaRepository<Room, String> {
     @Query(nativeQuery = true, value = """
             SELECT *
             FROM tbl_room
-            WHERE id IN (:seatIds);
+            WHERE id IN (:roomIds);
             """)
-    List<Room> findSeatsBySeatIds(List<String> seatIds);
+    List<Room> findRoomsByRoomIds(List<String> roomIds);
 
     @Query(nativeQuery = true, value = """
             SELECT tu.id as userId,
                    CONCAT(tui.first_name, ' ', tui.last_name) as userName,
                    tr.checkin_time as checkInTime
             FROM tbl_room ts
-            JOIN tbl_reservation tr ON ts.id = tr.seat_id
+            JOIN tbl_reservation tr ON ts.id = tr.room_id
             JOIN tbl_user tu ON tr.user_id = tu.id
             JOIN tbl_user_info tui ON tu.user_info_id = tui.id
-            WHERE ts.id = :seatId
+            WHERE ts.id = :roomId
               AND ts.status = 'UNAVAILABLE'
               AND tr.checkin_time = (
                 SELECT MAX(checkin_time)
                 FROM tbl_reservation
-                WHERE seat_id = :seatId
+                WHERE room_id = :roomId
             );
             """)
-    RoomResponseProjection findRoomInMap(String seatId);
+    RoomResponseProjection findRoomInMap(String roomId);
 
     @Query(nativeQuery = true, value = """
             SELECT COUNT(*) AS occupiedSeats

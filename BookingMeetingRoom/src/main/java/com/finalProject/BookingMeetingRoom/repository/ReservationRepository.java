@@ -26,7 +26,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
             WHERE r.room_id = :roomId
             AND NOT (:endTime <= r.start_time OR :startTime >= r.end_time)
             """, nativeQuery = true)
-    List<Reservation> checkOverlappingReservationsByRoom(@Param("roomId") String seatId,
+    List<Reservation> checkOverlappingReservationsByRoom(@Param("roomId") String roomId,
                                                          @Param("startTime") LocalDateTime startTime,
                                                          @Param("endTime") LocalDateTime endTime);
 
