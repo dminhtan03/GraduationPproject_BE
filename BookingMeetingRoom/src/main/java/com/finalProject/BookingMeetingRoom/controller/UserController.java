@@ -1,10 +1,10 @@
 package com.finalProject.BookingMeetingRoom.controller;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
-import com.finalProject.BookingMeetingRoom.model.dto.request.ChangePasswordRequest;
-import com.finalProject.BookingMeetingRoom.model.dto.request.ForgotPasswordRequest;
-import com.finalProject.BookingMeetingRoom.model.dto.request.ForgotPasswordVerifyRequest;
-import com.finalProject.BookingMeetingRoom.model.dto.request.RegistrationRequest;
+import com.finalProject.BookingMeetingRoom.model.request.ChangePasswordRequest;
+import com.finalProject.BookingMeetingRoom.model.request.ForgotPasswordRequest;
+import com.finalProject.BookingMeetingRoom.model.request.ForgotPasswordVerifyRequest;
+import com.finalProject.BookingMeetingRoom.model.request.RegistrationRequest;
 import com.finalProject.BookingMeetingRoom.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

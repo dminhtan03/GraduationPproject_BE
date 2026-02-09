@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.model.dto.response;
+package com.finalProject.BookingMeetingRoom.model.response;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

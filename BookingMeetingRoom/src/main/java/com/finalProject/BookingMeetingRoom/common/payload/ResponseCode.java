@@ -20,6 +20,9 @@ public enum ResponseCode {
     PASSWORD_CONFIRM_NOT_MATCH("USR_400", "New password and confirm password do not match", HttpStatus.BAD_REQUEST),
     USER_DISABLE("USR_401", "User disabled" , HttpStatus.UNAUTHORIZED),
     ACCOUNT_LOCKED("USR_401", "Account locked" , HttpStatus.UNAUTHORIZED),
+    // ==========Room Errors===========
+    ROOM_NOT_FOUND("SEAT_404", "Seat not found" , HttpStatus.NOT_FOUND),
+    CANNOT_RESERVE_ROOM("SEAT_410","Seat cannot be reserve at selected period",HttpStatus.BAD_REQUEST),
     // ======= Validation Errors =======
     VALIDATION_FAILED("VAL_422", "Validation failed", HttpStatus.UNPROCESSABLE_ENTITY),
     // ======= OTP Errors =======
@@ -34,9 +37,13 @@ public enum ResponseCode {
     TOKEN_BLACKLISTED("TOK_403", "Token is blacklisted", HttpStatus.UNAUTHORIZED),
     ACCESS_DENIED("TOK_403", "Access denied" , HttpStatus.FORBIDDEN),
     REFRESH_TOKEN_NOT_FOUND("TOK_404", "Refresh token not found" , HttpStatus.NOT_FOUND ),
+    // ======= Reservation Errors =======
+    USER_TIME_OVERLAP("USR_409", "User has already reserved a seat at this time", HttpStatus.CONFLICT),
 
     // ======= Other Errors =======
     AUTH_HEADER_NOT_FOUND("AUTH_401", "Authorization header not found", HttpStatus.UNAUTHORIZED);
+
+
 
     private final String code;
     private final String message;

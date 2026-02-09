@@ -1,11 +1,15 @@
-package com.finalProject.BookingMeetingRoom.model.dto.response;
+package com.finalProject.BookingMeetingRoom.model.response;
 
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.UUID;
+
 @Setter
 @Getter
-public class RegistrationResponse {
+public class UserResponse {
+    private String id;
+
     private String firstName;
 
     private String lastName;
@@ -19,4 +23,7 @@ public class RegistrationResponse {
     private String email;
 
     private String gender;
+
+    private boolean isReset;
 }
+
