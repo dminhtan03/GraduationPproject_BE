@@ -13,4 +13,6 @@ public interface AuthService {
 
     AuthResponse refreshToken(String refreshToken, HttpServletResponse response);
 
+    AuthResponse loginWithGoogle(String idToken, HttpServletResponse response);
+
 }

@@ -2,6 +2,7 @@ package com.finalProject.BookingMeetingRoom.controller;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.dto.request.LoginRequest;
+import com.finalProject.BookingMeetingRoom.model.dto.request.GoogleLoginRequest;
 import com.finalProject.BookingMeetingRoom.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,6 +24,14 @@ public class AuthController {
             HttpServletResponse response
     ) {
         return ResponseEntity.ok(Response.ofSucceeded(authService.doLogin(request, response)));
+    }
+
+    @PostMapping("/google-login")
+    public ResponseEntity<?> googleLogin(
+            @Valid @RequestBody GoogleLoginRequest request,
+            HttpServletResponse response
+    ) {
+        return ResponseEntity.ok(Response.ofSucceeded(authService.loginWithGoogle(request.getIdToken(), response)));
     }
 
     @PostMapping("/doLogout")

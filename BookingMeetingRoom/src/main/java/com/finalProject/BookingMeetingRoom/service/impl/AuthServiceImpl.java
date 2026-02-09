@@ -23,7 +23,13 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -40,6 +46,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${application.security.jwt.refresh-token.expiration}")
     private long refreshTokenExpiration;
+
+    @Value("${application.security.google.client-id}")
+    private String googleClientId;
 
     public AuthResponse doLogin(LoginRequest request, HttpServletResponse response) {
         try {
@@ -78,6 +87,63 @@ public class AuthServiceImpl implements AuthService {
             String refreshToken = jwtUtils.generateRefreshToken(user);
 
             var refreshTokenCookies = new Cookie("refreshToken", refreshToken);
+            refreshTokenCookies.setHttpOnly(true);
+            refreshTokenCookies.setSecure(true);
+            refreshTokenCookies.setPath("/");
+            refreshTokenCookies.setMaxAge((int) (refreshTokenExpiration / 1000));
+            response.addCookie(refreshTokenCookies);
+
+            return new AuthResponse(accessToken, refreshToken);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public AuthResponse loginWithGoogle(String idToken, HttpServletResponse response) {
+        try {
+            var transport = GoogleNetHttpTransport.newTrustedTransport();
+            var jsonFactory = JacksonFactory.getDefaultInstance();
+
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(transport, jsonFactory)
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken googleIdToken = verifier.verify(idToken);
+
+            if (googleIdToken == null) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED);
+            }
+
+            GoogleIdToken.Payload payload = googleIdToken.getPayload();
+            String email = payload.getEmail();
+
+            Optional<User> optionalUser = userRepository.findByEmail(email);
+            if (optionalUser.isEmpty()) {
+                throw new CustomException(ResponseCode.USER_NOT_FOUND);
+            }
+
+            User user = optionalUser.get();
+
+            if (!user.isEnabled()) {
+                throw new CustomException(ResponseCode.USER_DISABLE);
+            }
+            if (user.isLocked()) {
+                throw new CustomException(ResponseCode.ACCOUNT_LOCKED);
+            }
+            user.setLoginCount(0);
+            userRepository.save(user);
+
+            var claims = new HashMap<String, Object>();
+            claims.put("user", user.getUserInfo().getFullName());
+
+            String accessToken = jwtUtils.generateToken(claims, user);
+            String refreshToken = jwtUtils.generateRefreshToken(user);
+
+            Cookie refreshTokenCookies = new Cookie("refreshToken", refreshToken);
             refreshTokenCookies.setHttpOnly(true);
             refreshTokenCookies.setSecure(true);
             refreshTokenCookies.setPath("/");

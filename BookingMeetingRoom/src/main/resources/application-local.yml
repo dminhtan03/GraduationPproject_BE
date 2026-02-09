@@ -45,6 +45,8 @@ application:
       expiration: 900000
       refresh-token:
         expiration: 604800000
+    google:
+      client-id: 144477910293-ee1pdggtphn3lskpogcomk55s08qd0n6.apps.googleusercontent.com
   character:
     value: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%
 
