@@ -108,7 +108,12 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-
+    /**
+     * Changes the password of the currently authenticated user.
+     *
+     * @param request        the request containing current and new passwords
+     * @param authentication the authentication object containing user details
+     */
     @Transactional
     public void changePassword(ChangePasswordRequest request, Authentication authentication) {
         try {
@@ -123,6 +128,8 @@ public class UserServiceImpl implements UserService {
             }
 
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+            user.setReset(false);
+
             userRepository.save(user);
 
             emailService.sendEmail(
@@ -135,13 +142,17 @@ public class UserServiceImpl implements UserService {
             );
         } catch (CustomException e) {
             throw e;
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             log.error("Unexpected error during password change", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
 
+    /**
+     * Handles the forgot password process by generating an OTP and sending a validation email.
+     *
+     * @param request the request containing the user's email
+     */
     @Transactional
     public void handleForgotPassword(ForgotPasswordRequest request) {
         try {
@@ -164,6 +175,11 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    /**
+     * Verifies the OTP for forgot password and resets the user's password if valid.
+     *
+     * @param request the request containing the email and OTP
+     */
     @Transactional
     public void verifyForgotPassword(ForgotPasswordVerifyRequest request) {
         try {
@@ -218,7 +234,13 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-    private void sendChangePasswordEmail(User userOpt, String newPassword) {
+    /**
+     * Sends a change password email to the user with the new password.
+     *
+     * @param userOpt     the user whose password has been changed
+     * @param newPassword the new password to be sent
+     */
+    public void sendChangePasswordEmail(User userOpt, String newPassword) {
         try {
             emailService.sendEmail(
                     userOpt.getUserInfo().getEmail(),
@@ -233,19 +255,23 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    /**
+     * Activates the user account using a valid OTP.
+     *
+     * @param validOtp the valid OTP code
+     */
     @Transactional
     public void activateAccount(String validOtp) {
         try {
             var otp = userOtpRepository.findByOtpCode(validOtp)
                     .orElseThrow(() -> new CustomException(ResponseCode.INVALID_OTP));
 
-            if(LocalDateTime.now().isAfter(otp.getExpiresAt())) {
-                sendValidationEmail(otp.getUser());
+            if (LocalDateTime.now().isAfter(otp.getExpiresAt())) {
                 throw new CustomException(ResponseCode.EXPIRED_OTP);
             }
 
             var user = otp.getUser();
-            if(user == null) {
+            if (user == null) {
                 throw new CustomException(ResponseCode.USER_NOT_FOUND);
             }
 
@@ -260,74 +286,6 @@ public class UserServiceImpl implements UserService {
             log.error("Unexpected error during account activation", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
-    }
-
-    public List<UserResponse> getAllUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if(!authentication.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))) {
-            throw new CustomException(ResponseCode.ACCESS_DENIED);
-        }
-
-        List<UserInfo> userInfos = userInfoRepository.findAll();
-        return userInfos.stream()
-                .map(userMapper::toUserResponse)
-                .collect(Collectors.toList());
-    }
-
-    private String generateRandomPassword() {
-        int length = 8;
-        SecureRandom random = new SecureRandom();
-        StringBuilder sb = new StringBuilder();
-
-        for(int i = 0; i < length; i++) {
-            sb.append(character.charAt(random.nextInt(character.length())));
-        }
-        return sb.toString();
-    }
-
-    private void sendValidationEmail(User user) throws MessagingException {
-        var validOtp = generateAndActivateCode(user);
-        emailService.sendEmail(
-                user.getUserInfo().getEmail(),
-                user.getUserInfo().getFullName(),
-                EmailTemplateName.ACTIVATE_ACCOUNT,
-                activationUrl,
-                validOtp,
-                "Activate your account"
-        );
-    }
-
-    private String generateAndActivateCode(User user) {
-        var actCode = generateActivationCode();
-
-        String otpKey = "otp:" + user.getUserInfo().getEmail();
-        redisService.setValue(otpKey, actCode, 5, TimeUnit.MINUTES);
-
-        UserOtp otp = new UserOtp();
-        otp.setId(UUID.randomUUID().toString());
-        otp.setOtpCode(actCode);
-        otp.setExpiresAt(LocalDateTime.now().plusMinutes(3));
-        otp.setIssuedAt(LocalDateTime.now());
-        otp.setValidatedAt(null);
-        otp.setUsed(false);
-        otp.setUser(user);
-        userOtpRepository.save(otp);
-        return actCode;
-    }
-
-    private String generateActivationCode() {
-        String character = "0123456789";
-        StringBuilder codeBuilder = new StringBuilder();
-        SecureRandom random = new SecureRandom();
-
-        for (int i = 0; i < 6; i++) {
-            int randomIndex = random.nextInt(character.length());
-            char randomChar = character.charAt(randomIndex);
-            codeBuilder.append(randomChar);
-        }
-
-        return codeBuilder.toString();
     }
 
     /**
@@ -347,5 +305,82 @@ public class UserServiceImpl implements UserService {
             log.error("Unexpected error during OTP resend", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Generates a random password of length 8 using characters defined in the application properties.
+     *
+     * @return a randomly generated password
+     */
+    public String generateRandomPassword() {
+        int length = 8;
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < length; i++) {
+            sb.append(character.charAt(random.nextInt(character.length())));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Sends a validation email to the user for account activation.
+     *
+     * @param user the user to whom the validation email will be sent
+     * @throws MessagingException if there is an error sending the email
+     */
+    public void sendValidationEmail(User user) throws MessagingException {
+        var validOtp = generateAndActivateCode(user);
+        emailService.sendEmail(
+                user.getUserInfo().getEmail(),
+                user.getUserInfo().getFullName(),
+                EmailTemplateName.ACTIVATE_ACCOUNT,
+                activationUrl,
+                validOtp,
+                "Activate your account"
+        );
+    }
+
+    /**
+     * Generates an activation code, saves it in Redis and the database, and returns the code.
+     *
+     * @param user the user for whom the activation code is generated
+     * @return the generated activation code
+     */
+    public String generateAndActivateCode(User user) {
+        var actCode = generateActivationCode();
+
+        String otpKey = "otp:" + user.getUserInfo().getEmail();
+        redisService.setValue(otpKey, actCode, 1, TimeUnit.MINUTES);
+
+        UserOtp otp = new UserOtp();
+        otp.setId(UUID.randomUUID().toString());
+        otp.setOtpCode(actCode);
+        otp.setExpiresAt(LocalDateTime.now().plusMinutes(1));
+        otp.setIssuedAt(LocalDateTime.now());
+        otp.setValidatedAt(null);
+        otp.setUsed(false);
+        otp.setUser(user);
+        userOtpRepository.save(otp);
+        return actCode;
+    }
+
+    /**
+     * Generates a random activation code consisting of 6 digits.
+     *
+     * @return a 6-digit activation code
+     */
+    public String generateActivationCode() {
+        String character = "0123456789";
+        StringBuilder codeBuilder = new StringBuilder();
+        SecureRandom random = new SecureRandom();
+
+        for (int i = 0; i < 6; i++) {
+            int randomIndex = random.nextInt(character.length());
+            char randomChar = character.charAt(randomIndex);
+            codeBuilder.append(randomChar);
+        }
+
+        return codeBuilder.toString();
     }
 }

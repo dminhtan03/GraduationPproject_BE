@@ -1,15 +1,11 @@
 package com.finalProject.BookingMeetingRoom.controller.user;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
-import com.finalProject.BookingMeetingRoom.model.request.ChangePasswordRequest;
-import com.finalProject.BookingMeetingRoom.model.request.ForgotPasswordRequest;
-import com.finalProject.BookingMeetingRoom.model.request.ForgotPasswordVerifyRequest;
-import com.finalProject.BookingMeetingRoom.model.request.RegistrationRequest;
+import com.finalProject.BookingMeetingRoom.model.request.*;
 import com.finalProject.BookingMeetingRoom.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,7 +21,6 @@ public class UserController {
         return ResponseEntity.ok(Response.ofSucceeded(userService.register(request)));
     }
 
-    @PreAuthorize("hasAnyAuthority(@authorityConstant.MAKE)")
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
@@ -34,7 +29,6 @@ public class UserController {
         return ResponseEntity.ok(Response.ofSucceeded("Password changed successfully"));
     }
 
-//    @PreAuthorize("hasAnyAuthority(@authorityConstant.MAKE)")
     @PostMapping("/forgot-password")
     public ResponseEntity<?> handleForgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
@@ -54,6 +48,13 @@ public class UserController {
             @RequestParam(name = "validOtp") String validOtp) {
         userService.activateAccount(validOtp);
         return ResponseEntity.ok(Response.ofSucceeded("Activate account successfully"));
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<?> resendOtp(
+            @RequestBody ResendOtpRequest resendOtpRequest) {
+        userService.resendOtp(resendOtpRequest);
+        return ResponseEntity.ok(Response.ofSucceeded("Resend OTP successfully"));
     }
 
 //    @GetMapping
