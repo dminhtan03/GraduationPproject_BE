@@ -3,9 +3,11 @@ package com.finalProject.BookingMeetingRoom.service.impl;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.common.utils.JwtUtils;
+import com.finalProject.BookingMeetingRoom.mapper.UserMapper;
 import com.finalProject.BookingMeetingRoom.model.request.LoginRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AuthResponse;
 import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.model.response.UserResponse;
 import com.finalProject.BookingMeetingRoom.repository.RefreshTokenRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.AuthService;
@@ -43,6 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtils jwtUtils;
     private final RedisService redisService;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserMapper userMapper;
 
     @Value("${application.security.jwt.refresh-token.expiration}")
     private long refreshTokenExpiration;
@@ -236,6 +239,40 @@ public class AuthServiceImpl implements AuthService {
                     .accessToken(newAccessToken)
                     .refreshToken(newRefreshToken)
                     .build();
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Retrieves the profile of the currently authenticated user.
+     *
+     * @param request the HTTP request containing the access token
+     * @return UserResponse containing user profile information
+     */
+    @Override
+    public UserResponse getProfile(HttpServletRequest request) {
+        try {
+            String authHeader = request.getHeader("Authorization");
+
+            String accessToken = authHeader.substring(7);
+
+            String userEmail = jwtUtils.extractUsername(accessToken);
+
+            var user = userRepository.findByEmail(userEmail);
+
+            if (user.isEmpty()) {
+                throw new CustomException(ResponseCode.USER_NOT_FOUND);
+            }
+
+            var userResponse = userMapper.toUserResponse(user.get().getUserInfo());
+            userResponse.setId(user.get().getId());
+            userResponse.setReset(user.get().isReset());
+
+            return userResponse;
+        } catch (CustomException e) {
+            throw e;
         } catch (Exception e) {
             logger.error(e.getMessage());
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);

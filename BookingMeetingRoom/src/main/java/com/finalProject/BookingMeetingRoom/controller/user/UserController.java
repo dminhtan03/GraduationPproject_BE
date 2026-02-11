@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.controller;
+package com.finalProject.BookingMeetingRoom.controller.user;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.ChangePasswordRequest;

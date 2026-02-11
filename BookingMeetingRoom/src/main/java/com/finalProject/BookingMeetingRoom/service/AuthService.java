@@ -2,6 +2,7 @@ package com.finalProject.BookingMeetingRoom.service;
 
 import com.finalProject.BookingMeetingRoom.model.request.LoginRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AuthResponse;
+import com.finalProject.BookingMeetingRoom.model.response.UserResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -15,4 +16,5 @@ public interface AuthService {
 
     AuthResponse loginWithGoogle(String idToken, HttpServletResponse response);
 
+    UserResponse getProfile(HttpServletRequest request);
 }

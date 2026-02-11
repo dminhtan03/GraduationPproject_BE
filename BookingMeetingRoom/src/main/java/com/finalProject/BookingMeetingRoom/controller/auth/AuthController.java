@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.controller;
+package com.finalProject.BookingMeetingRoom.controller.auth;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 
@@ -49,4 +49,8 @@ public class AuthController {
         return ResponseEntity.ok(Response.ofSucceeded(authService.refreshToken(refreshToken, response)));
     }
 
+    @GetMapping("/profile")
+    public ResponseEntity<?> getProfile(HttpServletRequest request) {
+        return ResponseEntity.ok(Response.ofSucceeded(authService.getProfile(request)));
+    }
 }
