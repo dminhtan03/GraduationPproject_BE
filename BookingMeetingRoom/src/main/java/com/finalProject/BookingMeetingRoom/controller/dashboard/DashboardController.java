@@ -18,7 +18,7 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
 
-    @GetMapping(value = "/seats-map")
+    @GetMapping(value = "/rooms-map")
     public ResponseEntity<?> getRoomsMap(){
         return ResponseEntity.ok(Response.ofSucceeded(dashboardService.getRoomsMapDashboard()));
     }
