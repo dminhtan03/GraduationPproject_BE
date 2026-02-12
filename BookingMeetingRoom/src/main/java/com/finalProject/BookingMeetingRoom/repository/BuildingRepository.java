@@ -41,13 +41,13 @@ public interface BuildingRepository extends JpaRepository<Building, String> {
                    tb.address,
                    tf.id as floorId,
                    tf.floor_name as floorName,
-                   ts.id as seatId,
+                   ts.id as roomId,
                    ts.location_code as locationCode,
                    ts.status as status,
                    ts.score as score
             FROM tbl_building tb
             JOIN tbl_floor tf on tb.id = tf.building_id
-            JOIN tbl_seat ts on tf.id = ts.floor_id
+            JOIN tbl_room ts on tf.id = ts.floor_id
             WHERE tb.is_deleted = false
               AND tf.is_deleted = false
             """)
@@ -59,15 +59,15 @@ public interface BuildingRepository extends JpaRepository<Building, String> {
             SELECT
                 b.building_name AS buildingName,
                 COUNT(s.id) FILTER (WHERE s.status = 'UNAVAILABLE') AS occupied,
-                COUNT(s.id) AS totalSeats,
-                COUNT(s.id) FILTER (WHERE s.status = 'BROKEN') AS brokenSeats,
-                COUNT(s.id) FILTER (WHERE s.status = 'AVAILABLE') AS availableSeats,
+                COUNT(s.id) AS totalRooms,
+                COUNT(s.id) FILTER (WHERE s.status = 'BROKEN') AS brokenRooms,
+                COUNT(s.id) FILTER (WHERE s.status = 'AVAILABLE') AS availableRooms,
                 COALESCE(ROUND(
                     100.0 * COUNT(s.id) FILTER (WHERE s.status = 'UNAVAILABLE') / NULLIF(COUNT(s.id), 0)
                 ), 0) AS occupancyRate
             FROM tbl_building b
             LEFT JOIN tbl_floor f ON b.id = f.building_id AND f.is_deleted = false
-            LEFT JOIN tbl_seat s ON f.id = s.floor_id
+            LEFT JOIN tbl_room s ON f.id = s.floor_id
             WHERE b.is_deleted = false
             GROUP BY b.building_name
             LIMIT 5;

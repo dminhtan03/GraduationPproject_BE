@@ -51,60 +51,6 @@ public class DashboardServiceImpl implements DashboardService {
      * @param connectedUser the authenticated user
      * @return EmployeeDashboardResponse containing active reservations, last checked-in details, and hours worked
      */
-//    @Override
-//    public EmployeeDashboardResponse getDashboard(Authentication connectedUser) {
-//        try {
-//            var user = userRepository.findByEmail(connectedUser.getName());
-//            if (user.isEmpty()) {
-//                throw new CustomException(ResponseCode.USER_NOT_FOUND);
-//            }
-//
-//            int todayActiveReservations = reservationRepository.countActiveReservations(user.get().getId());
-//            int upcomingReservations = reservationRepository.countUpcomingReservations(user.get().getId());
-//
-//            var activateReservationDto = ActiveReservationDto.builder()
-//                    .todayActiveReservations(todayActiveReservations)
-//                    .upcomingReservations(upcomingReservations)
-//                    .build();
-//
-//            var lastCheckedIn = reservationRepository.findLastCheckedInOfUser(user.get().getId());
-//            var lastCheckedInDto = new LastCheckedInDto();
-//            if (lastCheckedIn == null || lastCheckedIn.getSeatId() == null) {
-//                lastCheckedInDto = LastCheckedInDto.builder()
-//                        .seatId("N/A")
-//                        .buildingName("")
-//                        .floorName("")
-//                        .lastCheckedInTime(null)
-//                        .build();
-//            } else {
-//                lastCheckedInDto = LastCheckedInDto.builder()
-//                        .seatId(lastCheckedIn.getSeatId())
-//                        .buildingName(lastCheckedIn.getBuildingName())
-//                        .floorName(lastCheckedIn.getFloorName())
-//                        .lastCheckedInTime(lastCheckedIn.getLastCheckedInTime())
-//                        .build();
-//            }
-//
-//            int totalHoursThisWeek = reservationRepository.totalHoursThisWeek(user.get().getId());
-//            int totalHoursThisMonth = reservationRepository.totalHoursThisMonth(user.get().getId());
-//
-//            var hoursThisWeekDto = HoursThisWeekDto.builder()
-//                    .totalHoursThisWeek(totalHoursThisWeek)
-//                    .totalHoursThisMonth(totalHoursThisMonth)
-//                    .build();
-//
-//            return EmployeeDashboardResponse.builder()
-//                    .activeReservationDto(activateReservationDto)
-//                    .lastCheckedInDto(lastCheckedInDto)
-//                    .hoursThisWeekDto(hoursThisWeekDto)
-//                    .totalReservationsThisMonth(reservationRepository.countReservationsThisMonth(user.get().getId()))
-//                    .build();
-//        } catch (CustomException e) {
-//            throw e;
-//        } catch (Exception e) {
-//            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
-//        }
-//    }
 
     /**
      * Retrieves the seat map dashboard data, organizing seat information by building and floor.
@@ -171,74 +117,12 @@ public class DashboardServiceImpl implements DashboardService {
      *
      * @return DashboardSummaryResponse containing the summary data
      */
-//    @Override
-//    public DashboardSummaryResponse getDashboardSummary() {
-//        try {
-//
-//            var totalSeats = seatRepository.count();
-//            var occupiedSeats = seatRepository.countOccupiedSeats();
-//            var brokenSeats = seatRepository.countBrokenSeats();
-//            var totalUsers = userRepository.count();
-//
-//            return DashboardSummaryResponse.builder()
-//                    .totalSeats((int) totalSeats)
-//                    .occupiedSeats(occupiedSeats)
-//                    .brokenSeats(brokenSeats)
-//                    .totalUsers((int) totalUsers)
-//                    .build();
-//        } catch (CustomException e) {
-//            throw e;
-//        } catch (Exception e) {
-//            logger.error(e.getMessage(), e);
-//            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
-//        }
-//    }
 
     /**
      * Retrieves an overview of the dashboard, including building occupancy and recent activity.
      *
      * @return DashboardOverviewResponse containing building occupancy and recent activity data
      */
-//    @Override
-//    public DashboardOverviewResponse getDashboardOverview() {
-//        try {
-//            var buildingOccupancy = buildingRepository.findBuildingOccupancy();
-//            var recentActivity = reservationRepository.findRecentActivity();
-//
-//            var buildingOccupancyDto = buildingOccupancy.stream()
-//                    .map(occupancy -> BuildingOccupancyDto.builder()
-//                            .buildingName(occupancy.getBuildingName())
-//                            .occupied(occupancy.getOccupied())
-//                            .totalSeats(occupancy.getTotalSeats())
-//                            .brokenSeats(occupancy.getBrokenSeats())
-//                            .availableSeats(occupancy.getAvailableSeats())
-//                            .occupancyRate(occupancy.getOccupancyRate())
-//                            .build())
-//                    .toList();
-//
-//            var recentActivityDto = recentActivity.stream()
-//                    .map(activity -> RecentActivityDto.builder()
-//                            .userName(activity.getUserName())
-//                            .locationCode(activity.getLocationCode())
-//                            .buildingName(activity.getBuildingName())
-//                            .reservationStatus(activity.getReservationStatus())
-//                            .reservationTime(activity.getReservationTime())
-//                            .build())
-//                    .toList();
-//
-//
-//            return DashboardOverviewResponse.builder()
-//                    .buildingOccupancyDto(buildingOccupancyDto)
-//                    .recentActivityDto(recentActivityDto)
-//                    .build();
-//        } catch (CustomException e) {
-//            throw e;
-//        } catch (Exception e) {
-//            logger.error(e.getMessage(), e);
-//            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
-//        }
-//    }
-
     /**
      * Retrieves a list of all buildings with their basic information.
      *

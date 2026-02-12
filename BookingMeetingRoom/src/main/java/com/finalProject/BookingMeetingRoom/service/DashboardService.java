@@ -12,17 +12,8 @@ import org.springframework.security.core.Authentication;
 import java.util.List;
 
 public interface DashboardService {
-//    EmployeeDashboardResponse getDashboard(Authentication connectedUser);
-
     RoomMapDashboardResponse getRoomsMapDashboard();
-
-//    DashboardSummaryResponse getDashboardSummary();
-//
-//    DashboardOverviewResponse getDashboardOverview();
-
     List<AmbiguousBuildingResponse> getAllBuildings();
-
     List<AmbiguousFloorResponse> getAllFloorsByBuildingId(String buildingId);
-
     List<RoomDto> getAllRoomsByFloorId(String buildingId);
 }

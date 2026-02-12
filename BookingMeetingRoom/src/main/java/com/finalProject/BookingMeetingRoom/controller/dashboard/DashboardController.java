@@ -18,29 +18,10 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
 
-//    @GetMapping(value = "")
-//    public ResponseEntity<?> getDashboard(
-//            Authentication connectedUser
-//    ) {
-//        return ResponseEntity.ok(Response.ofSucceeded(dashboardService.getDashboard(connectedUser)));
-//    }
-
     @GetMapping(value = "/seats-map")
     public ResponseEntity<?> getRoomsMap(){
         return ResponseEntity.ok(Response.ofSucceeded(dashboardService.getRoomsMapDashboard()));
     }
-
-//    @GetMapping(value = "/summary")
-//    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
-//    public ResponseEntity<?> getAdminDashboard(){
-//        return ResponseEntity.ok(Response.ofSucceeded(dashboardService.getDashboardSummary()));
-//    }
-
-//    @GetMapping(value = "/overview")
-//    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
-//    public ResponseEntity<?> getOverviewDashboard(){
-//        return ResponseEntity.ok(Response.ofSucceeded(dashboardService.getDashboardOverview()));
-//    }
 
     @GetMapping(value = "/all-buildings")
     public ResponseEntity<?> getAllBuildings(){
