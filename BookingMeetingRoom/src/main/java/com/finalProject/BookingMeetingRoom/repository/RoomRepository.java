@@ -26,7 +26,7 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             AND tf.is_deleted = false
             ORDER BY locationCode
             """)
-    List<Room> findRooms(String floorId);
+    List<RoomDtoProjection> findRooms(String floorId);
 
     List<Room> findByFloorOrderByLocationCode(Floor floor);
 
