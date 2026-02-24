@@ -2,6 +2,7 @@ package com.finalProject.BookingMeetingRoom.controller.user;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.*;
+import com.finalProject.BookingMeetingRoom.model.request.UpdateUserInfoRequest;
 import com.finalProject.BookingMeetingRoom.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +56,14 @@ public class UserController {
             @RequestBody ResendOtpRequest resendOtpRequest) {
         userService.resendOtp(resendOtpRequest);
         return ResponseEntity.ok(Response.ofSucceeded("Resend OTP successfully"));
+    }
+
+    @PutMapping("/update-info")
+    public ResponseEntity<?> updateUserInfo(
+            @Valid @RequestBody UpdateUserInfoRequest request,
+            Authentication authentication) {
+        userService.updateUserInfo(request, authentication);
+        return ResponseEntity.ok(Response.ofSucceeded("User info updated successfully"));
     }
 
 //    @GetMapping

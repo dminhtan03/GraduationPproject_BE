@@ -17,4 +17,6 @@ public interface UserService {
     void activateAccount(String validOtp);
 
     void resendOtp(ResendOtpRequest request);
+
+    void updateUserInfo(UpdateUserInfoRequest request, Authentication authentication);
 }
