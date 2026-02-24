@@ -149,6 +149,28 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
+     * Updates phone number and address of the currently authenticated user.
+     */
+    @Transactional
+    public void updateUserInfo(UpdateUserInfoRequest request, Authentication authentication) {
+        try {
+            var user = (User) authentication.getPrincipal();
+            var info = user.getUserInfo();
+            if (info == null) {
+                throw new CustomException(ResponseCode.USER_NOT_FOUND);
+            }
+            info.setPhoneNumber(request.getPhoneNumber());
+            info.setAddress(request.getAddress());
+            userInfoRepository.save(info);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during updating user info", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Handles the forgot password process by generating an OTP and sending a validation email.
      *
      * @param request the request containing the user's email
