@@ -62,17 +62,17 @@ public interface RoomRepository extends JpaRepository<Room, String> {
     RoomResponseProjection findRoomInMap(String roomId);
 
     @Query(nativeQuery = true, value = """
-            SELECT COUNT(*) AS occupiedSeats
+            SELECT COUNT(*) AS occupiedRooms
             FROM tbl_room
             WHERE status = 'UNAVAILABLE'
             """)
-    int countOccupiedSeats();
+    int countOccupiedRooms();
 
     @Query(nativeQuery = true, value = """
-            SELECT COUNT(*) AS brokenSeats
+            SELECT COUNT(*) AS brokenRooms
             FROM tbl_room
             WHERE status = 'BROKEN'
             """)
-    int countBrokenSeats();
+    int countBrokenRooms();
 
 }
