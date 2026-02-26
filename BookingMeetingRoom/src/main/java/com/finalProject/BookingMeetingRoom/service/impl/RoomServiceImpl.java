@@ -157,8 +157,8 @@ public class RoomServiceImpl implements RoomService {
                 throw new CustomException(ResponseCode.ROOM_NOT_FOUND);
             }
             return RoomDetailResponse.builder()
-                    .userId(room.getUserId())
-                    .userName(room.getUserName())
+                    .currentUserId(room.getUserId())
+                    .currentUserName(room.getUserName())
                     .checkInTime(room.getCheckInTime())
                     .build();
         } catch (CustomException e) {

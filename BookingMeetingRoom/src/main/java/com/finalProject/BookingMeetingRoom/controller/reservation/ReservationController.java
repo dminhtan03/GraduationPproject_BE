@@ -1,5 +1,6 @@
 package com.finalProject.BookingMeetingRoom.controller.reservation;
 
+import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
 import jakarta.validation.Valid;
@@ -23,6 +24,12 @@ public class ReservationController {
     public ResponseEntity<?> createReservation(@RequestBody @Valid ReservationRequest request,
                                                Authentication authentication) {
         return ResponseEntity.ok((reservationService.reserveRoom(request, authentication)));
+    }
+
+    @GetMapping
+    public ResponseEntity<?> getAllReservations(@RequestParam(defaultValue = "0") int page,
+                                                @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(Response.ofSucceeded(reservationService.getAllReservations(page, size)));
     }
 
 }

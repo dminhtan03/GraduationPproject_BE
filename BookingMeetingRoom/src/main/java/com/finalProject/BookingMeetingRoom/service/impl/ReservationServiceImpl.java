@@ -17,6 +17,9 @@ import com.finalProject.BookingMeetingRoom.mapper.ReservationMapperFacade;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -89,6 +92,20 @@ public class ReservationServiceImpl implements ReservationService {
             throw e;
         } catch (Exception e) {
             log.error("Unexpected error during reserving room", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public Page<ReservationResponse> getAllReservations(int page, int size) {
+        try {
+            Pageable pageable = PageRequest.of(page, size);
+
+            return reservationRepository.findAll(pageable)
+                    .map(reservationMapperFacade::toResponse);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during get all reservations", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
