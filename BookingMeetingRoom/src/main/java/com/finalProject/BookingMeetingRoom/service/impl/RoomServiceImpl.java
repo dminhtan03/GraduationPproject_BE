@@ -6,9 +6,11 @@ import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.model.entity.Floor;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
+import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
@@ -33,6 +35,7 @@ public class RoomServiceImpl implements RoomService {
     private final FloorRepository floorRepository;
     private final RoomRepository roomRepository;
     private final ReservationRepository reservationRepository;
+    private final FeedbackRepository feedbackRepository;
 
     /**
      * Searches for available rooms based on the provided request.
@@ -150,22 +153,41 @@ public class RoomServiceImpl implements RoomService {
      * @return RoomDetailResponse containing user information and check-in time
      */
     @Override
-    public RoomDetailResponse getRoomDetails(String roomId) {
+    public RoomDetailResponse getRoomDetail(String roomId) {
         try {
-            var room = roomRepository.findRoomInMap(roomId);
-            if (room == null) {
-                throw new CustomException(ResponseCode.ROOM_NOT_FOUND);
-            }
+            Room room = roomRepository.findById(roomId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
+
+            RoomRepository.CurrentUserProjection currentUser = roomRepository.findCurrentUserByRoomId(roomId);
+
+            var feedbacks = feedbackRepository.findByRoomIdOrderByCreatedAtDesc(roomId)
+                    .stream()
+                    .map(f -> FeedbackInfoRequest.builder()
+                            .id(f.getId())
+                            .rating(f.getRating())
+                            .description(f.getDescription())
+                            .createdAt(f.getCreatedAt())
+                            .build())
+                    .collect(Collectors.toList());
+
             return RoomDetailResponse.builder()
-                    .currentUserId(room.getUserId())
-                    .currentUserName(room.getUserName())
-                    .checkInTime(room.getCheckInTime())
+                    .roomId(room.getId())
+                    .locationCode(room.getLocationCode())
+                    .status(room.getStatus())
+                    .capacity(room.getCapacity())
+                    .amenities(room.getAmenities())
+                    .images(room.getImages())
+                    .score(room.getScore())
+                    .currentUserId(currentUser != null ? currentUser.getUserId() : null)
+                    .currentUserName(currentUser != null ? currentUser.getUserName() : null)
+                    .checkInTime(currentUser != null ? currentUser.getCheckInTime() : null)
+                    .feedbacks(feedbacks)
                     .build();
         } catch (CustomException e) {
             throw e;
         } catch (Exception e) {
+            logger.error(e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
-
 }

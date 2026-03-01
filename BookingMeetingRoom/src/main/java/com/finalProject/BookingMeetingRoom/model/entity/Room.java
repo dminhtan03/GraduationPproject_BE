@@ -28,6 +28,9 @@ public class Room {
     @Enumerated(EnumType.STRING)
     private RoomStatus status;
 
+    @Column(name = "CAPACITY")
+    private Integer capacity;
+
     @Column(name = "SCORE")
     private Double score;
 
@@ -43,6 +46,17 @@ public class Room {
 
     @OneToMany(mappedBy = "room")
     private List<Reservation> reservations;
+
+    @ManyToMany
+    @JoinTable(
+            name = "tbl_room_amenity",
+            joinColumns = @JoinColumn(name = "room_id"),
+            inverseJoinColumns = @JoinColumn(name = "amenity_id")
+    )
+    private List<Amenity> amenities;
+
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
+    private List<RoomImage> images;
 
     public Double getScore() {
         if (reservations == null || reservations.isEmpty()) {

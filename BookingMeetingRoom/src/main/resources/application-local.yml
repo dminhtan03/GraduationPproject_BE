@@ -42,7 +42,7 @@ application:
   security:
     jwt:
       secret-key: YoVBs+fSApwsrc0fZeUG7tFtyRjc4nIixENeTMlkwSXdmnCSS48XPYhUO29JPqeO
-      expiration: 900000
+      expiration: 9000000
       refresh-token:
         expiration: 604800000
     google:

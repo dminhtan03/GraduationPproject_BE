@@ -13,5 +13,5 @@ public interface RoomService {
 
     Page<RoomSearchResponse> getRoomStatus(RoomSearchRequest request, int page, int size);
 
-    RoomDetailResponse getRoomDetails(String roomId);
+    RoomDetailResponse getRoomDetail(String roomId);
 }
