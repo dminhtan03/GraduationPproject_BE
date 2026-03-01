@@ -2,8 +2,9 @@ package com.finalProject.BookingMeetingRoom.controller.room;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
+import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
-import com.finalProject.BookingMeetingRoom.service.impl.RoomServiceImpl;
+import com.finalProject.BookingMeetingRoom.service.RoomService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RoomController {
 
-    private final RoomServiceImpl roomService;
+    private final RoomService roomService;
 
     @PostMapping("/search")
     public ResponseEntity<List<RoomSearchResponse>> searchRooms(@RequestBody @Valid RoomSearchRequest request) {
@@ -31,10 +32,7 @@ public class RoomController {
     }
 
     @GetMapping("/{roomId}")
-    public ResponseEntity<?> getRoomDetails(
-            @PathVariable("roomId") String roomId
-    ) {
-        return ResponseEntity.ok(roomService.getRoomDetails(roomId));
+    public ResponseEntity<?> getRoomDetail(@PathVariable String roomId) {
+        return ResponseEntity.ok(Response.ofSucceeded(roomService.getRoomDetail(roomId)));
     }
-
 }

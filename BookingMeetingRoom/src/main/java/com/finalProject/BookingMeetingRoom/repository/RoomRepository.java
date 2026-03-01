@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface RoomRepository extends JpaRepository<Room, String> {
@@ -44,24 +45,6 @@ public interface RoomRepository extends JpaRepository<Room, String> {
     List<Room> findRoomsByRoomIds(List<String> roomIds);
 
     @Query(nativeQuery = true, value = """
-            SELECT tu.id as userId,
-                   CONCAT(tui.first_name, ' ', tui.last_name) as userName,
-                   tr.checkin_time as checkInTime
-            FROM tbl_room ts
-            JOIN tbl_reservation tr ON ts.id = tr.room_id
-            JOIN tbl_user tu ON tr.user_id = tu.id
-            JOIN tbl_user_info tui ON tu.user_info_id = tui.id
-            WHERE ts.id = :roomId
-              AND ts.status = 'UNAVAILABLE'
-              AND tr.checkin_time = (
-                SELECT MAX(checkin_time)
-                FROM tbl_reservation
-                WHERE room_id = :roomId
-            );
-            """)
-    RoomResponseProjection findRoomInMap(String roomId);
-
-    @Query(nativeQuery = true, value = """
             SELECT COUNT(*) AS occupiedRooms
             FROM tbl_room
             WHERE status = 'UNAVAILABLE'
@@ -75,4 +58,26 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             """)
     int countBrokenRooms();
 
+    interface CurrentUserProjection {
+        String getUserId();
+        String getUserName();
+        LocalDateTime getCheckInTime();
+    }
+
+    @Query("""
+            SELECT u.id as userId,
+                   CONCAT(ui.firstName, ' ', ui.lastName) as userName,
+                   r.checkinTime as checkInTime
+            FROM Reservation r
+            JOIN r.room ro
+            JOIN r.user u
+            JOIN u.userInfo ui
+            WHERE ro.id = :roomId
+            AND r.checkinTime = (
+                SELECT MAX(r2.checkinTime)
+                FROM Reservation r2
+                WHERE r2.room.id = :roomId
+            )
+            """)
+    CurrentUserProjection findCurrentUserByRoomId(String roomId);
 }
