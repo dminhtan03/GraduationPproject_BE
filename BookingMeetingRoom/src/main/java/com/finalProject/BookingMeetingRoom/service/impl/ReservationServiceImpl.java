@@ -8,6 +8,7 @@ import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
@@ -109,4 +110,74 @@ public class ReservationServiceImpl implements ReservationService {
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
+
+    public Page<MyReservationResponse> getReservationStatus(
+            int page, int size, Authentication connectedUser,
+            String locationCode, String address, List<String> statuses,
+            String buildingId, String startTime, String endTime
+    ) {
+        try {
+            var user = userRepository.findByEmail(connectedUser.getName())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            Pageable pageable = PageRequest.of(page, size);
+
+            String effectiveStartTime;
+            String effectiveEndTime;
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+
+            Set<ReservationStatus> activeStatuses = Set.of(
+                    ReservationStatus.PENDING,
+                    ReservationStatus.RESERVED,
+                    ReservationStatus.IN_USE
+            );
+
+            boolean containsOnlyActiveStatuses = statuses != null && statuses.stream()
+                    .map(String::toUpperCase)
+                    .map(ReservationStatus::valueOf)
+                    .allMatch(activeStatuses::contains);
+
+            boolean isStartTimeProvided = startTime != null && !startTime.isBlank();
+            boolean isEndTimeProvided = endTime != null && !endTime.isBlank();
+
+            if (isStartTimeProvided) {
+                LocalDateTime parsedStartTime = LocalDateTime.parse(startTime, formatter);
+                effectiveStartTime = parsedStartTime.format(formatter);
+                effectiveEndTime = isEndTimeProvided ?
+                        LocalDateTime.parse(endTime, formatter).format(formatter) :
+                        null;
+            } else {
+                if (!containsOnlyActiveStatuses) {
+                    effectiveStartTime = LocalDateTime.now().minusMonths(1).format(formatter);
+                    effectiveEndTime = null;
+                } else {
+                    effectiveStartTime = LocalDate.now().atStartOfDay().format(formatter);
+                    effectiveEndTime = null;
+                }
+            }
+
+            var myReservation = reservationRepository.findMyReservations(
+                    user.getId(),
+                    locationCode,
+                    address,
+                    statuses,
+                    buildingId,
+                    effectiveStartTime,
+                    effectiveEndTime,
+                    pageable
+            );
+
+            return myReservation.map(reservationMapperFacade::toMyResponse);
+        } catch (CustomException e) {
+            throw e;
+        } catch (DateTimeParseException e) {
+            log.warn("Invalid date format for startTime or endTime", e);
+            throw new CustomException(ResponseCode.INVALID_DATE_FORMAT);
+        } catch (Exception e) {
+            log.error("Unexpected error during get reservation status", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
 }

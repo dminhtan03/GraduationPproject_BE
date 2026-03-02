@@ -2,6 +2,8 @@ package com.finalProject.BookingMeetingRoom.mapper;
 
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.projection.MyReservationProjection;
+import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -43,6 +45,22 @@ public class ReservationMapperFacade {
         return response;
     }
 
-
+    public MyReservationResponse toMyResponse(MyReservationProjection myReservationProjection) {
+        if (myReservationProjection == null) return null;
+        var response = new MyReservationResponse();
+        response.setReservationId(myReservationProjection.getReservationId());
+        response.setLocationCode(myReservationProjection.getLocationCode());
+        response.setFloorName(myReservationProjection.getFloorName());
+        response.setBuildingName(myReservationProjection.getBuildingName());
+        response.setAddress(myReservationProjection.getAddress());
+        response.setReservationStatus(myReservationProjection.getReservationStatus());
+        response.setSelectedDate(myReservationProjection.getSelectedDate());
+        response.setStartTime(myReservationProjection.getStartTime());
+        response.setEndTime(myReservationProjection.getEndTime());
+        response.setDuration(myReservationProjection.getDuration());
+        var isFeedback = myReservationProjection.getIsFeedback();
+        response.setIsFeedback(isFeedback != null && isFeedback == 1L);
+        return response;
+    }
 
 }
