@@ -11,7 +11,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RoomSearchResponse {
-    private String seatId;
+    private String roomId;
     private String locationCode;
     private Double score;
     private RoomStatus status;

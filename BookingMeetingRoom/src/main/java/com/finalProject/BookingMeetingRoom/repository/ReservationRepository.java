@@ -42,14 +42,14 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
 
     @Query(value = """
                 SELECT * FROM tbl_reservation r
-                WHERE r.seat_id = :seatId
+                WHERE r.room_id = :roomId
                   AND DATE(r.start_time ) = DATE(:startTime)
                   AND (
                        r.start_time < :endTime AND r.end_time > :startTime
             
                   )
             """, nativeQuery = true)
-    List<Reservation> findOverlappingReservations(@Param("seatId") String seatId,
+    List<Reservation> findOverlappingReservations(@Param("roomId") String roomId,
                                                   @Param("startTime") LocalDateTime startTime,
                                                   @Param("endTime") LocalDateTime endTime);
 
