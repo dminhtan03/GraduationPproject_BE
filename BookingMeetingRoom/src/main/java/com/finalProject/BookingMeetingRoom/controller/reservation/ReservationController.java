@@ -9,9 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -21,6 +18,20 @@ import java.util.List;
 public class ReservationController {
 
     private final ReservationService reservationService;
+
+    @PutMapping("/check-in/{reservationId}")
+    public ResponseEntity<?> checkIn(@PathVariable String reservationId,
+            Authentication authentication) {
+        reservationService.checkIn(reservationId, authentication);
+        return ResponseEntity.ok(Response.ofSucceeded("Check-in successful for reservation ID: " + reservationId));
+    }
+
+    @PutMapping("/cancel/{id}")
+    public ResponseEntity<?> cancelReservation(@PathVariable("id") String reservationId,
+            Authentication connectedUser) {
+        reservationService.cancelReservation(reservationId, connectedUser);
+        return ResponseEntity.ok(Response.ofSucceeded("Reservation cancel successfully"));
+    }
 
 
     @PostMapping

@@ -1,21 +1,26 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
+import com.finalProject.BookingMeetingRoom.model.request.RoomReserveStatusUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.RealTimeService;
 import com.finalProject.BookingMeetingRoom.service.ReservationHistoryService;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapper;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapperFacade;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
+
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,6 +46,7 @@ import java.util.UUID;
 public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationRepository reservationRepository;
+    private final RealTimeService realTimeService;
     private final UserRepository userRepository;
     private final ReservationMapper reservationMapper;
     private final RoomRepository roomRepository;
@@ -49,6 +55,61 @@ public class ReservationServiceImpl implements ReservationService {
 
     record ReservationContext(Reservation reservation, Room room) {}
 
+    
+    /**
+     * Check-in a reservation.
+     *
+     * @param reservationId  the ID of the reservation to check in
+     * @param authentication the authentication object containing user details
+     */
+    @Transactional
+    public void checkIn(String reservationId, Authentication authentication) {
+        try {
+
+            var context = validateReservationContext(reservationId, authentication);
+            var reservation = context.reservation();
+            var room = context.room();
+
+            if (!reservation.getStatus().equals(ReservationStatus.RESERVED)) {
+                throw new CustomException(ResponseCode.RESERVATION_NOT_RESERVED);
+            }
+
+            if (!room.getStatus().equals(RoomStatus.AVAILABLE)) {
+                throw new CustomException(ResponseCode.ROOM_NOT_AVAILABLE);
+            }
+
+            if (LocalDateTime.now().isBefore(reservation.getStartTime())) {
+                throw new CustomException(ResponseCode.RESERVATION_NOT_TIME_CHECK_IN);
+            }
+
+            reservationHistoryService.saveHistory(reservation, reservation.getUser().getId(),
+                    ReservationStatus.RESERVED, null, reservation.getUpdatedAt());
+
+            reservation.setStatus(ReservationStatus.IN_USE);
+            reservation.setCheckinTime(LocalDateTime.now());
+            reservation.setUpdatedAt(LocalDateTime.now());
+            reservationRepository.save(reservation);
+
+            room.setStatus(RoomStatus.UNAVAILABLE);
+            roomRepository.save(room);
+
+            realTimeService.sendRealTimeRoomReserveStatusUpdate(
+                    RoomReserveStatusUpdateRequest.builder()
+                            .roomId(room.getId())
+                            .type("UPDATE")
+                            .leftTime(reservation.getStartTime())
+                            .rightTime(reservation.getEndTime())
+                            .build(),
+                    room.getFloor().getId(),
+                    reservation.getStartTime().toLocalDate().toString());
+
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
 
     public ReservationResponse reserveRoom(ReservationRequest request, Authentication connectedUser) {
         try {
@@ -179,5 +240,65 @@ public class ReservationServiceImpl implements ReservationService {
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
+
+    /**
+     * Cancel a reservation and save the history of the action.
+     *
+     * @param reservationId the ID of the reservation to cancel
+     * @param connectedUser the authentication object containing user details
+     */
+    @Transactional
+    public void cancelReservation(String reservationId, Authentication connectedUser) {
+        try {
+            var reservation = reservationRepository.findByIdAndStatus(reservationId, ReservationStatus.RESERVED)
+                    .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_INVALID_STATUS));
+
+            var user = userRepository.findByEmail(connectedUser.getName())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            if (!reservation.getUser().getId().equals(user.getId())) {
+                throw new CustomException(ResponseCode.PERMISSION_DENIED);
+            }
+
+            reservationHistoryService.saveHistory(reservation, user.getId(),
+                    ReservationStatus.RESERVED, null, reservation.getUpdatedAt());
+
+            reservation.setStatus(ReservationStatus.CANCELLED);
+            reservation.setUpdatedAt(LocalDateTime.now());
+            reservationRepository.save(reservation);
+
+            realTimeService.deleteReservation(reservation);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during cancelling", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Validate the reservation context (Reservation and Seat).
+     *
+     * @param reservationId  the ID of the reservation to validate
+     * @param authentication the authentication object containing user details
+     * @return a ReservationContext containing the reservation and seat information
+     */
+    private ReservationContext validateReservationContext(String reservationId, Authentication authentication) {
+        var currentUser = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        var reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+        var room = roomRepository.findById(reservation.getRoom().getId())
+                .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
+
+        if (!reservation.getUser().getId().equals(currentUser.getId())) {
+            throw new CustomException(ResponseCode.RESERVATION_USER_NOT_FOUND);
+        }
+
+        return new ReservationContext(reservation, room);
+    }
+
 
 }
