@@ -10,8 +10,10 @@ import org.springframework.security.core.Authentication;
 import java.util.List;
 
 public interface ReservationService {
+   
 
-
+    void checkIn(String reservationId, Authentication authentication);
+    void cancelReservation(String reservationId, Authentication connectedUser);
     ReservationResponse reserveRoom(ReservationRequest request, Authentication connectedUser);
     Page<ReservationResponse> getAllReservations(int page, int size);
     Page<MyReservationResponse> getReservationStatus(int page, int size, Authentication connectedUser, String locationCode, String address, List<String> statuses,
