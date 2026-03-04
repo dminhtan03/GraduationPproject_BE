@@ -1,6 +1,9 @@
 package com.finalProject.BookingMeetingRoom.service;
 
 import com.finalProject.BookingMeetingRoom.common.enums.EmailTemplateName;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -12,9 +15,11 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
+import com.finalProject.BookingMeetingRoom.model.request.NotificationRequest;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -24,7 +29,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class EmailService {
     private final JavaMailSender javaMailSender;
     private final SpringTemplateEngine emailTemplateEngine;
-
+    private final ReservationRepository reservationRepository;
     @Value("${spring.mail.username}")
     private String fromAddress;
 
@@ -68,6 +73,34 @@ public class EmailService {
         helper.setText(template, true);
 
         javaMailSender.send(mimeMessage);
+    }
+
+    public void sendEmailStatusReservation(NotificationRequest notificationRequest) {
+        Reservation reservation = reservationRepository.findById(notificationRequest.getReservationId())
+                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+
+        User user = reservation.getUser();
+        if (user == null || user.getUserInfo().getEmail() == null) {
+            log.warn("User or email not found for reservation: {}", reservation.getId());
+            return;
+        }
+
+        String firstName = Optional.ofNullable(user.getUserInfo().getFirstName()).orElse("");
+        String lastName = Optional.ofNullable(user.getUserInfo().getLastName()).orElse("");
+        String fullName = (firstName + " " + lastName).trim();
+
+        try {
+            sendEmail(
+                    user.getUserInfo().getEmail(),
+                    fullName,
+                    EmailTemplateName.RESERVATION_STATUS,
+                    "",
+                    notificationRequest.getContent(),
+                    notificationRequest.getTitle()
+            );
+        } catch (MessagingException e) {
+            log.error("Failed to send reservation status email for reservation: {}", reservation.getId(), e);
+        }
     }
 
 }

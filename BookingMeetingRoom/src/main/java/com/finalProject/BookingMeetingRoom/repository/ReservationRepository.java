@@ -136,4 +136,79 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
             Pageable pageable
     );
 
+    @Query(value = """
+        SELECT * 
+        FROM tbl_reservation r 
+        WHERE DATE_ADD(r.start_time, INTERVAL 15 MINUTE) < NOW()
+          AND r.status = 'RESERVED'
+        """, nativeQuery = true)
+    List<Reservation> findReservationsOverStartTime();
+
+    @Query(value = "SELECT * from tbl_reservation r WHERE r.end_time < now() " +
+            " and r.status = 'IN_USE' "
+            , nativeQuery = true)
+    List<Reservation> findReservationsOverEndTime();
+
+    List<Reservation> findByStatus(ReservationStatus status);
+
+    @Query("SELECT r FROM Reservation r WHERE r.user.id IN :userIds AND r.status IN :statuses")
+    List<Reservation> findByUserIdsAndStatusIn(Set<String> userIds, List<ReservationStatus> statuses);
+
+    @Query("SELECT r FROM Reservation r " +
+            "WHERE r.room.id IN :roomIds " +
+            "AND r.status IN :statuses")
+    List<Reservation> findByRoomIdsAndStatusIn(@Param("roomIds") Set<String> roomIds,
+                                               @Param("statuses") List<ReservationStatus> statuses);
+
+    @Query("""
+            SELECT u.id,
+                   COUNT(r)
+            FROM User u
+            LEFT JOIN u.reservations r
+                   ON r.startTime >= :startOfDay
+                   AND r.startTime < :endOfDay
+                   AND r.status <> 'FAIL'
+            WHERE u.id IN :userIds
+            GROUP BY u.id
+            """)
+    List<Object[]> countReservationsTodayByUserIds(@Param("userIds") Set<String> userIds,
+                                                   @Param("startOfDay") LocalDateTime startOfDay,
+                                                   @Param("endOfDay") LocalDateTime endOfDay);
+
+    @Query(value = """
+        SELECT * 
+        FROM tbl_reservation r
+        WHERE r.start_time BETWEEN 
+              DATE_ADD(NOW(), INTERVAL 15 MINUTE)
+              AND DATE_ADD(NOW(), INTERVAL 16 MINUTE)
+          AND r.status = 'RESERVED'
+        """, nativeQuery = true)
+    List<Reservation> findReservationsToRemindCheckIn();
+    @Query(value = """
+            SELECT * 
+            FROM tbl_reservation 
+            WHERE end_time <= :time 
+              AND room_id = :roomId 
+              AND status IN ('RESERVED', 'IN_USE') 
+            ORDER BY end_time DESC 
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Reservation> findLastReservation(
+            @Param("time") LocalDateTime time,
+            @Param("roomId") String roomId
+    );
+
+    @Query(value = """
+            SELECT * 
+            FROM tbl_reservation 
+            WHERE start_time >= :time 
+              AND room_id = :roomId 
+              AND status IN ('RESERVED', 'IN_USE') 
+            ORDER BY start_time ASC 
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Reservation> findNextReservation(
+            @Param("time") LocalDateTime time,
+            @Param("roomId") String roomId
+    );
 }
