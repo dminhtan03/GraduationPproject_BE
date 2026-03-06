@@ -33,6 +33,21 @@ public class ReservationController {
         return ResponseEntity.ok(Response.ofSucceeded("Reservation cancel successfully"));
     }
 
+    @PutMapping("/extend/{id}")
+    public ResponseEntity<?> extendReservation(@PathVariable("id") String reservationId,
+                                               @RequestParam(name = "hour", defaultValue = "1") double hour,
+                                               Authentication connectedUser) {
+        reservationService.extendReservation(reservationId, hour, connectedUser);
+        return ResponseEntity.ok(Response.ofSucceeded("Reservation extend successfully"));
+    }
+
+    @PutMapping("/return-room/{reservationId}")
+    public ResponseEntity<?> returnRoom(@PathVariable String reservationId,
+                                        Authentication authentication) {
+        reservationService.returnRoom(reservationId, authentication);
+        return ResponseEntity.ok(Response.ofSucceeded("Room returned successfully for reservation ID: " + reservationId));
+    }
+
 
     @PostMapping
     public ResponseEntity<?> createReservation(@RequestBody @Valid ReservationRequest request,

@@ -1,5 +1,6 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import com.finalProject.BookingMeetingRoom.common.enums.HistoryAction;
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
@@ -54,6 +55,127 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationHistoryService reservationHistoryService;
 
     record ReservationContext(Reservation reservation, Room room) {}
+
+
+     /**
+     * Return a seat after use.
+     *
+     * @param reservationId  the ID of the reservation to return
+     * @param authentication the authentication object containing user details
+     */
+    @Transactional
+    public void returnRoom(String reservationId, Authentication authentication) {
+        try {
+
+            var context = validateReservationContext(reservationId, authentication);
+            var reservation = context.reservation();
+            var room = context.room();
+
+            if (!reservation.getStatus().equals(ReservationStatus.IN_USE)) {
+                throw new CustomException(ResponseCode.RESERVATION_NOT_IN_USE);
+            }
+
+            if (!room.getStatus().equals(RoomStatus.UNAVAILABLE)) {
+                throw new CustomException(ResponseCode.ROOM_NOT_UNAVAILABLE);
+            }
+
+            reservation.setStatus(ReservationStatus.COMPLETED);
+            reservation.setReturnTime(LocalDateTime.now());
+            reservation.setUpdatedAt(LocalDateTime.now());
+            reservationRepository.save(reservation);
+
+            room.setStatus(RoomStatus.AVAILABLE);
+            roomRepository.save(room);
+
+            realTimeService.sendRoomStatus(room);
+            realTimeService.deleteReservation(reservation);
+
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+
+
+     /**
+     * Extend a reservation for a specified number of hours.
+     *
+     * @param reservationId the ID of the reservation to extend
+     * @param hour          the number of hours to extend (between 1 and 8)
+     * @param connectedUser the authentication object containing user details
+     */
+    @Transactional
+    public void extendReservation(String reservationId, double hour, Authentication connectedUser) {
+        try {
+
+            if (hour < 1 || hour > 8) {
+                throw new CustomException(ResponseCode.RESERVATION_INVALID_HOUR);
+            }
+
+            var reservation = reservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+            Set<ReservationStatus> allowedStatuses = Set.of(ReservationStatus.IN_USE, ReservationStatus.RESERVED);
+            if (!allowedStatuses.contains(reservation.getStatus())) {
+                throw new CustomException(ResponseCode.RESERVATION_NOT_IN_USE);
+            }
+
+            var room = reservation.getRoom();
+            if (room.getStatus() == RoomStatus.BROKEN) {
+                throw new CustomException(ResponseCode.ROOM_BROKEN);
+            }
+
+            var user = userRepository.findByEmail(connectedUser.getName())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            if (!reservation.getUser().getId().equals(user.getId())) {
+                throw new CustomException(ResponseCode.PERMISSION_DENIED);
+            }
+
+            LocalDateTime newStartTime = reservation.getEndTime();
+            LocalDateTime newEndTime = newStartTime.plusMinutes(convertToMinutes(hour));
+
+            if (newEndTime.toLocalDate().isAfter(newStartTime.toLocalDate())) {
+                throw new CustomException(ResponseCode.RESERVATION_NOT_EXTEND_AFTER_MIDNIGHT);
+            }
+
+            boolean isOverLap = reservationRepository.checkOverlapReservation(room.getId(),
+                    List.of(ReservationStatus.RESERVED, ReservationStatus.IN_USE),
+                    newStartTime,
+                    newEndTime,
+                    reservationId);
+
+            if (isOverLap) {
+                throw new CustomException(ResponseCode.RESERVATION_TIME_OVERLAP);
+            }
+
+            long totalMinutes = reservationRepository.getTotalReservedMinutesForUser(
+                    user.getId(), newStartTime.toLocalDate()
+            );
+
+            if ((totalMinutes + convertToMinutes(hour)) > convertToMinutes(8)) {
+                throw new CustomException(ResponseCode.USER_TIME_EXCEEDED);
+            }
+
+            reservationHistoryService.saveHistory(reservation, user.getId(), null,
+                    HistoryAction.EXTEND, reservation.getUpdatedAt());
+
+            reservation.setEndTime(newEndTime);
+            reservation.setUpdatedAt(LocalDateTime.now());
+            reservationRepository.save(reservation);
+
+            realTimeService.addReservation(reservation);
+
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during extending", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
 
     
     /**
@@ -300,5 +422,9 @@ public class ReservationServiceImpl implements ReservationService {
         return new ReservationContext(reservation, room);
     }
 
+
+    private long convertToMinutes(double hour) {
+        return Math.round(hour * 60);
+    }
 
 }
