@@ -62,6 +62,7 @@ public enum ResponseCode {
     RESERVATION_NOT_TIME_CHECK_IN("RES_400", "You cannot check in before start time." , HttpStatus.BAD_REQUEST),
     RESERVATION_INVALID_HOUR("RES_400", "Hour is invalid", HttpStatus.BAD_REQUEST),
     RESERVATION_HISTORY_NOT_FOUND("RES_HIS_404", "Reservation history not found", HttpStatus.NOT_FOUND),
+    FEEDBACK_ONLY_FOR_COMPLETED_RESERVATION("FBD_400", "Feedback can only be submitted for completed reservations", HttpStatus.BAD_REQUEST),
 
     USER_TIME_OVERLAP("USR_409", "User has already reserved a ROOM at this time", HttpStatus.CONFLICT),
 
