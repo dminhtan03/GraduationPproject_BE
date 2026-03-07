@@ -56,6 +56,8 @@ public class ReservationMapperFacade {
         response.setBuildingName(myReservationProjection.getBuildingName());
         response.setAddress(myReservationProjection.getAddress());
         response.setReservationStatus(myReservationProjection.getReservationStatus());
+        response.setPurpose(myReservationProjection.getPurpose());
+        response.setNote(myReservationProjection.getNote());
         response.setSelectedDate(myReservationProjection.getSelectedDate());
         response.setStartTime(myReservationProjection.getStartTime());
         response.setEndTime(myReservationProjection.getEndTime());

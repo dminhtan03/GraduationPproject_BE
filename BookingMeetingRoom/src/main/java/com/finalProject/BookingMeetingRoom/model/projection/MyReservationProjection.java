@@ -10,6 +10,8 @@ public interface MyReservationProjection {
     String getFloorName();
     String getAddress();
     String getReservationStatus();
+    String getPurpose();
+    String getNote();
     LocalDate getSelectedDate();
     LocalDateTime getStartTime();
     LocalDateTime getEndTime();

@@ -80,6 +80,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
           tf.floor_name AS floorName,
           tb.building_name AS buildingName,
           tr.status AS reservationStatus,
+          tr.purpose AS purpose,
+          tr.note AS note,
           DATE(tr.start_time) AS selectedDate,
           tr.start_time AS startTime,
           tr.end_time AS endTime,
