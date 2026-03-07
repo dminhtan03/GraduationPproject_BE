@@ -21,4 +21,9 @@ public class ReservationRequest {
 
     @NotNull
     private LocalDateTime endTime;
+
+    @NotNull
+    private String purpose;
+
+    private String note;
 }

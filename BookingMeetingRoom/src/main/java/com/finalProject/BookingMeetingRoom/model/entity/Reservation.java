@@ -30,6 +30,12 @@ public class Reservation {
     @Enumerated(EnumType.STRING)
     private ReservationStatus status;
 
+    @Column(name = "PURPOSE")
+    private String purpose; // Mục đích sử dụng
+
+    @Column(name = "NOTE")
+    private String note;    // Ghi chú (không bắt buộc)
+
     @Column(name = "CHECKIN_TIME")
     private LocalDateTime checkinTime;
 

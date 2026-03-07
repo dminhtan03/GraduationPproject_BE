@@ -31,6 +31,8 @@ public class ReservationMapperFacade {
         response.setStartTime(reservation.getStartTime());
         response.setEndTime(reservation.getEndTime());
         response.setStatus(reservation.getStatus());
+        response.setPurpose(reservation.getPurpose());
+        response.setNote(reservation.getNote());
         response.setCheckinTime(reservation.getCheckinTime());
         response.setReturnTime(reservation.getReturnTime());
         response.setCreateAt(reservation.getCreateAt());

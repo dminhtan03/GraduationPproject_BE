@@ -22,6 +22,10 @@ public class ReservationResponse {
 
     private ReservationStatus status;
 
+    private String purpose;
+
+    private String note;
+
     private LocalDateTime checkinTime;
 
     private LocalDateTime returnTime;
