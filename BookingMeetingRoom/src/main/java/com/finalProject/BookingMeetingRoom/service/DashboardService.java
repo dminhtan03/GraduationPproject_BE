@@ -7,6 +7,8 @@ import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewRespo
 import com.finalProject.BookingMeetingRoom.model.response.DashboardSummaryResponse;
 import com.finalProject.BookingMeetingRoom.model.response.EmployeeDashboardResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
+import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
@@ -16,4 +18,8 @@ public interface DashboardService {
     List<AmbiguousBuildingResponse> getAllBuildings();
     List<AmbiguousFloorResponse> getAllFloorsByBuildingId(String buildingId);
     List<RoomDto> getAllRoomsByFloorId(String buildingId);
+
+    Page<UserDashboardResponse> getAllUsers(int page, int size);
+    void lockUser(String userId);
+    void unlockUser(String userId);
 }
