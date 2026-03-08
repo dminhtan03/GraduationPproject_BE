@@ -1,38 +1,36 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
-import com.finalProject.BookingMeetingRoom.model.dto.ActiveReservationDto;
-import com.finalProject.BookingMeetingRoom.model.dto.BuildingOccupancyDto;
-import com.finalProject.BookingMeetingRoom.model.dto.HoursThisWeekDto;
-import com.finalProject.BookingMeetingRoom.model.dto.LastCheckedInDto;
-import com.finalProject.BookingMeetingRoom.model.dto.RecentActivityDto;
 import com.finalProject.BookingMeetingRoom.model.dto.RoomDto;
 import com.finalProject.BookingMeetingRoom.model.projection.RoomDtoProjection;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousFloorResponse;
-import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewResponse;
-import com.finalProject.BookingMeetingRoom.model.response.DashboardSummaryResponse;
 import com.finalProject.BookingMeetingRoom.model.response.DetailFloorResponse;
-import com.finalProject.BookingMeetingRoom.model.response.EmployeeDashboardResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
+import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
 import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.DashboardService;
-import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -177,6 +175,61 @@ public class DashboardServiceImpl implements DashboardService {
         } catch (CustomException e) {
             throw e;
         } catch (Exception e) {
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public Page<UserDashboardResponse> getAllUsers(int page, int size) {
+        try {
+            Pageable pageable = PageRequest.of(page, size);
+            var users = userRepository.findAll(pageable);
+
+            return users.map(user -> UserDashboardResponse.builder()
+                    .id(user.getId())
+                    .fullName(user.getUserInfo() != null ? user.getUserInfo().getFullName() : null)
+                    .email(user.getUserInfo() != null ? user.getUserInfo().getEmail() : null)
+                    .phoneNumber(user.getUserInfo() != null ? user.getUserInfo().getPhoneNumber() : null)
+                    .department(user.getUserInfo() != null ? user.getUserInfo().getDepartment() : null)
+                    .enabled(user.isEnabled())
+                    .isLocked(user.isLocked())
+                    .build());
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void lockUser(String userId) {
+        try {
+            var user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+            user.setLocked(true);
+            userRepository.save(user);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void unlockUser(String userId) {
+        try {
+            var user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+            user.setLocked(false);
+            userRepository.save(user);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
