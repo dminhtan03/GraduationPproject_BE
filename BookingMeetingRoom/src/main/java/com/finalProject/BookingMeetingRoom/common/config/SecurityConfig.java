@@ -17,34 +17,35 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final AuthenticationProvider authProvider;
+        private final AuthenticationProvider authProvider;
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
-        http
-                .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/api/v1/auth/**",
-                                "/api/v1/user/**",
-                                "/api/v1/user/activate-account",
-                                "/v3/api-docs/**",
-                                "/swagger-resources",
-                                "/swagger-resources/**",
-                                "/configuration/ui",
-                                "/configuration/security",
-                                "/swagger-ui/**",
-                                "/webjars/**",
-                                "/actuator/**"
-                        )
-                        .permitAll()
-                        .anyRequest()
-                        .authenticated()
-                )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authProvider)
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter)
+                        throws Exception {
+                http
+                                .csrf(AbstractHttpConfigurer::disable)
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(
+                                                                "/api/v1/auth/**",
+                                                                "/api/v1/user/**",
+                                                                "/api/v1/user/activate-account",
+                                                                "/v3/api-docs/**",
+                                                                "/swagger-resources",
+                                                                "/swagger-resources/**",
+                                                                "/configuration/ui",
+                                                                "/configuration/security",
+                                                                "/swagger-ui/**",
+                                                                "/webjars/**",
+                                                                "/actuator/**",
+                                                                "/websocket/**")
+                                                .permitAll()
+                                                .anyRequest()
+                                                .authenticated())
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authenticationProvider(authProvider)
+                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+                return http.build();
+        }
 }
