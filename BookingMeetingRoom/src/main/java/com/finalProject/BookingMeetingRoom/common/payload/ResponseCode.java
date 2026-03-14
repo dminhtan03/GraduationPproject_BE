@@ -47,7 +47,7 @@ public enum ResponseCode {
     ROOM_NOT_AVAILABLE("ROOM_400", "ROOM is not available" , HttpStatus.BAD_REQUEST),
     CANNOT_CHANGE_ROOM_STATUS("ROOM_409", "ROOM can be changed only if it is broken", HttpStatus.CONFLICT),
     ROOM_BROKEN("ROOM_409", "ROOM is broken and cannot be used", HttpStatus.CONFLICT),
-    CANNOT_RESERVE_ROOM("ROOM_410","ROOM cannot be reserve at selected period",HttpStatus.BAD_REQUEST),
+    CANNOT_RESERVE_ROOM("ROOM_410","Someone has already booked a room during your chosen time slot.",HttpStatus.BAD_REQUEST),
 
     // ======= Reservation Errors =======
     RESERVATION_NOT_FOUND("RES_404", "Reservation not found" , HttpStatus.NOT_FOUND),

@@ -8,6 +8,19 @@ import com.finalProject.BookingMeetingRoom.model.entity.Floor;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
+// start add import
+import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
+import com.finalProject.BookingMeetingRoom.repository.AmenityRepository;
+// start add excel imports
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+// end add excel imports
+import java.util.UUID;
+// end add import
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
 import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
@@ -36,6 +49,9 @@ public class RoomServiceImpl implements RoomService {
     private final RoomRepository roomRepository;
     private final ReservationRepository reservationRepository;
     private final FeedbackRepository feedbackRepository;
+    // start add repository
+    private final AmenityRepository amenityRepository;
+    // end add repository
 
     /**
      * Searches for available rooms based on the provided request.
@@ -190,4 +206,88 @@ public class RoomServiceImpl implements RoomService {
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
+
+    // start implement addRoom
+    @Override
+    public void addRoom(RoomCreateRequest request) {
+        try {
+            Floor floor = floorRepository.findById(request.getFloorId())
+                    .orElseThrow(() -> new CustomException(ResponseCode.FLOOR_NOT_FOUND));
+
+            Room room = new Room();
+            room.setId(UUID.randomUUID().toString());
+            room.setLocationCode(request.getLocationCode());
+            room.setStatus(request.getStatus());
+            room.setCapacity(request.getCapacity());
+            room.setScore(request.getScore() != null ? request.getScore() : 0.0);
+            room.setFloor(floor);
+            room.setCreateAt(LocalDateTime.now());
+            room.setUpdatedAt(LocalDateTime.now());
+
+            if (request.getAmenityIds() != null && !request.getAmenityIds().isEmpty()) {
+                room.setAmenities(amenityRepository.findAllById(request.getAmenityIds()));
+            }
+
+            roomRepository.save(room);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error adding room: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // end implement addRoom
+
+    // start implement importRoomsFromExcel
+    @Override
+    public void importRoomsFromExcel(MultipartFile file) {
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = new XSSFWorkbook(is)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            for (Row row : sheet) {
+                // Skip header row
+                if (row.getRowNum() == 0) continue;
+
+                try {
+                    String locationCode = getCellValue(row.getCell(0));
+                    String statusStr = getCellValue(row.getCell(1));
+                    String capacityStr = getCellValue(row.getCell(2));
+                    String scoreStr = getCellValue(row.getCell(3));
+                    String floorId = getCellValue(row.getCell(4));
+                    String amenityIdsStr = getCellValue(row.getCell(5));
+
+                    if (locationCode.isEmpty() || floorId.isEmpty()) continue;
+
+                    RoomCreateRequest request = RoomCreateRequest.builder()
+                            .locationCode(locationCode)
+                            .status(RoomStatus.valueOf(statusStr.toUpperCase()))
+                            .capacity((int) Double.parseDouble(capacityStr))
+                            .score(scoreStr.isEmpty() ? 0.0 : Double.parseDouble(scoreStr))
+                            .floorId(floorId)
+                            .amenityIds(amenityIdsStr.isEmpty() ? new ArrayList<>() :
+                                    Arrays.asList(amenityIdsStr.split(",")))
+                            .build();
+
+                    addRoom(request);
+                } catch (Exception e) {
+                    logger.error("Error processing row " + row.getRowNum() + ": " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error importing rooms from excel: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private String getCellValue(Cell cell) {
+        if (cell == null) return "";
+        switch (cell.getCellType()) {
+            case STRING: return cell.getStringCellValue();
+            case NUMERIC: return String.valueOf(cell.getNumericCellValue());
+            case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
+            default: return "";
+        }
+    }
+    // end implement importRoomsFromExcel
 }
