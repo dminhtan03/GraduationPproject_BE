@@ -4,6 +4,9 @@ import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.*;
 import com.finalProject.BookingMeetingRoom.model.request.UpdateUserInfoRequest;
 import com.finalProject.BookingMeetingRoom.service.UserService;
+// start add multipart import
+import org.springframework.web.multipart.MultipartFile;
+// end add multipart import
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -57,6 +60,19 @@ public class UserController {
         userService.resendOtp(resendOtpRequest);
         return ResponseEntity.ok(Response.ofSucceeded("Resend OTP successfully"));
     }
+
+    // start add adminAddUser and importUsersFromExcel api
+    @PostMapping("/admin/add")
+    public ResponseEntity<?> adminAddUser(@Valid @RequestBody RegistrationRequest request) {
+        return ResponseEntity.ok(Response.ofSucceeded(userService.adminAddUser(request)));
+    }
+
+    @PostMapping("/admin/import-excel")
+    public ResponseEntity<?> importUsersFromExcel(@RequestParam("file") MultipartFile file) {
+        userService.importUsersFromExcel(file);
+        return ResponseEntity.ok(Response.ofSucceeded("Users imported successfully from excel"));
+    }
+    // end add adminAddUser and importUsersFromExcel api
 
     @PutMapping("/update-info")
     public ResponseEntity<?> updateUserInfo(

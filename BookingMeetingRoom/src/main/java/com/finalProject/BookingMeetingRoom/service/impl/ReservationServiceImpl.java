@@ -233,9 +233,12 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
+    // start update reserveRoom with immediate reservation logic
+    @Transactional
     public ReservationResponse reserveRoom(ReservationRequest request, Authentication connectedUser) {
         try {
-            var room = roomRepository.findById(request.getRoomId())
+            // Locking the room to prevent race conditions
+            var room = roomRepository.findByIdForUpdate(request.getRoomId())
                     .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
 
             var user = userRepository.findByEmail(connectedUser.getName())
@@ -244,17 +247,19 @@ public class ReservationServiceImpl implements ReservationService {
             var startTime = request.getStartTime();
             var endTime = request.getEndTime();
 
+            // Check overlap for user (including PENDING, RESERVED, IN_USE)
             List<Reservation> checkOverlapByUser = reservationRepository.checkOverlapByUser(user.getId(), startTime,
-                    endTime, List.of(ReservationStatus.IN_USE.name(), ReservationStatus.RESERVED.name()));
+                    endTime, List.of(ReservationStatus.IN_USE.name(), ReservationStatus.RESERVED.name(), ReservationStatus.PENDING.name()));
 
             if (!checkOverlapByUser.isEmpty()) {
                 throw new CustomException(ResponseCode.USER_TIME_OVERLAP);
             }
 
+            // Check overlap for room (including PENDING, RESERVED, IN_USE)
             boolean conflict = reservationRepository
                     .checkOverlappingReservationsByRoom(room.getId(), startTime, endTime)
                     .stream()
-                    .anyMatch(r -> Set.of(ReservationStatus.IN_USE, ReservationStatus.RESERVED)
+                    .anyMatch(r -> Set.of(ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING)
                             .contains(r.getStatus()));
 
             if (conflict) {
@@ -265,11 +270,15 @@ public class ReservationServiceImpl implements ReservationService {
             reservation.setId(UUID.randomUUID().toString());
             reservation.setRoom(room);
             reservation.setUser(user);
+            reservation.setStatus(ReservationStatus.RESERVED); // Change status to RESERVED directly
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
 
             reservationHistoryService.saveHistory(reservation, user.getId(),
-                    ReservationStatus.PENDING, null, reservation.getUpdatedAt());
+                    ReservationStatus.RESERVED, null, reservation.getUpdatedAt());
+
+            // Send real-time update
+            realTimeService.addReservation(reservation);
 
             return reservationMapperFacade.toResponse(reservation);
         } catch (CustomException e) {
@@ -279,6 +288,7 @@ public class ReservationServiceImpl implements ReservationService {
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
+    // end update reserveRoom with immediate reservation logic
 
     public Page<ReservationResponse> getAllReservations(int page, int size) {
         try {
