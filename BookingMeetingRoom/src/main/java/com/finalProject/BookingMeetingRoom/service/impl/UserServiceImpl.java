@@ -519,7 +519,12 @@ public class UserServiceImpl implements UserService {
                 if (DateUtil.isCellDateFormatted(cell)) {
                     return cell.getLocalDateTimeCellValue().toString();
                 }
-                return String.valueOf(cell.getNumericCellValue());
+                double numericValue = cell.getNumericCellValue();
+                // Kiểm tra nếu là số nguyên thì loại bỏ phần thập phân .0
+                if (numericValue == (long) numericValue) {
+                    return String.valueOf((long) numericValue);
+                }
+                return String.valueOf(numericValue);
             case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
             default: return "";
         }
