@@ -85,11 +85,21 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             JOIN r.user u
             JOIN u.userInfo ui
             WHERE ro.id = :roomId
-            AND r.checkinTime = (
-                SELECT MAX(r2.checkinTime)
-                FROM Reservation r2
-                WHERE r2.room.id = :roomId
-            )
+              AND r.returnTime IS NULL
+              AND r.status IN (
+                    'RESERVED',
+                    'IN_USE'
+              )
+              AND r.startTime = (
+                  SELECT MAX(r2.startTime)
+                  FROM Reservation r2
+                  WHERE r2.room.id = :roomId
+                    AND r2.returnTime IS NULL
+                    AND r2.status IN (
+                          'RESERVED',
+                          'IN_USE'
+                    )
+              )
             """)
     CurrentUserProjection findCurrentUserByRoomId(String roomId);
 }
