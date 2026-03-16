@@ -36,4 +36,6 @@ public class UserResponse {
     // start add bookingLockedUntil
     private LocalDateTime bookingLockedUntil;
     // end add bookingLockedUntil
+    private Integer cancellationCount;
 }
+

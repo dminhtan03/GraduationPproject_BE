@@ -1,45 +1,42 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
-import com.finalProject.BookingMeetingRoom.common.enums.HistoryAction;
-import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
-import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
-import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
-import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
-import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
-import com.finalProject.BookingMeetingRoom.model.entity.Room;
-import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
-import com.finalProject.BookingMeetingRoom.model.request.RoomReserveStatusUpdateRequest;
-import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
-import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
-import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
-import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
-import com.finalProject.BookingMeetingRoom.repository.UserRepository;
-import com.finalProject.BookingMeetingRoom.service.RealTimeService;
-import com.finalProject.BookingMeetingRoom.service.ReservationHistoryService;
-import com.finalProject.BookingMeetingRoom.mapper.ReservationMapper;
-import com.finalProject.BookingMeetingRoom.mapper.ReservationMapperFacade;
-import com.finalProject.BookingMeetingRoom.service.ReservationService;
-
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import com.finalProject.BookingMeetingRoom.common.enums.HistoryAction;
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.mapper.ReservationMapper;
+import com.finalProject.BookingMeetingRoom.mapper.ReservationMapperFacade;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
+import com.finalProject.BookingMeetingRoom.model.request.RoomReserveStatusUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.RealTimeService;
+import com.finalProject.BookingMeetingRoom.service.ReservationHistoryService;
+import com.finalProject.BookingMeetingRoom.service.ReservationService;
+
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
@@ -211,6 +208,7 @@ public class ReservationServiceImpl implements ReservationService {
             reservation.setCheckinTime(LocalDateTime.now());
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
+            realTimeService.sendReservationStatus(reservation);
 
             room.setStatus(RoomStatus.UNAVAILABLE);
             roomRepository.save(room);
@@ -243,6 +241,12 @@ public class ReservationServiceImpl implements ReservationService {
 
             var user = userRepository.findByEmail(connectedUser.getName())
                     .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            // start add check for booking lock
+            if (user.getBookingLockedUntil() != null && LocalDateTime.now().isBefore(user.getBookingLockedUntil())) {
+                throw new CustomException(ResponseCode.BOOKING_FUNCTION_LOCKED, user.getBookingLockedUntil());
+            }
+            // end add check for booking lock
 
             var startTime = request.getStartTime();
             var endTime = request.getEndTime();
@@ -326,10 +330,20 @@ public class ReservationServiceImpl implements ReservationService {
                     ReservationStatus.IN_USE
             );
 
+            // start update getReservationStatus to handle invalid status strings safely
             boolean containsOnlyActiveStatuses = statuses != null && statuses.stream()
                     .map(String::toUpperCase)
+                    .filter(s -> {
+                        try {
+                            ReservationStatus.valueOf(s);
+                            return true;
+                        } catch (IllegalArgumentException e) {
+                            return false;
+                        }
+                    })
                     .map(ReservationStatus::valueOf)
                     .allMatch(activeStatuses::contains);
+            // end update getReservationStatus to handle invalid status strings safely
 
             boolean isStartTimeProvided = startTime != null && !startTime.isBlank();
             boolean isEndTimeProvided = endTime != null && !endTime.isBlank();
@@ -348,6 +362,13 @@ public class ReservationServiceImpl implements ReservationService {
                     effectiveStartTime = LocalDate.now().atStartOfDay().format(formatter);
                     effectiveEndTime = null;
                 }
+            }
+
+            // Ensure statuses is not null for Native Query to avoid SQL syntax error
+            if (statuses == null || statuses.isEmpty()) {
+                statuses = java.util.Arrays.stream(ReservationStatus.values())
+                        .map(Enum::name)
+                        .toList();
             }
 
             var myReservation = reservationRepository.findMyReservations(
@@ -391,6 +412,21 @@ public class ReservationServiceImpl implements ReservationService {
             if (!reservation.getUser().getId().equals(user.getId())) {
                 throw new CustomException(ResponseCode.PERMISSION_DENIED);
             }
+
+            // start add cancellation limit logic
+            LocalDate today = LocalDate.now();
+            if (user.getLastCancellationDate() != null && user.getLastCancellationDate().isEqual(today)) {
+                user.setCancellationCount(user.getCancellationCount() + 1);
+            } else {
+                user.setCancellationCount(1);
+                user.setLastCancellationDate(today);
+            }
+
+            if (user.getCancellationCount() >= 3) {
+                user.setBookingLockedUntil(LocalDateTime.now().plusHours(24));
+            }
+            userRepository.save(user);
+            // end add cancellation limit logic
 
             reservationHistoryService.saveHistory(reservation, user.getId(),
                     ReservationStatus.RESERVED, null, reservation.getUpdatedAt());

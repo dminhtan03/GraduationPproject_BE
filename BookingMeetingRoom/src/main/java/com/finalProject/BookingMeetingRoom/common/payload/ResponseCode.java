@@ -23,6 +23,9 @@ public enum ResponseCode {
     ACCOUNT_LOCKED("USR_401", "Account locked" , HttpStatus.UNAUTHORIZED),
     ALREADY_ACTIVATED("USR_409", "Account already activated", HttpStatus.CONFLICT),
     PERMISSION_DENIED("USR_403", "Have permission to action", HttpStatus.FORBIDDEN),
+    // start add booking locked error
+    BOOKING_FUNCTION_LOCKED("USR_423", "Booking function is locked", HttpStatus.LOCKED),
+    // end add booking locked error
 
     // ======= Validation Errors =======
     VALIDATION_FAILED("VAL_422", "Validation failed", HttpStatus.UNPROCESSABLE_ENTITY),

@@ -68,6 +68,17 @@ public class User implements UserDetails {
     @JsonManagedReference
     private List<Reservation> reservations;
 
+    // start add cancellation tracking fields
+    @Column(name = "booking_locked_until")
+    private LocalDateTime bookingLockedUntil;
+
+    @Column(name = "cancellation_count")
+    private Integer cancellationCount = 0;
+
+    @Column(name = "last_cancellation_date")
+    private java.time.LocalDate lastCancellationDate;
+    // end add cancellation tracking fields
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         Set<GrantedAuthority> authorities = new HashSet<>();
