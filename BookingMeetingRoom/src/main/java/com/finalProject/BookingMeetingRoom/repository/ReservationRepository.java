@@ -1,22 +1,21 @@
 package com.finalProject.BookingMeetingRoom.repository;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.model.projection.MyReservationProjection;
+import io.lettuce.core.dynamic.annotation.Param;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
-import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
-import com.finalProject.BookingMeetingRoom.model.projection.MyReservationProjection;
-
-import io.lettuce.core.dynamic.annotation.Param;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, String> {
@@ -110,7 +109,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
         AND (:locationCode IS NULL OR ts.location_code LIKE CONCAT('%', :locationCode, '%'))
         AND (:address IS NULL OR tb.address LIKE CONCAT('%', :address, '%'))
         AND (:buildingId IS NULL OR tb.id = :buildingId)
-        AND (tr.status IN (:statuses))
+        AND (:statuses IS NULL OR tr.status IN (:statuses))
 
         AND (
               :startTime IS NULL
@@ -133,7 +132,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
             AND (:locationCode IS NULL OR ts.location_code LIKE CONCAT('%', :locationCode, '%'))
             AND (:address IS NULL OR tb.address LIKE CONCAT('%', :address, '%'))
             AND (:buildingId IS NULL OR tb.id = :buildingId)
-            AND (tr.status IN (:statuses))
+            AND (:statuses IS NULL OR tr.status IN (:statuses))
 
             AND (
                   :startTime IS NULL

@@ -208,7 +208,6 @@ public class ReservationServiceImpl implements ReservationService {
             reservation.setCheckinTime(LocalDateTime.now());
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
-            realTimeService.sendReservationStatus(reservation);
 
             room.setStatus(RoomStatus.UNAVAILABLE);
             roomRepository.save(room);
@@ -362,13 +361,6 @@ public class ReservationServiceImpl implements ReservationService {
                     effectiveStartTime = LocalDate.now().atStartOfDay().format(formatter);
                     effectiveEndTime = null;
                 }
-            }
-
-            // Ensure statuses is not null for Native Query to avoid SQL syntax error
-            if (statuses == null || statuses.isEmpty()) {
-                statuses = java.util.Arrays.stream(ReservationStatus.values())
-                        .map(Enum::name)
-                        .toList();
             }
 
             var myReservation = reservationRepository.findMyReservations(

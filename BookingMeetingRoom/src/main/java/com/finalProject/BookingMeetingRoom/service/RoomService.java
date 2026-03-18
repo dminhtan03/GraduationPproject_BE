@@ -7,6 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
+import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
 
@@ -21,6 +22,10 @@ public interface RoomService {
     // start add addRoom method
     void addRoom(RoomCreateRequest request);
     // end add addRoom method
+
+    // start add updateRoom method
+    void updateRoom(RoomUpdateRequest request);
+    // end add updateRoom method
 
     // start add importRoomsFromExcel method
     void importRoomsFromExcel(MultipartFile file);

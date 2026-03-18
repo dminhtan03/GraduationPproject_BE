@@ -1,5 +1,28 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import com.finalProject.BookingMeetingRoom.repository.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
@@ -7,38 +30,14 @@ import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.model.entity.Floor;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
-import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
-// start add import
 import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
-import com.finalProject.BookingMeetingRoom.repository.AmenityRepository;
-// start add excel imports
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.web.multipart.MultipartFile;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-// end add excel imports
-import java.util.UUID;
-// end add import
+import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
+import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
-import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
-import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
-import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
-import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
-import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -237,6 +236,38 @@ public class RoomServiceImpl implements RoomService {
         }
     }
     // end implement addRoom
+
+    // start implement updateRoom
+    @Override
+    @Transactional
+    public void updateRoom(RoomUpdateRequest request) {
+        try {
+            Room room = roomRepository.findById(request.getRoomId())
+                    .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
+
+            if (request.getCapacity() != null) {
+                room.setCapacity(request.getCapacity());
+            }
+
+            if (request.getStatus() != null) {
+                room.setStatus(request.getStatus());
+            }
+
+            if (request.getAmenityIds() != null) {
+                // To easily add/remove/change amenities, we replace the whole list
+                room.setAmenities(amenityRepository.findAllById(request.getAmenityIds()));
+            }
+
+            room.setUpdatedAt(LocalDateTime.now());
+            roomRepository.save(room);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error updating room: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // end implement updateRoom
 
     // start implement importRoomsFromExcel
     @Override

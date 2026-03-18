@@ -13,6 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
+// start update import
+import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
+import org.springframework.web.bind.annotation.PutMapping;
+// end update import
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
@@ -53,6 +57,14 @@ public class RoomController {
         return ResponseEntity.ok(Response.ofSucceeded("Room added successfully"));
     }
     // end add addRoom api
+
+    // start add updateRoom api
+    @PutMapping
+    public ResponseEntity<?> updateRoom(@RequestBody @Valid RoomUpdateRequest request) {
+        roomService.updateRoom(request);
+        return ResponseEntity.ok(Response.ofSucceeded("Room updated successfully"));
+    }
+    // end add updateRoom api
 
     // start add importRoomsFromExcel api
     @PostMapping("/import-excel")
