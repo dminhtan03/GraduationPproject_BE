@@ -61,6 +61,12 @@ public class ReservationController {
         return ResponseEntity.ok(Response.ofSucceeded(reservationService.getAllReservations(page, size)));
     }
 
+    @PutMapping("/detail-reservation/{reservationId}")
+    public ResponseEntity<?> getReservationDetail(@PathVariable("reservationId") String reservationId,
+                                                  Authentication authentication) {
+        return ResponseEntity.ok(Response.ofSucceeded(reservationService.getReservationDetail(reservationId, authentication)));
+    }
+
     @GetMapping("my-status")
     public ResponseEntity<?> getReservationStatus(@RequestParam(defaultValue = "0") int page,
                                                   @RequestParam(defaultValue = "5") int size,

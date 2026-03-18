@@ -21,12 +21,17 @@ import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapper;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapperFacade;
+import com.finalProject.BookingMeetingRoom.mapper.FeedbackMapper;
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomReserveStatusUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationHistoryResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
+import com.finalProject.BookingMeetingRoom.repository.ReservationHistoryRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
@@ -44,12 +49,14 @@ import lombok.extern.slf4j.Slf4j;
 public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationRepository reservationRepository;
+    private final ReservationHistoryRepository reservationHistoryRepository;
     private final RealTimeService realTimeService;
     private final UserRepository userRepository;
     private final ReservationMapper reservationMapper;
     private final RoomRepository roomRepository;
     private final ReservationMapperFacade reservationMapperFacade;
     private final ReservationHistoryService reservationHistoryService;
+    private final FeedbackMapper feedbackMapper;
 
     record ReservationContext(Reservation reservation, Room room) {}
 
@@ -76,6 +83,7 @@ public class ReservationServiceImpl implements ReservationService {
                 throw new CustomException(ResponseCode.ROOM_NOT_UNAVAILABLE);
             }
 
+        
             reservation.setStatus(ReservationStatus.COMPLETED);
             reservation.setReturnTime(LocalDateTime.now());
             reservation.setUpdatedAt(LocalDateTime.now());
@@ -202,7 +210,7 @@ public class ReservationServiceImpl implements ReservationService {
             }
 
             reservationHistoryService.saveHistory(reservation, reservation.getUser().getId(),
-                    ReservationStatus.RESERVED, null, reservation.getUpdatedAt());
+                    ReservationStatus.RESERVED, HistoryAction.CHECK_IN, reservation.getUpdatedAt());
 
             reservation.setStatus(ReservationStatus.IN_USE);
             reservation.setCheckinTime(LocalDateTime.now());
@@ -420,8 +428,6 @@ public class ReservationServiceImpl implements ReservationService {
             userRepository.save(user);
             // end add cancellation limit logic
 
-            reservationHistoryService.saveHistory(reservation, user.getId(),
-                    ReservationStatus.RESERVED, null, reservation.getUpdatedAt());
 
             reservation.setStatus(ReservationStatus.CANCELLED);
             reservation.setUpdatedAt(LocalDateTime.now());
@@ -432,6 +438,60 @@ public class ReservationServiceImpl implements ReservationService {
             throw e;
         } catch (Exception e) {
             log.error("Unexpected error during cancelling", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+   
+
+    public ReservationDetailResponse getReservationDetail(String reservationId, Authentication authentication) {
+        try {
+            var currentUser = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            var reservation = reservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+            if (!reservation.getUser().getId().equals(currentUser.getId())) {
+                throw new CustomException(ResponseCode.PERMISSION_DENIED);
+            }
+
+            var reservationResponse = reservationMapperFacade.toResponse(reservation);
+
+            var roomImages = reservation.getRoom().getImages().stream()
+                    .map(img -> RoomImageResponse.builder()
+                            .id(img.getId())
+                            .roomId(img.getRoom().getId())
+                            .imageUrl(img.getImageUrl())
+                            .publicId(img.getPublicId())
+                            .createdAt(img.getCreatedAt())
+                            .build())
+                    .toList();
+
+            var history = reservationHistoryRepository.findByReservationId(reservationId).stream()
+                    .map(h -> ReservationHistoryResponse.builder()
+                            .id(h.getId())
+                            .oldStatus(h.getOldStatus())
+                            .action(h.getAction())
+                            .oldStartTime(h.getOldStartTime())
+                            .oldEndTime(h.getOldEndTime())
+                            .performBy(h.getPerformBy())
+                            .performAt(h.getPerformAt())
+                            .build())
+                    .toList();
+
+            var feedback = reservation.getFeedback() != null ? feedbackMapper.toFeedbackResponse(reservation.getFeedback()) : null;
+
+            return ReservationDetailResponse.builder()
+                    .reservation(reservationResponse)
+                    .roomImages(roomImages)
+                    .history(history)
+                    .feedback(feedback)
+                    .build();
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during get reservation detail", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
