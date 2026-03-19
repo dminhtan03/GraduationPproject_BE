@@ -44,7 +44,12 @@ public interface BuildingRepository extends JpaRepository<Building, String> {
                    ts.id as roomId,
                    ts.location_code as locationCode,
                    ts.status as status,
-                   ts.score as score
+                   ts.score as score,
+                   ts.x_position as xPosition,
+                   ts.y_position as yPosition,
+                   ts.width as width,
+                   ts.height as height,
+                   ts.is_positioned as positioned
             FROM tbl_building tb
             JOIN tbl_floor tf on tb.id = tf.building_id
             JOIN tbl_room ts on tf.id = ts.floor_id

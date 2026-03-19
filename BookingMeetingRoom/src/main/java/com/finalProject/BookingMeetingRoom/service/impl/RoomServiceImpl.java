@@ -31,6 +31,9 @@ import com.finalProject.BookingMeetingRoom.model.entity.Floor;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
+// start add layout request import
+import com.finalProject.BookingMeetingRoom.model.request.FloorLayoutRequest;
+// end add layout request import
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
@@ -271,7 +274,7 @@ public class RoomServiceImpl implements RoomService {
 
     // start implement importRoomsFromExcel
     @Override
-    public void importRoomsFromExcel(MultipartFile file) {
+    public void importRoomsFromExcel(MultipartFile file, String floorId) {
         try (InputStream is = file.getInputStream();
              Workbook workbook = new XSSFWorkbook(is)) {
 
@@ -285,17 +288,22 @@ public class RoomServiceImpl implements RoomService {
                     String statusStr = getCellValue(row.getCell(1));
                     String capacityStr = getCellValue(row.getCell(2));
                     String scoreStr = getCellValue(row.getCell(3));
-                    String floorId = getCellValue(row.getCell(4));
+                    String excelFloorId = getCellValue(row.getCell(4));
                     String amenityIdsStr = getCellValue(row.getCell(5));
 
-                    if (locationCode.isEmpty() || floorId.isEmpty()) continue;
+                    String targetFloorId = (floorId != null && !floorId.isEmpty()) ? floorId : excelFloorId;
+
+                    if (locationCode.isEmpty() || targetFloorId.isEmpty()) {
+                        logger.warn("Skipping row " + row.getRowNum() + ": locationCode or floorId is missing.");
+                        continue;
+                    }
 
                     RoomCreateRequest request = RoomCreateRequest.builder()
                             .locationCode(locationCode)
-                            .status(RoomStatus.valueOf(statusStr.toUpperCase()))
-                            .capacity((int) Double.parseDouble(capacityStr))
+                            .status(statusStr.isEmpty() ? RoomStatus.AVAILABLE : RoomStatus.valueOf(statusStr.toUpperCase()))
+                            .capacity(capacityStr.isEmpty() ? 0 : (int) Double.parseDouble(capacityStr))
                             .score(scoreStr.isEmpty() ? 0.0 : Double.parseDouble(scoreStr))
-                            .floorId(floorId)
+                            .floorId(targetFloorId)
                             .amenityIds(amenityIdsStr.isEmpty() ? new ArrayList<>() :
                                     Arrays.asList(amenityIdsStr.split(",")))
                             .build();
@@ -321,4 +329,31 @@ public class RoomServiceImpl implements RoomService {
         }
     }
     // end implement importRoomsFromExcel
+
+    // start implement updateFloorLayout
+    @Override
+    @Transactional
+    public void updateFloorLayout(String floorId, FloorLayoutRequest request) {
+        try {
+            if (request.getItems() == null) return;
+
+            for (FloorLayoutRequest.RoomLayoutItem item : request.getItems()) {
+                roomRepository.findById(item.getRoomId()).ifPresent(room -> {
+                    if (room.getFloor().getId().equals(floorId)) {
+                        room.setXPosition(item.getX());
+                        room.setYPosition(item.getY());
+                        room.setWidth(item.getWidth());
+                        room.setHeight(item.getHeight());
+                        room.setPositioned(true);
+                        room.setUpdatedAt(LocalDateTime.now());
+                        roomRepository.save(room);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            logger.error("Error updating floor layout: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // end implement updateFloorLayout
 }

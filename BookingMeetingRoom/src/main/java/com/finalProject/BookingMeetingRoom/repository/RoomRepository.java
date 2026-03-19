@@ -32,7 +32,12 @@ public interface RoomRepository extends JpaRepository<Room, String> {
             SELECT ts.id as roomId,
                    ts.location_code as locationCode,
                    ts.status,
-                   ts.score
+                   ts.score,
+                   ts.x_position as xPosition,
+                   ts.y_position as yPosition,
+                   ts.width as width,
+                   ts.height as height,
+                   ts.is_positioned as positioned
             FROM tbl_room ts
             JOIN tbl_floor tf ON ts.floor_id = tf.id
             WHERE tf.id = :floorId

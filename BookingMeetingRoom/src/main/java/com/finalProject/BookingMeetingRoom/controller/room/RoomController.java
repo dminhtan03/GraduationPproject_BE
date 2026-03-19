@@ -6,23 +6,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
+import com.finalProject.BookingMeetingRoom.model.request.FloorLayoutRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
-// start update import
-import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
-import org.springframework.web.bind.annotation.PutMapping;
-// end update import
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
+import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
-// start add multipart import
-import org.springframework.web.multipart.MultipartFile;
-// end add multipart import
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -68,9 +66,21 @@ public class RoomController {
 
     // start add importRoomsFromExcel api
     @PostMapping("/import-excel")
-    public ResponseEntity<?> importRoomsFromExcel(@RequestParam("file") MultipartFile file) {
-        roomService.importRoomsFromExcel(file);
+    public ResponseEntity<?> importRoomsFromExcel(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "floorId", required = false) String floorId) {
+        roomService.importRoomsFromExcel(file, floorId);
         return ResponseEntity.ok(Response.ofSucceeded("Rooms imported successfully from excel"));
     }
     // end add importRoomsFromExcel api
+
+    // start add updateFloorLayout api
+    @PutMapping("/floors/{floorId}/layout")
+    public ResponseEntity<?> updateFloorLayout(
+            @PathVariable String floorId,
+            @RequestBody FloorLayoutRequest request) {
+        roomService.updateFloorLayout(floorId, request);
+        return ResponseEntity.ok(Response.ofSucceeded("Floor layout updated successfully"));
+    }
+    // end add updateFloorLayout api
 }
