@@ -63,6 +63,9 @@ public enum ResponseCode {
     RESERVATION_TIME_OVERLAP("RES_409", "Overlap with other reservations", HttpStatus.CONFLICT),
     RESERVATION_NOT_RESERVED("RES_400", "This Reservation is not reserved" , HttpStatus.BAD_REQUEST),
     RESERVATION_NOT_TIME_CHECK_IN("RES_400", "You cannot check in before start time." , HttpStatus.BAD_REQUEST),
+    // start add reservation check-in expired error
+    RESERVATION_CHECK_IN_EXPIRED("RES_400", "Check-in time has expired (15 minutes limit).", HttpStatus.BAD_REQUEST),
+    // end add reservation check-in expired error
     RESERVATION_INVALID_HOUR("RES_400", "Hour is invalid", HttpStatus.BAD_REQUEST),
     RESERVATION_HISTORY_NOT_FOUND("RES_HIS_404", "Reservation history not found", HttpStatus.NOT_FOUND),
     FEEDBACK_ONLY_FOR_COMPLETED_RESERVATION("FBD_400", "Feedback can only be submitted for completed reservations", HttpStatus.BAD_REQUEST),
