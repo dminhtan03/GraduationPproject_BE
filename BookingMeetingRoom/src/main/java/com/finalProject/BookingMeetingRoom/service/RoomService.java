@@ -33,6 +33,6 @@ public interface RoomService {
     // end add importRoomsFromExcel method
 
     // start add updateFloorLayout method
-    void updateFloorLayout(String floorId, FloorLayoutRequest request);
+    void updateFloorLayout(String floorId, List<FloorLayoutRequest.RoomLayoutItem> items);
     // end add updateFloorLayout method
 }

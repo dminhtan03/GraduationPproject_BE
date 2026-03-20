@@ -333,13 +333,15 @@ public class RoomServiceImpl implements RoomService {
     // start implement updateFloorLayout
     @Override
     @Transactional
-    public void updateFloorLayout(String floorId, FloorLayoutRequest request) {
+    public void updateFloorLayout(String floorId, List<FloorLayoutRequest.RoomLayoutItem> items) {
         try {
-            if (request.getItems() == null) return;
+            if (items == null) return;
 
-            for (FloorLayoutRequest.RoomLayoutItem item : request.getItems()) {
+            for (FloorLayoutRequest.RoomLayoutItem item : items) {
                 roomRepository.findById(item.getRoomId()).ifPresent(room -> {
-                    if (room.getFloor().getId().equals(floorId)) {
+                    // Always update if it belongs to the floor or we trust the frontend
+                    // Let's add a check to be safe
+                    if (room.getFloor() != null && room.getFloor().getId().equals(floorId)) {
                         room.setXPosition(item.getX());
                         room.setYPosition(item.getY());
                         room.setWidth(item.getWidth());
