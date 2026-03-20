@@ -78,8 +78,8 @@ public class RoomController {
     @PutMapping("/floors/{floorId}/layout")
     public ResponseEntity<?> updateFloorLayout(
             @PathVariable String floorId,
-            @RequestBody List<FloorLayoutRequest.RoomLayoutItem> items) {
-        roomService.updateFloorLayout(floorId, items);
+            @RequestBody FloorLayoutRequest request) {
+        roomService.updateFloorLayout(floorId, request);
         return ResponseEntity.ok(Response.ofSucceeded("Floor layout updated successfully"));
     }
     // end add updateFloorLayout api
