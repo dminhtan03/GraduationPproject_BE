@@ -1,17 +1,15 @@
 package com.finalProject.BookingMeetingRoom.service;
 
+import java.util.List;
+
+import org.springframework.data.domain.Page;
+
 import com.finalProject.BookingMeetingRoom.model.dto.RoomDto;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousFloorResponse;
-import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewResponse;
-import com.finalProject.BookingMeetingRoom.model.response.DashboardSummaryResponse;
-import com.finalProject.BookingMeetingRoom.model.response.EmployeeDashboardResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
 import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
-import org.springframework.data.domain.Page;
-import org.springframework.security.core.Authentication;
-
-import java.util.List;
 
 public interface DashboardService {
     RoomMapDashboardResponse getRoomsMapDashboard();
@@ -22,4 +20,8 @@ public interface DashboardService {
     Page<UserDashboardResponse> getAllUsers(int page, int size);
     void lockUser(String userId);
     void unlockUser(String userId);
+
+    // start add createBuilding method
+    void createBuilding(BuildingCreateRequest request);
+    // end add createBuilding method
 }

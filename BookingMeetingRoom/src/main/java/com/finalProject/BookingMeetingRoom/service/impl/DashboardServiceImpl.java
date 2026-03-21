@@ -1,9 +1,11 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.model.dto.RoomDto;
+import com.finalProject.BookingMeetingRoom.model.entity.Building;
+import com.finalProject.BookingMeetingRoom.model.entity.Floor;
 import com.finalProject.BookingMeetingRoom.model.projection.RoomDtoProjection;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousFloorResponse;
 import com.finalProject.BookingMeetingRoom.model.response.DetailFloorResponse;
@@ -95,6 +100,11 @@ public class DashboardServiceImpl implements DashboardService {
                 roomDto.setLocationCode(room.getLocationCode());
                 roomDto.setStatus(room.getStatus());
                 roomDto.setScore(room.getScore());
+                roomDto.setXPosition(room.getXPosition());
+                roomDto.setYPosition(room.getYPosition());
+                roomDto.setWidth(room.getWidth());
+                roomDto.setHeight(room.getHeight());
+                roomDto.setPositioned(room.getPositioned() != null && room.getPositioned());
 
                 floorResponse.getRooms().add(roomDto);
             }
@@ -170,7 +180,12 @@ public class DashboardServiceImpl implements DashboardService {
                             seat.getRoomId(),
                             seat.getLocationCode(),
                             seat.getStatus(),
-                            seat.getScore()
+                            seat.getScore(),
+                            seat.getXPosition(),
+                            seat.getYPosition(),
+                            seat.getWidth(),
+                            seat.getHeight(),
+                            seat.getPositioned() != null && seat.getPositioned()
                     )).toList();
         } catch (CustomException e) {
             throw e;
@@ -234,4 +249,34 @@ public class DashboardServiceImpl implements DashboardService {
         }
     }
 
+    // start implement createBuilding
+    @Override
+    @Transactional
+    public void createBuilding(BuildingCreateRequest request) {
+        try {
+            Building building = new Building();
+            building.setId(UUID.randomUUID().toString());
+            building.setName(request.getName());
+            building.setAddress(request.getAddress());
+            building.setDeleted(false);
+            building.setCreatedAt(LocalDateTime.now());
+            building.setUpdatedAt(LocalDateTime.now());
+            buildingRepository.save(building);
+
+            for (int i = 1; i <= request.getTotalFloors(); i++) {
+                Floor floor = new Floor();
+                floor.setId(UUID.randomUUID().toString());
+                floor.setName("Floor " + i);
+                floor.setBuilding(building);
+                floor.setDeleted(false);
+                floor.setCreateAt(LocalDateTime.now());
+                floor.setUpdatedAt(LocalDateTime.now());
+                floorRepository.save(floor);
+            }
+        } catch (Exception e) {
+            logger.error("Error creating building: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+    // end implement createBuilding
 }

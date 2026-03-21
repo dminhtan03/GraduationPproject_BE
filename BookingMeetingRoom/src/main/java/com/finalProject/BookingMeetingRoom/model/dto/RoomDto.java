@@ -15,4 +15,12 @@ public class RoomDto {
     private String locationCode;
     private RoomStatus status;
     private Double score;
+
+    // start add layout fields
+    private Double xPosition;
+    private Double yPosition;
+    private Double width;
+    private Double height;
+    private boolean positioned;
+    // end add layout fields
 }

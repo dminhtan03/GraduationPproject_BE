@@ -1,14 +1,21 @@
 package com.finalProject.BookingMeetingRoom.controller.dashboard;
 
-import com.finalProject.BookingMeetingRoom.common.payload.Response;
-import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
-import com.finalProject.BookingMeetingRoom.service.DashboardService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.finalProject.BookingMeetingRoom.common.payload.Response;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
+import com.finalProject.BookingMeetingRoom.service.DashboardService;
+
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping(value = "/api/v1/dashboard")
@@ -55,7 +62,15 @@ public class DashboardController {
     @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
     public ResponseEntity<?> unlockUser(@PathVariable String userId) {
         dashboardService.unlockUser(userId);
-        return ResponseEntity.ok(Response.ofSucceeded("User unlocked successfully"));
+        return ResponseEntity.ok(Response.ofSucceeded("Unlock user successfully"));
     }
 
+    // start add createBuilding api
+    @PostMapping("/buildings")
+    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
+    public ResponseEntity<?> createBuilding(@RequestBody BuildingCreateRequest request) {
+        dashboardService.createBuilding(request);
+        return ResponseEntity.ok(Response.ofSucceeded("Building created successfully"));
+    }
+    // end add createBuilding api
 }
