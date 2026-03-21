@@ -45,6 +45,9 @@ public class Reservation {
     @Version
     private Integer version;
 
+    @Column(name = "Reason")
+    private String reason;
+
     @Column(name = "CREATED_AT")
     private LocalDateTime createAt;
 
