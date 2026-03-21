@@ -44,6 +44,9 @@ public class ReservationHistory {
     @Column(name = "Reason")
     private String reason;
 
+    @Column(name = "Cancel_By")
+    private String cancelBy;
+
     @ManyToOne
     @JoinColumn(name = "reservation_id")
     private Reservation reservation;

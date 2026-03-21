@@ -1,3 +1,8 @@
+cloudinary:
+  cloud-name: ds8upcxgo
+  api-key: 612812197984693
+  api-secret: GpJ8xqq_Hw1m4PHaq3MlfaWiI4s
+
 spring:
   datasource:
     url: jdbc:mysql://localhost:3307/finalproject

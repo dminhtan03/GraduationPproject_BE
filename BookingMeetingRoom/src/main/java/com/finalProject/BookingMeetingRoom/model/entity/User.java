@@ -48,6 +48,9 @@ public class User implements UserDetails {
     @Column(name = "UPDATED_AT")
     private LocalDateTime updatedAt;
 
+    @Column(name = "Reason")
+    private String reason;
+
     @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(name = "USER_INFO_ID", referencedColumnName = "ID")
     private UserInfo userInfo;

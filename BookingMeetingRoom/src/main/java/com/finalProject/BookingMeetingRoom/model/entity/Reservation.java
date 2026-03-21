@@ -48,6 +48,9 @@ public class Reservation {
     @Column(name = "Reason")
     private String reason;
 
+    @Column(name = "Cancel_By")
+    private String cancelBy;
+
     @Column(name = "CREATED_AT")
     private LocalDateTime createAt;
 
