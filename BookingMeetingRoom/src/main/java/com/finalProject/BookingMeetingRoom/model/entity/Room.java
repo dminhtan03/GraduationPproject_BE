@@ -1,14 +1,26 @@
 package com.finalProject.BookingMeetingRoom.model.entity;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
-import jakarta.persistence.*;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Getter
 @Setter
@@ -57,6 +69,23 @@ public class Room {
 
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL)
     private List<RoomImage> images;
+
+    // start add layout fields
+    @Column(name = "X_POSITION")
+    private Double xPosition = 0.0;
+
+    @Column(name = "Y_POSITION")
+    private Double yPosition = 0.0;
+
+    @Column(name = "WIDTH")
+    private Double width = 100.0;
+
+    @Column(name = "HEIGHT")
+    private Double height = 100.0;
+
+    @Column(name = "IS_POSITIONED")
+    private Boolean positioned = false;
+    // end add layout fields
 
     public Double getScore() {
         if (reservations == null || reservations.isEmpty()) {

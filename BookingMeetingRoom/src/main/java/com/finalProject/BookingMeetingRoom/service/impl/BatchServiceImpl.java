@@ -71,12 +71,16 @@ public class BatchServiceImpl {
      * @param status The status to process (NO_SHOW or COMPLETED).
      */
 
+    // start update processReservation to be Transactional and use currentTime
+    @Transactional
     public void processReservation(ReservationStatus status) {
         log.info("Processing reservation status: {}", status);
 
+        LocalDateTime now = LocalDateTime.now();
         var reservations = status == ReservationStatus.NO_SHOW
-                ? reservationRepository.findReservationsOverStartTime()
-                : reservationRepository.findReservationsOverEndTime();
+                ? reservationRepository.findReservationsOverStartTime(now)
+                : reservationRepository.findReservationsOverEndTime(now);
+    // end update processReservation to be Transactional and use currentTime
 
         if (!reservations.isEmpty()) {
             if (status == ReservationStatus.NO_SHOW) {

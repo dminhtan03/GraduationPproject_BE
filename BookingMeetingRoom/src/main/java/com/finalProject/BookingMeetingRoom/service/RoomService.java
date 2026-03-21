@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.finalProject.BookingMeetingRoom.model.request.FloorLayoutRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
@@ -28,6 +29,10 @@ public interface RoomService {
     // end add updateRoom method
 
     // start add importRoomsFromExcel method
-    void importRoomsFromExcel(MultipartFile file);
+    void importRoomsFromExcel(MultipartFile file, String floorId);
     // end add importRoomsFromExcel method
+
+    // start add updateFloorLayout method
+    void updateFloorLayout(String floorId, FloorLayoutRequest request);
+    // end add updateFloorLayout method
 }

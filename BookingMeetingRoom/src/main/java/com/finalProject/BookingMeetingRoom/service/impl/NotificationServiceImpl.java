@@ -308,10 +308,13 @@ public class NotificationServiceImpl implements NotificationService {
      * Reminds users to check-in for their reservations that are about to start.
      * It retrieves reservations that need a check-in reminder and sends notifications.
      */
+    // start update remindCheckIn to use current time
+    @Override
     public void remindCheckIn() {
         log.info("Reminding users to check-in...");
 
-        List<Reservation> reservations = reservationRepository.findReservationsToRemindCheckIn();
+        List<Reservation> reservations = reservationRepository.findReservationsToRemindCheckIn(java.time.LocalDateTime.now());
+    // end update remindCheckIn to use current time
 
         notifyUsersAboutReservation(
                 reservations,

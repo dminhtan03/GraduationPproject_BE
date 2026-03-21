@@ -1,21 +1,21 @@
 package com.finalProject.BookingMeetingRoom.repository;
 
-import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
-import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
-import com.finalProject.BookingMeetingRoom.model.entity.User;
-import com.finalProject.BookingMeetingRoom.model.projection.MyReservationProjection;
-import io.lettuce.core.dynamic.annotation.Param;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.projection.MyReservationProjection;
 
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, String> {
@@ -109,7 +109,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
         AND (:locationCode IS NULL OR ts.location_code LIKE CONCAT('%', :locationCode, '%'))
         AND (:address IS NULL OR tb.address LIKE CONCAT('%', :address, '%'))
         AND (:buildingId IS NULL OR tb.id = :buildingId)
-        AND (:statuses IS NULL OR tr.status IN (:statuses))
+        AND (tr.status IN (:statuses))
 
         AND (
               :startTime IS NULL
@@ -132,7 +132,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
             AND (:locationCode IS NULL OR ts.location_code LIKE CONCAT('%', :locationCode, '%'))
             AND (:address IS NULL OR tb.address LIKE CONCAT('%', :address, '%'))
             AND (:buildingId IS NULL OR tb.id = :buildingId)
-            AND (:statuses IS NULL OR tr.status IN (:statuses))
+            AND (tr.status IN (:statuses))
 
             AND (
                   :startTime IS NULL
@@ -152,17 +152,21 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
       @Param("endTime") String endTime,
       Pageable pageable);
 
+  // start update findReservationsOverStartTime to use parameter
   @Query(value = """
       SELECT *
       FROM tbl_reservation r
-      WHERE DATE_ADD(r.start_time, INTERVAL 15 MINUTE) < NOW()
+      WHERE DATE_ADD(r.start_time, INTERVAL 15 MINUTE) < :currentTime
         AND r.status = 'RESERVED'
       """, nativeQuery = true)
-  List<Reservation> findReservationsOverStartTime();
+  List<Reservation> findReservationsOverStartTime(@Param("currentTime") LocalDateTime currentTime);
+  // end update findReservationsOverStartTime to use parameter
 
-  @Query(value = "SELECT * from tbl_reservation r WHERE r.end_time < now() " +
+  // start update findReservationsOverEndTime to use parameter
+  @Query(value = "SELECT * from tbl_reservation r WHERE r.end_time < :currentTime " +
       " and r.status = 'IN_USE' ", nativeQuery = true)
-  List<Reservation> findReservationsOverEndTime();
+  List<Reservation> findReservationsOverEndTime(@Param("currentTime") LocalDateTime currentTime);
+  // end update findReservationsOverEndTime to use parameter
 
   List<Reservation> findByStatus(ReservationStatus status);
 
@@ -190,15 +194,17 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
       @Param("startOfDay") LocalDateTime startOfDay,
       @Param("endOfDay") LocalDateTime endOfDay);
 
+  // start update findReservationsToRemindCheckIn to use parameter
   @Query(value = """
       SELECT *
       FROM tbl_reservation r
       WHERE r.start_time BETWEEN
-            DATE_ADD(NOW(), INTERVAL 15 MINUTE)
-            AND DATE_ADD(NOW(), INTERVAL 16 MINUTE)
+            DATE_ADD(:currentTime, INTERVAL 15 MINUTE)
+            AND DATE_ADD(:currentTime, INTERVAL 16 MINUTE)
         AND r.status = 'RESERVED'
       """, nativeQuery = true)
-  List<Reservation> findReservationsToRemindCheckIn();
+  List<Reservation> findReservationsToRemindCheckIn(@Param("currentTime") LocalDateTime currentTime);
+  // end update findReservationsToRemindCheckIn to use parameter
 
   @Query(value = """
       SELECT *

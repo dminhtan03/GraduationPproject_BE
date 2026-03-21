@@ -19,9 +19,9 @@ import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.mapper.FeedbackMapper;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapper;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapperFacade;
-import com.finalProject.BookingMeetingRoom.mapper.FeedbackMapper;
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
@@ -209,6 +209,12 @@ public class ReservationServiceImpl implements ReservationService {
                 throw new CustomException(ResponseCode.RESERVATION_NOT_TIME_CHECK_IN);
             }
 
+            // start add check for 15 minutes limit
+            if (LocalDateTime.now().isAfter(reservation.getStartTime().plusMinutes(15))) {
+                throw new CustomException(ResponseCode.RESERVATION_CHECK_IN_EXPIRED);
+            }
+            // end add check for 15 minutes limit
+
             reservationHistoryService.saveHistory(reservation, reservation.getUser().getId(),
                     ReservationStatus.RESERVED, HistoryAction.CHECK_IN, reservation.getUpdatedAt());
 
@@ -338,16 +344,22 @@ public class ReservationServiceImpl implements ReservationService {
             );
 
             // start update getReservationStatus to handle invalid status strings safely
-            boolean containsOnlyActiveStatuses = statuses != null && statuses.stream()
-                    .map(String::toUpperCase)
-                    .filter(s -> {
-                        try {
-                            ReservationStatus.valueOf(s);
-                            return true;
-                        } catch (IllegalArgumentException e) {
-                            return false;
-                        }
-                    })
+            if (statuses != null) {
+                statuses = statuses.stream()
+                        .map(String::toUpperCase)
+                        .map(s -> s.equals("CHECKED_IN") ? "IN_USE" : s) // map CHECKED_IN to IN_USE
+                        .filter(s -> {
+                            try {
+                                ReservationStatus.valueOf(s);
+                                return true;
+                            } catch (IllegalArgumentException e) {
+                                return false;
+                            }
+                        })
+                        .collect(java.util.stream.Collectors.toList());
+            }
+
+            boolean containsOnlyActiveStatuses = statuses != null && !statuses.isEmpty() && statuses.stream()
                     .map(ReservationStatus::valueOf)
                     .allMatch(activeStatuses::contains);
             // end update getReservationStatus to handle invalid status strings safely
@@ -370,6 +382,14 @@ public class ReservationServiceImpl implements ReservationService {
                     effectiveEndTime = null;
                 }
             }
+
+            // start add fix statuses null for native query
+            if (statuses == null || statuses.isEmpty()) {
+                statuses = java.util.Arrays.stream(ReservationStatus.values())
+                        .map(Enum::name)
+                        .collect(java.util.stream.Collectors.toList());
+            }
+            // end add fix statuses null for native query
 
             var myReservation = reservationRepository.findMyReservations(
                     user.getId(),
