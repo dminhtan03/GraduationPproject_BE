@@ -24,7 +24,7 @@ public class RoomDetailResponse {
     private Integer capacity;
 
     private List<Amenity> amenities;
-    private List<RoomImage> images;
+    private List<RoomImageResponse> images;
 
     private Double score;
 

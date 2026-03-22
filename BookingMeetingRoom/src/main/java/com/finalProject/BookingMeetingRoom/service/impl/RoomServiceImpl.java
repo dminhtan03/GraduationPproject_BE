@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.repository.*;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -171,6 +172,7 @@ public class RoomServiceImpl implements RoomService {
      * @return RoomDetailResponse containing user information and check-in time
      */
     @Override
+    @Transactional(readOnly = true)
     public RoomDetailResponse getRoomDetail(String roomId) {
         try {
             Room room = roomRepository.findById(roomId)
@@ -188,13 +190,24 @@ public class RoomServiceImpl implements RoomService {
                             .build())
                     .collect(Collectors.toList());
 
+            var images = room.getImages() == null
+                    ? List.<RoomImageResponse>of()
+                    : room.getImages().stream()
+                    .map(image -> RoomImageResponse.builder()
+                            .id(image.getId())
+                            .imageUrl(image.getImageUrl())
+                            .publicId(image.getPublicId())
+                            .createdAt(image.getCreatedAt())
+                            .build())
+                    .collect(Collectors.toList());
+
             return RoomDetailResponse.builder()
                     .roomId(room.getId())
                     .locationCode(room.getLocationCode())
                     .status(room.getStatus())
                     .capacity(room.getCapacity())
                     .amenities(room.getAmenities())
-                    .images(room.getImages())
+                    .images(images)
                     .score(room.getScore())
                     .currentUserId(currentUser != null ? currentUser.getUserId() : null)
                     .currentUserName(currentUser != null ? currentUser.getUserName() : null)
