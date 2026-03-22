@@ -6,7 +6,8 @@ import lombok.Getter;
 public enum EmailTemplateName {
 
     ACTIVATE_ACCOUNT("activate_account"),
-    RESERVATION_STATUS("reservation-status");
+    RESERVATION_STATUS("reservation-status"),
+    FORCE_CANCEL("force_cancel");
 
     private final String name;
     EmailTemplateName(String name) {

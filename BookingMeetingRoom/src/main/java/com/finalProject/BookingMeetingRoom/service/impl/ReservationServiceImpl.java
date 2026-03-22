@@ -35,9 +35,13 @@ import com.finalProject.BookingMeetingRoom.repository.ReservationHistoryReposito
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.repository.UserInfoRepository;
 import com.finalProject.BookingMeetingRoom.service.RealTimeService;
 import com.finalProject.BookingMeetingRoom.service.ReservationHistoryService;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
+import com.finalProject.BookingMeetingRoom.service.EmailService;
+import com.finalProject.BookingMeetingRoom.common.enums.EmailTemplateName;
+import com.finalProject.BookingMeetingRoom.model.request.NotificationRequest;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -52,11 +56,13 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationHistoryRepository reservationHistoryRepository;
     private final RealTimeService realTimeService;
     private final UserRepository userRepository;
+    private final UserInfoRepository userInfoRepository;
     private final ReservationMapper reservationMapper;
     private final RoomRepository roomRepository;
     private final ReservationMapperFacade reservationMapperFacade;
     private final ReservationHistoryService reservationHistoryService;
     private final FeedbackMapper feedbackMapper;
+    private final EmailService emailService;
 
     record ReservationContext(Reservation reservation, Room room) {}
 
@@ -418,10 +424,11 @@ public class ReservationServiceImpl implements ReservationService {
      * Cancel a reservation and save the history of the action.
      *
      * @param reservationId the ID of the reservation to cancel
+     * @param reason the reason for cancellation
      * @param connectedUser the authentication object containing user details
      */
     @Transactional
-    public void cancelReservation(String reservationId, Authentication connectedUser) {
+    public void cancelReservation(String reservationId, String reason, Authentication connectedUser) {
         try {
             var reservation = reservationRepository.findByIdAndStatus(reservationId, ReservationStatus.RESERVED)
                     .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_INVALID_STATUS));
@@ -450,6 +457,8 @@ public class ReservationServiceImpl implements ReservationService {
 
 
             reservation.setStatus(ReservationStatus.CANCELLED);
+            reservation.setReason(reason);
+            reservation.setCancelBy(user.getId());
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
 
@@ -459,6 +468,99 @@ public class ReservationServiceImpl implements ReservationService {
         } catch (Exception e) {
             log.error("Unexpected error during cancelling", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Force cancel a reservation by admin with reason.
+     * Sends email notification to the user about the cancellation.
+     *
+     * @param reservationId the ID of the reservation to force cancel
+     * @param reason the reason for force cancellation
+     * @param adminUser the authentication object containing admin details
+     */
+    @Transactional
+    public void forceCancelReservation(String reservationId, String reason, Authentication adminUser) {
+        try {
+            var reservation = reservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+           
+
+            var admin = userInfoRepository.findByEmail(adminUser.getName())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            var bookingUser = reservation.getUser();
+            if (bookingUser == null) {
+                throw new CustomException(ResponseCode.USER_NOT_FOUND);
+            }
+
+            var room = reservation.getRoom();
+            if (room == null) {
+                throw new CustomException(ResponseCode.ROOM_NOT_FOUND);
+            }
+
+            // Update reservation status to cancelled
+            reservation.setStatus(ReservationStatus.CANCELLED);
+            reservation.setReason(reason);
+            reservation.setCancelBy(admin.getEmail());  // Save admin email
+            reservation.setUpdatedAt(LocalDateTime.now());
+            reservationRepository.save(reservation);
+
+            // Update room status to AVAILABLE so it can be booked immediately
+            room.setStatus(RoomStatus.AVAILABLE);
+            roomRepository.save(room);
+
+            // Send real-time updates
+            realTimeService.sendRoomStatus(room);           // Notify room is available
+            realTimeService.sendReservationStatus(reservation);  // Update reservation status
+            realTimeService.deleteReservation(reservation); // Remove from booking list
+
+            // Send email notification to user
+            sendForceCancelEmailNotification(bookingUser, reservation, reason);
+
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during force cancelling", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Send forceful cancellation email to user with reason
+     *
+     * @param user the user to receive the email
+     * @param reservation the cancelled reservation
+     * @param reason the reason for cancellation
+     */
+    private void sendForceCancelEmailNotification(com.finalProject.BookingMeetingRoom.model.entity.User user,
+                                                   Reservation reservation,
+                                                   String reason) {
+        try {
+            if (user.getUserInfo() == null || user.getUserInfo().getEmail() == null) {
+                log.warn("User email not found for reservation: {}", reservation.getId());
+                return;
+            }
+
+            String fullName = (user.getUserInfo().getFirstName() != null ? user.getUserInfo().getFirstName() : "") +
+                    " " +
+                    (user.getUserInfo().getLastName() != null ? user.getUserInfo().getLastName() : "");
+            fullName = fullName.trim();
+
+            String email = user.getUserInfo().getEmail();
+
+            emailService.sendForceCancelEmail(
+                    email,
+                    fullName,
+                    reason,
+                    "Your Meeting Room Booking Has Been Cancelled by Administrator"
+            );
+
+            log.info("Force cancel email sent to user: {} for reservation: {}", email, reservation.getId());
+        } catch (Exception e) {
+            log.error("Failed to send force cancel email for reservation: {}", reservation.getId(), e);
+            // Don't throw exception, just log it to prevent blocking the cancellation process
         }
     }
 

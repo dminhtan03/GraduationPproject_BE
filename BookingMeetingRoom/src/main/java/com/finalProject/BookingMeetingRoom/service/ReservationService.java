@@ -14,7 +14,7 @@ public interface ReservationService {
 
         void checkIn(String reservationId, Authentication authentication);
 
-        void cancelReservation(String reservationId, Authentication connectedUser);
+        void cancelReservation(String reservationId, String reason, Authentication connectedUser);
 
         ReservationResponse reserveRoom(ReservationRequest request, Authentication connectedUser);
 
@@ -29,4 +29,6 @@ public interface ReservationService {
         void returnRoom(String reservationId, Authentication authentication);
 
         ReservationDetailResponse getReservationDetail(String reservationId, Authentication authentication);
+        
+        void forceCancelReservation(String reservationId, String reason, Authentication adminUser);
 }
