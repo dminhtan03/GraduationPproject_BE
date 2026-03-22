@@ -103,4 +103,30 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendForceCancelEmail(String to, String username, String reason, String subject) throws MessagingException {
+        MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(
+                mimeMessage,
+                MimeMessageHelper.MULTIPART_MODE_MIXED,
+                UTF_8.name()
+        );
+
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("username", username);
+        properties.put("reason", reason);
+
+        Context context = new Context();
+        context.setVariables(properties);
+
+        helper.setFrom(fromAddress);
+        helper.setTo(to);
+        helper.setSubject(subject);
+
+        String template = emailTemplateEngine.process(EmailTemplateName.FORCE_CANCEL.getName(), context);
+        helper.setText(template, true);
+
+        javaMailSender.send(mimeMessage);
+    }
+
 }
