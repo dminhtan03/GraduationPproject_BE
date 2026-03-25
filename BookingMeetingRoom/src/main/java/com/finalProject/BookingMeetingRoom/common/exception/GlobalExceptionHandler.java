@@ -39,13 +39,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<Response<Void>> handleAccessDeniedException(
             org.springframework.security.access.AccessDeniedException e, WebRequest request) {
-        return buildErrorResponse(e.getMessage(), HttpStatus.FORBIDDEN, request.getDescription(false));
+        return buildErrorResponse(e.getMessage(), HttpStatus.FORBIDDEN, request.getDescription(false), "403");
     }
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<Response<Void>> handleCustomException(CustomException ex, WebRequest request) {
         ResponseCode code = ex.getResponseCode();
-        return buildErrorResponse(code, request.getDescription(false));
+        String message = (ex.getData() instanceof String) ? (String) ex.getData() : code.getMessage();
+        return buildErrorResponse(message, code.getHttpStatus(), request.getDescription(false), code.getCode());
     }
 
     /**
@@ -57,7 +58,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Response<Void>> handleRuntimeException(RuntimeException e, WebRequest request) {
-        return buildErrorResponse(e.getMessage(), HttpStatus.BAD_REQUEST, request.getDescription(false));
+        return buildErrorResponse(e.getMessage(), HttpStatus.BAD_REQUEST, request.getDescription(false), "400");
     }
 
     /**
@@ -89,33 +90,21 @@ public class GlobalExceptionHandler {
      * @param message the error message
      * @param status  the HTTP status
      * @param path    the request path
+     * @param code    the internal error code
      * @return a ResponseEntity containing the error response
      */
-    private ResponseEntity<Response<Void>> buildErrorResponse(String message, HttpStatus status, String path) {
+    private ResponseEntity<Response<Void>> buildErrorResponse(String message, HttpStatus status, String path, String code) {
         Response<Void> response = new Response<>();
         Response.Metadata metadata = new Response.Metadata();
-        metadata.setCode(String.valueOf(status.value()));
+        metadata.setCode(code);
         metadata.setMessage(message);
         response.setMeta(metadata);
 
         return ResponseEntity.status(status).body(response);
     }
 
-    /**
-     * Build an error response.
-     *
-
-     * @param path    the request path
-     * @return a ResponseEntity containing the error response
-     */
     private ResponseEntity<Response<Void>> buildErrorResponse(ResponseCode code, String path) {
-        Response<Void> response = new Response<>();
-        Response.Metadata metadata = new Response.Metadata();
-        metadata.setCode(code.getCode());
-        metadata.setMessage(code.getMessage());
-        response.setMeta(metadata);
-
-        return ResponseEntity.status(code.getHttpStatus()).body(response);
+        return buildErrorResponse(code.getMessage(), code.getHttpStatus(), path, code.getCode());
     }
 
     /**

@@ -52,6 +52,11 @@ public interface RoomRepository extends JpaRepository<Room, String> {
 
     List<Room> findByFloor(Floor floor);
 
+    boolean existsByFloorIdAndLocationCode(String floorId, String locationCode);
+
+    @Query("SELECT r.locationCode FROM Room r WHERE r.floor.id = :floorId")
+    List<String> findLocationCodesByFloorId(@Param("floorId") String floorId);
+
     int countByStatus(RoomStatus roomStatus);
 
     @Query(nativeQuery = true, value = """

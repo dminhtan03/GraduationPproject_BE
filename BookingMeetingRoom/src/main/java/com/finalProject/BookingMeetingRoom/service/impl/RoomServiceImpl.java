@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
-import com.finalProject.BookingMeetingRoom.repository.*;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -31,14 +29,18 @@ import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.model.entity.Floor;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
-import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
-// start add layout request import
 import com.finalProject.BookingMeetingRoom.model.request.FloorLayoutRequest;
-// end add layout request import
+import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
+import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
+import com.finalProject.BookingMeetingRoom.repository.AmenityRepository;
+import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
+import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
 
 import lombok.RequiredArgsConstructor;
@@ -224,10 +226,16 @@ public class RoomServiceImpl implements RoomService {
 
     // start implement addRoom
     @Override
+    @Transactional
     public void addRoom(RoomCreateRequest request) {
         try {
             Floor floor = floorRepository.findById(request.getFloorId())
                     .orElseThrow(() -> new CustomException(ResponseCode.FLOOR_NOT_FOUND));
+
+            // [ADDED] Check if room name already exists on this floor
+            if (roomRepository.existsByFloorIdAndLocationCode(request.getFloorId(), request.getLocationCode())) {
+                throw new CustomException(ResponseCode.ROOM_ALREADY_EXISTS);
+            }
 
             Room room = new Room();
             room.setId(UUID.randomUUID().toString());
@@ -292,6 +300,11 @@ public class RoomServiceImpl implements RoomService {
              Workbook workbook = new XSSFWorkbook(is)) {
 
             Sheet sheet = workbook.getSheetAt(0);
+            List<String> skippedRooms = new ArrayList<>();
+            List<String> existingRoomNames = (floorId != null && !floorId.isEmpty())
+                    ? roomRepository.findLocationCodesByFloorId(floorId)
+                    : new ArrayList<>();
+
             for (Row row : sheet) {
                 // Skip header row
                 if (row.getRowNum() == 0) continue;
@@ -311,6 +324,13 @@ public class RoomServiceImpl implements RoomService {
                         continue;
                     }
 
+                    // [ADDED] Skip if room already exists on this floor
+                    if (existingRoomNames.contains(locationCode)) {
+                        logger.warn("Skipping duplicate room: " + locationCode);
+                        skippedRooms.add(locationCode);
+                        continue;
+                    }
+
                     RoomCreateRequest request = RoomCreateRequest.builder()
                             .locationCode(locationCode)
                             .status(statusStr.isEmpty() ? RoomStatus.AVAILABLE : RoomStatus.valueOf(statusStr.toUpperCase()))
@@ -322,10 +342,22 @@ public class RoomServiceImpl implements RoomService {
                             .build();
 
                     addRoom(request);
+                    // Add new room name to the list to prevent duplicates within the same Excel file
+                    existingRoomNames.add(locationCode);
                 } catch (Exception e) {
                     logger.error("Error processing row " + row.getRowNum() + ": " + e.getMessage());
                 }
             }
+
+            // If there were any skipped rooms, notify the user
+            if (!skippedRooms.isEmpty()) {
+                String message = "Import completed, but the following rooms were skipped because they already exist: " +
+                        String.join(", ", skippedRooms);
+                throw new CustomException(ResponseCode.ROOM_ALREADY_EXISTS, message);
+            }
+
+        } catch (CustomException e) {
+            throw e;
         } catch (Exception e) {
             logger.error("Error importing rooms from excel: " + e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
