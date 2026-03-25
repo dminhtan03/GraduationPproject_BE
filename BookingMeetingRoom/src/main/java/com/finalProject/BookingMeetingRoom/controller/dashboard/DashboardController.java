@@ -11,9 +11,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
+
+import org.springframework.format.annotation.DateTimeFormat;
+
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
 import com.finalProject.BookingMeetingRoom.service.DashboardService;
+import com.finalProject.BookingMeetingRoom.service.ReservationService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,6 +29,23 @@ import lombok.RequiredArgsConstructor;
 public class DashboardController {
 
     private final DashboardService dashboardService;
+    private final ReservationService reservationService;
+
+    @GetMapping("/reservations")
+    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
+    public ResponseEntity<?> getAllReservationsForAdmin(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) ReservationStatus status,
+            @RequestParam(required = false) String userName,
+            @RequestParam(required = false) String userEmail,
+            @RequestParam(required = false) String roomName,
+            @RequestParam(required = false) String floorName,
+            @RequestParam(required = false) String buildingName,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        return ResponseEntity.ok(Response.ofSucceeded(reservationService.getAllReservationsForAdmin(page, size, status, userName, userEmail, roomName, floorName, buildingName, startDate, endDate)));
+    }
 
     @GetMapping(value = "/rooms-map")
     public ResponseEntity<?> getRoomsMap(){

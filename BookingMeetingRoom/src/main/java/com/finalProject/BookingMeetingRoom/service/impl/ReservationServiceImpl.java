@@ -27,6 +27,7 @@ import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomReserveStatusUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.AdminReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationHistoryResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
@@ -323,6 +324,19 @@ public class ReservationServiceImpl implements ReservationService {
             throw e;
         } catch (Exception e) {
             log.error("Unexpected error during get all reservations", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // [ADDED] Get all reservations for admin with filtering
+    @Override
+    public Page<AdminReservationResponse> getAllReservationsForAdmin(int page, int size, ReservationStatus status, String userName, String userEmail, String roomName, String floorName, String buildingName, LocalDateTime startDate, LocalDateTime endDate) {
+        try {
+            Pageable pageable = PageRequest.of(page, size);
+            Page<Reservation> reservations = reservationRepository.findAllWithDetailsForAdmin(pageable, status, userName, userEmail, roomName, floorName, buildingName, startDate, endDate);
+            return reservations.map(reservationMapperFacade::toAdminResponse);
+        } catch (Exception e) {
+            log.error("Unexpected error during get all reservations for admin", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }

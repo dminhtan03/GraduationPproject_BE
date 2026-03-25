@@ -152,6 +152,31 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
       @Param("endTime") String endTime,
       Pageable pageable);
 
+  // [ADDED] Find all reservations with user and room details for admin
+  @Query("SELECT r FROM Reservation r " +
+          "JOIN FETCH r.user u " +
+          "JOIN FETCH r.room ro " +
+          "JOIN FETCH ro.floor f " +
+          "JOIN FETCH f.building b " +
+          "LEFT JOIN u.userInfo ui " + // [SỬA] Thêm LEFT JOIN tới UserInfo để có thể tìm theo tên
+          "WHERE (:status IS NULL OR r.status = :status) " +
+          "AND (:userName IS NULL OR CONCAT(ui.firstName, ' ', ui.lastName) LIKE %:userName%) " + // [SỬA] Tìm theo tên đầy đủ từ UserInfo
+          "AND (:userEmail IS NULL OR ui.email LIKE %:userEmail%) " + // [SỬA] Tìm theo email từ UserInfo
+          "AND (:roomName IS NULL OR ro.locationCode LIKE %:roomName%) " +
+          "AND (:floorName IS NULL OR f.name LIKE %:floorName%) " + // [SỬA] Sửa từ f.floorName thành f.name
+          "AND (:buildingName IS NULL OR b.name LIKE %:buildingName%) " + // [SỬA] Sửa từ b.buildingName thành b.name
+          "AND (cast(:startDate as timestamp) IS NULL OR r.startTime >= :startDate) " +
+          "AND (cast(:endDate as timestamp) IS NULL OR r.endTime <= :endDate)")
+  Page<Reservation> findAllWithDetailsForAdmin(Pageable pageable,
+                                               @Param("status") ReservationStatus status,
+                                               @Param("userName") String userName,
+                                               @Param("userEmail") String userEmail,
+                                               @Param("roomName") String roomName,
+                                               @Param("floorName") String floorName,
+                                               @Param("buildingName") String buildingName,
+                                               @Param("startDate") LocalDateTime startDate,
+                                               @Param("endDate") LocalDateTime endDate);
+
   // start update findReservationsOverStartTime to use parameter
   @Query(value = """
       SELECT *
@@ -161,6 +186,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
       """, nativeQuery = true)
   List<Reservation> findReservationsOverStartTime(@Param("currentTime") LocalDateTime currentTime);
   // end update findReservationsOverStartTime to use parameter
+
 
   // start update findReservationsOverEndTime to use parameter
   @Query(value = "SELECT * from tbl_reservation r WHERE r.end_time < :currentTime " +

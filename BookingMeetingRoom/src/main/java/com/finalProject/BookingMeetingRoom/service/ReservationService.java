@@ -1,6 +1,8 @@
 package com.finalProject.BookingMeetingRoom.service;
 
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
+import com.finalProject.BookingMeetingRoom.model.response.AdminReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
@@ -8,9 +10,13 @@ import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailRespo
 import org.springframework.data.domain.Page;
 import org.springframework.security.core.Authentication;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ReservationService {
+
+        // [ADDED] Get all reservations for admin with filtering
+        Page<AdminReservationResponse> getAllReservationsForAdmin(int page, int size, ReservationStatus status, String userName, String userEmail, String roomName, String floorName, String buildingName, LocalDateTime startDate, LocalDateTime endDate);
 
         void checkIn(String reservationId, Authentication authentication);
 
