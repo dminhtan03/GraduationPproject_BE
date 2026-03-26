@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -98,10 +99,11 @@ public class DashboardServiceImpl implements DashboardService {
                         });
 
                 RoomDto roomDto = new RoomDto();
-                roomDto.setRoomId(room.getRoomId());
+                roomDto.setId(room.getRoomId());
                 roomDto.setLocationCode(room.getLocationCode());
                 roomDto.setStatus(room.getStatus());
                 roomDto.setScore(room.getScore());
+                roomDto.setCapacity(room.getCapacity());
                 roomDto.setXPosition(room.getXPosition());
                 roomDto.setYPosition(room.getYPosition());
                 roomDto.setWidth(room.getWidth());
@@ -215,23 +217,37 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<RoomDto> getAllRoomsByFloorId(String floorId) {
         try {
-            List<RoomDtoProjection> seats = roomRepository.findRooms(floorId);
+            Floor floor = floorRepository.findById(floorId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.FLOOR_NOT_FOUND));
 
-            return seats.stream()
-                    .map(seat -> new RoomDto(
-                            seat.getRoomId(),
-                            seat.getLocationCode(),
-                            seat.getStatus(),
-                            seat.getScore(),
-                            seat.getXPosition(),
-                            seat.getYPosition(),
-                            seat.getWidth(),
-                            seat.getHeight(),
-                            seat.getPositioned() != null && seat.getPositioned()
-                    )).toList();
+            List<Room> rooms = roomRepository.findByFloorOrderByLocationCode(floor);
+
+            return rooms.stream()
+                    .map(room -> {
+                         RoomDto dto = new RoomDto();
+                         dto.setId(room.getId());
+                         dto.setLocationCode(room.getLocationCode());
+                        dto.setStatus(room.getStatus());
+                        dto.setScore(room.getScore());
+                        dto.setCapacity(room.getCapacity());
+                        dto.setXPosition(room.getXPosition());
+                        dto.setYPosition(room.getYPosition());
+                        dto.setWidth(room.getWidth());
+                        dto.setHeight(room.getHeight());
+                        dto.setPositioned(room.getPositioned() != null && room.getPositioned());
+
+                        if (room.getAmenities() != null) {
+                            dto.setAmenities(room.getAmenities().stream()
+                                    .map(a -> new RoomDto.AmenityDto(a.getId(), a.getName()))
+                                    .toList());
+                        }
+
+                        return dto;
+                    }).toList();
         } catch (CustomException e) {
             throw e;
         } catch (Exception e) {
+            logger.error("Error fetching rooms by floor: " + e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }

@@ -26,6 +26,7 @@ import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.model.entity.Amenity;
 import com.finalProject.BookingMeetingRoom.model.entity.Floor;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
@@ -204,7 +205,7 @@ public class RoomServiceImpl implements RoomService {
                     .collect(Collectors.toList());
 
             return RoomDetailResponse.builder()
-                    .roomId(room.getId())
+                    .id(room.getId())
                     .locationCode(room.getLocationCode())
                     .status(room.getStatus())
                     .capacity(room.getCapacity())
@@ -222,6 +223,11 @@ public class RoomServiceImpl implements RoomService {
             logger.error(e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    @Override
+    public List<Amenity> getAllAmenities() {
+        return amenityRepository.findAll();
     }
 
     // start implement addRoom

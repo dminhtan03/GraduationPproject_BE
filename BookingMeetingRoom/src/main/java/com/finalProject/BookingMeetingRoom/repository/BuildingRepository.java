@@ -45,6 +45,7 @@ public interface BuildingRepository extends JpaRepository<Building, String> {
                    ts.location_code as locationCode,
                    ts.status as status,
                    ts.score as score,
+                   ts.capacity as capacity,
                    ts.x_position as xPosition,
                    ts.y_position as yPosition,
                    ts.width as width,
