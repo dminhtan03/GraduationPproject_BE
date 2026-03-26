@@ -8,10 +8,12 @@ import com.finalProject.BookingMeetingRoom.model.dto.RoomDto;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousFloorResponse;
+import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
 import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
 
 public interface DashboardService {
+    DashboardOverviewStatsResponse getOverviewStats();
     RoomMapDashboardResponse getRoomsMapDashboard();
     List<AmbiguousBuildingResponse> getAllBuildings();
     List<AmbiguousFloorResponse> getAllFloorsByBuildingId(String buildingId);

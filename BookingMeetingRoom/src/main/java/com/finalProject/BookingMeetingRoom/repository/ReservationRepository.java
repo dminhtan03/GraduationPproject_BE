@@ -196,6 +196,17 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
 
   List<Reservation> findByStatus(ReservationStatus status);
 
+  // [ADDED] Count reservations within a time range
+  long countByCreateAtBetween(LocalDateTime start, LocalDateTime end);
+
+  // [ADDED] Count distinct users with reservations within a time range
+  @Query("SELECT COUNT(DISTINCT r.user.id) FROM Reservation r WHERE r.createAt BETWEEN :start AND :end")
+  long countDistinctUsersByCreateAtBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  // [ADDED] Count reservations for today
+  @Query("SELECT COUNT(r) FROM Reservation r WHERE r.createAt >= :startOfDay")
+  long countTodaysReservations(@Param("startOfDay") LocalDateTime startOfDay);
+
   @Query("SELECT r FROM Reservation r WHERE r.user.id IN :userIds AND r.status IN :statuses")
   List<Reservation> findByUserIdsAndStatusIn(Set<String> userIds, List<ReservationStatus> statuses);
 

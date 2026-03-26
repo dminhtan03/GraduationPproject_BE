@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -28,6 +29,7 @@ import com.finalProject.BookingMeetingRoom.model.response.DetailFloorResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
 import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
+import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
 import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
@@ -131,6 +133,46 @@ public class DashboardServiceImpl implements DashboardService {
      *
      * @return DashboardOverviewResponse containing building occupancy and recent activity data
      */
+    @Override
+    public DashboardOverviewStatsResponse getOverviewStats() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfThisMonth = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
+        LocalDateTime startOfLastMonth = startOfThisMonth.minusMonths(1);
+        LocalDateTime endOfLastMonth = startOfThisMonth.minusNanos(1);
+
+        // Total Bookings
+        long currentMonthBookings = reservationRepository.countByCreateAtBetween(startOfThisMonth, now);
+        long lastMonthBookings = reservationRepository.countByCreateAtBetween(startOfLastMonth, endOfLastMonth);
+        double bookingChange = calculateChange(currentMonthBookings, lastMonthBookings);
+
+        // Active Users
+        long currentMonthActiveUsers = reservationRepository.countDistinctUsersByCreateAtBetween(startOfThisMonth, now);
+        long lastMonthActiveUsers = reservationRepository.countDistinctUsersByCreateAtBetween(startOfLastMonth, endOfLastMonth);
+        double activeUsersChange = calculateChange(currentMonthActiveUsers, lastMonthActiveUsers);
+
+        // Utilization Rate
+        long totalRooms = roomRepository.count();
+        long occupiedRooms = roomRepository.countByStatus(RoomStatus.UNAVAILABLE);
+        double utilizationRate = (totalRooms > 0) ? (double) occupiedRooms / totalRooms : 0.0;
+        // For simplicity, change for utilization is not calculated in this example.
+
+        // Today's Bookings
+        long todaysBookings = reservationRepository.countTodaysReservations(now.toLocalDate().atStartOfDay());
+
+        return DashboardOverviewStatsResponse.builder()
+                .totalBookings(new DashboardOverviewStatsResponse.StatItem(currentMonthBookings, bookingChange))
+                .activeUsers(new DashboardOverviewStatsResponse.StatItem(currentMonthActiveUsers, activeUsersChange))
+                .utilizationRate(new DashboardOverviewStatsResponse.StatItem((long) (utilizationRate * 100), 0))
+                .todaysBookings(new DashboardOverviewStatsResponse.StatItem(todaysBookings, 0))
+                .build();
+    }
+
+    private double calculateChange(long current, long previous) {
+        if (previous == 0) {
+            return (current > 0) ? 1.0 : 0.0; // 100% increase if previous was 0 and current is > 0
+        }
+        return (double) (current - previous) / previous;
+    }
     /**
      * Retrieves a list of all buildings with their basic information.
      *
