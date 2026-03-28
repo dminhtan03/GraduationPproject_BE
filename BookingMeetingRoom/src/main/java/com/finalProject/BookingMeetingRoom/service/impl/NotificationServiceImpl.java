@@ -56,8 +56,10 @@ public class NotificationServiceImpl implements NotificationService {
             List<Notification> notificationList = notificationRequestList.stream()
                     .map(request -> {
                         Notification notification = notificationMapper.toEntity(request);
+                        log.info("Đang tìm User với ID: '{}'", request.getUserId());
 
-                        User user = userRepository.findById(request.getUserId())
+                        String cleanUserId = request.getUserId().trim();
+                        User user = userRepository.findById(cleanUserId)
                                 .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
                         notification.setUser(user);
 
@@ -340,6 +342,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         for (Reservation reservation : sendNoticeRequest.getReservationList()) {
 
+            
             String roomName = reservation.getRoom().getLocationCode();
             String startTime = reservation.getStartTime().format(formatter);
             String endTime = reservation.getEndTime().format(formatter);
@@ -363,5 +366,7 @@ public class NotificationServiceImpl implements NotificationService {
         notificationProducer.sendNotifications(notificationRequestList);
 
     }
+
+    
 
 }
