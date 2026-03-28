@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -28,6 +30,7 @@ import com.finalProject.BookingMeetingRoom.model.response.DetailFloorResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
 import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
+import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
 import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
@@ -96,10 +99,11 @@ public class DashboardServiceImpl implements DashboardService {
                         });
 
                 RoomDto roomDto = new RoomDto();
-                roomDto.setRoomId(room.getRoomId());
+                roomDto.setId(room.getRoomId());
                 roomDto.setLocationCode(room.getLocationCode());
                 roomDto.setStatus(room.getStatus());
                 roomDto.setScore(room.getScore());
+                roomDto.setCapacity(room.getCapacity());
                 roomDto.setXPosition(room.getXPosition());
                 roomDto.setYPosition(room.getYPosition());
                 roomDto.setWidth(room.getWidth());
@@ -131,6 +135,46 @@ public class DashboardServiceImpl implements DashboardService {
      *
      * @return DashboardOverviewResponse containing building occupancy and recent activity data
      */
+    @Override
+    public DashboardOverviewStatsResponse getOverviewStats() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfThisMonth = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
+        LocalDateTime startOfLastMonth = startOfThisMonth.minusMonths(1);
+        LocalDateTime endOfLastMonth = startOfThisMonth.minusNanos(1);
+
+        // Total Bookings
+        long currentMonthBookings = reservationRepository.countByCreateAtBetween(startOfThisMonth, now);
+        long lastMonthBookings = reservationRepository.countByCreateAtBetween(startOfLastMonth, endOfLastMonth);
+        double bookingChange = calculateChange(currentMonthBookings, lastMonthBookings);
+
+        // Active Users
+        long currentMonthActiveUsers = reservationRepository.countDistinctUsersByCreateAtBetween(startOfThisMonth, now);
+        long lastMonthActiveUsers = reservationRepository.countDistinctUsersByCreateAtBetween(startOfLastMonth, endOfLastMonth);
+        double activeUsersChange = calculateChange(currentMonthActiveUsers, lastMonthActiveUsers);
+
+        // Utilization Rate
+        long totalRooms = roomRepository.count();
+        long occupiedRooms = roomRepository.countByStatus(RoomStatus.UNAVAILABLE);
+        double utilizationRate = (totalRooms > 0) ? (double) occupiedRooms / totalRooms : 0.0;
+        // For simplicity, change for utilization is not calculated in this example.
+
+        // Today's Bookings
+        long todaysBookings = reservationRepository.countTodaysReservations(now.toLocalDate().atStartOfDay());
+
+        return DashboardOverviewStatsResponse.builder()
+                .totalBookings(new DashboardOverviewStatsResponse.StatItem(currentMonthBookings, bookingChange))
+                .activeUsers(new DashboardOverviewStatsResponse.StatItem(currentMonthActiveUsers, activeUsersChange))
+                .utilizationRate(new DashboardOverviewStatsResponse.StatItem((long) (utilizationRate * 100), 0))
+                .todaysBookings(new DashboardOverviewStatsResponse.StatItem(todaysBookings, 0))
+                .build();
+    }
+
+    private double calculateChange(long current, long previous) {
+        if (previous == 0) {
+            return (current > 0) ? 1.0 : 0.0; // 100% increase if previous was 0 and current is > 0
+        }
+        return (double) (current - previous) / previous;
+    }
     /**
      * Retrieves a list of all buildings with their basic information.
      *
@@ -173,23 +217,37 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<RoomDto> getAllRoomsByFloorId(String floorId) {
         try {
-            List<RoomDtoProjection> seats = roomRepository.findRooms(floorId);
+            Floor floor = floorRepository.findById(floorId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.FLOOR_NOT_FOUND));
 
-            return seats.stream()
-                    .map(seat -> new RoomDto(
-                            seat.getRoomId(),
-                            seat.getLocationCode(),
-                            seat.getStatus(),
-                            seat.getScore(),
-                            seat.getXPosition(),
-                            seat.getYPosition(),
-                            seat.getWidth(),
-                            seat.getHeight(),
-                            seat.getPositioned() != null && seat.getPositioned()
-                    )).toList();
+            List<Room> rooms = roomRepository.findByFloorOrderByLocationCode(floor);
+
+            return rooms.stream()
+                    .map(room -> {
+                         RoomDto dto = new RoomDto();
+                         dto.setId(room.getId());
+                         dto.setLocationCode(room.getLocationCode());
+                        dto.setStatus(room.getStatus());
+                        dto.setScore(room.getScore());
+                        dto.setCapacity(room.getCapacity());
+                        dto.setXPosition(room.getXPosition());
+                        dto.setYPosition(room.getYPosition());
+                        dto.setWidth(room.getWidth());
+                        dto.setHeight(room.getHeight());
+                        dto.setPositioned(room.getPositioned() != null && room.getPositioned());
+
+                        if (room.getAmenities() != null) {
+                            dto.setAmenities(room.getAmenities().stream()
+                                    .map(a -> new RoomDto.AmenityDto(a.getId(), a.getName()))
+                                    .toList());
+                        }
+
+                        return dto;
+                    }).toList();
         } catch (CustomException e) {
             throw e;
         } catch (Exception e) {
+            logger.error("Error fetching rooms by floor: " + e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }

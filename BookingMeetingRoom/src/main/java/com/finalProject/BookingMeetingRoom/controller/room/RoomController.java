@@ -48,6 +48,11 @@ public class RoomController {
         return ResponseEntity.ok(Response.ofSucceeded(roomService.getRoomDetail(roomId)));
     }
 
+    @GetMapping("/amenities")
+    public ResponseEntity<?> getAllAmenities() {
+        return ResponseEntity.ok(Response.ofSucceeded(roomService.getAllAmenities()));
+    }
+
     // start add addRoom api
     @PostMapping
     public ResponseEntity<?> addRoom(@RequestBody @Valid RoomCreateRequest request) {

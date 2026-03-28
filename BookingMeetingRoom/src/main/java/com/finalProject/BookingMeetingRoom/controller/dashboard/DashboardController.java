@@ -31,6 +31,12 @@ public class DashboardController {
     private final DashboardService dashboardService;
     private final ReservationService reservationService;
 
+    @GetMapping("/overview-stats")
+    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
+    public ResponseEntity<?> getOverviewStats() {
+        return ResponseEntity.ok(Response.ofSucceeded(dashboardService.getOverviewStats()));
+    }
+
     @GetMapping("/reservations")
     @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
     public ResponseEntity<?> getAllReservationsForAdmin(

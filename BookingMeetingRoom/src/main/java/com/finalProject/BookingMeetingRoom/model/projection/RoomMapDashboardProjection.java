@@ -12,6 +12,7 @@ public interface RoomMapDashboardProjection {
     String getLocationCode();
     RoomStatus getStatus();
     Double getScore();
+    Integer getCapacity();
 
     // start add layout projection fields
     Double getXPosition();
