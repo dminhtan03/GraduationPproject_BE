@@ -227,6 +227,23 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     /**
+     * Notifies users about completed reservations by sending them notifications.
+     * It formats the content of the notification based on the reservation details.
+     *
+     * @param successfulReservations List of successful reservations to notify users about
+     */
+    public void noticeReturnRoomReservation(List<Reservation> successfulReservations) {
+        notifyUsersAboutReservation(
+                successfulReservations,
+                "Room Returned",
+                "Your reservation %s from %s to %s in %s has been successfully completed. Thank you for using our service!",
+                "Notifying users about completed reservations...",
+                true
+        );
+    }
+
+
+    /**
      * Notifies users about failed reservations by sending them notifications.
      * It formats the content of the notification based on the reservation details.
      *
@@ -238,6 +255,22 @@ public class NotificationServiceImpl implements NotificationService {
                 "Reservation Failed",
                 "Your reservation %s at from %s to %s in %s could not be processed. Please try again later.",
                 "Notifying users about failed reservations...",
+                true
+        );
+    }
+
+    /**
+     * Notifies users about cancelled reservations by sending them notifications.
+     * It formats the content of the notification based on the reservation details.
+     *
+     * @param cancelledReservations List of cancelled reservations to notify users about
+     */
+    public void noticeCancelReservation(List<Reservation> cancelledReservations) {
+        notifyUsersAboutReservation(
+                cancelledReservations,
+                "Reservation Cancelled",
+                "Your reservation %s at from %s to %s in %s has been cancelled.",
+                "Notifying users about cancelled reservations...",
                 true
         );
     }

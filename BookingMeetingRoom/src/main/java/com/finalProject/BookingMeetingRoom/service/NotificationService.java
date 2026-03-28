@@ -27,7 +27,11 @@ public interface NotificationService {
 
     void noticeOverTimeReservation(List<Reservation> overTimeReservations);
 
+    void noticeCancelReservation(List<Reservation> cancelledReservations);
+
     void noticeNoCheckInReservation(List<Reservation> noCheckInReservations);
+    
+    void noticeReturnRoomReservation(List<Reservation> returnRoomReservations);
 
     void noticeExtendReservation(List<Reservation> extendedReservations);
 

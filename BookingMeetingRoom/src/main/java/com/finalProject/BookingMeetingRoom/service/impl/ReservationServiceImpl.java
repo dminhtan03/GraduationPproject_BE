@@ -92,6 +92,7 @@ public class ReservationServiceImpl implements ReservationService {
             if (!room.getStatus().equals(RoomStatus.UNAVAILABLE)) {
                 throw new CustomException(ResponseCode.ROOM_NOT_UNAVAILABLE);
             }
+            List<Reservation> listReservationReturnRoom = new ArrayList<>();
 
             reservation.setStatus(ReservationStatus.COMPLETED);
             reservation.setReturnTime(LocalDateTime.now());
@@ -100,9 +101,12 @@ public class ReservationServiceImpl implements ReservationService {
 
             room.setStatus(RoomStatus.AVAILABLE);
             roomRepository.save(room);
+            listReservationReturnRoom.add(reservation);
+            notificationService.noticeReturnRoomReservation(listReservationReturnRoom);
 
             realTimeService.sendRoomStatus(room);
             realTimeService.deleteReservation(reservation);
+
 
         } catch (CustomException e) {
             throw e;
@@ -455,6 +459,8 @@ public class ReservationServiceImpl implements ReservationService {
                 throw new CustomException(ResponseCode.PERMISSION_DENIED);
             }
 
+             List<Reservation> listReservationCancel = new ArrayList<>();
+
             // start add cancellation limit logic
             LocalDate today = LocalDate.now();
             if (user.getLastCancellationDate() != null && user.getLastCancellationDate().isEqual(today)) {
@@ -475,6 +481,8 @@ public class ReservationServiceImpl implements ReservationService {
             reservation.setCancelBy(user.getId());
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
+            listReservationCancel.add(reservation);
+            notificationService.noticeCancelReservation(listReservationCancel);
 
             realTimeService.deleteReservation(reservation);
         } catch (CustomException e) {
