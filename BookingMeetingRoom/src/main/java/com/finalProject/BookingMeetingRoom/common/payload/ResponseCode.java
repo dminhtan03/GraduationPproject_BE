@@ -89,7 +89,11 @@ public enum ResponseCode {
     AUTH_HEADER_NOT_FOUND("AUTH_401", "Authorization header not found", HttpStatus.UNAUTHORIZED),
     FEEDBACK_ALREADY_EXISTS("FBD_409", "Feedback already exists for this reservation", HttpStatus.CONFLICT),
     CANNOT_FORCE_RETURN("RTN_401","ROOM cannot be force returned",HttpStatus.CONFLICT),
-    INVALID_DATE_FORMAT("DATE_400", "Invalid date format", HttpStatus.BAD_REQUEST);
+    INVALID_DATE_FORMAT("DATE_400", "Invalid date format", HttpStatus.BAD_REQUEST),
+
+    // ======= Amenity Errors =======
+    AMENITY_ALREADY_EXISTS("AMN_409", "Amenity with this name already exists", HttpStatus.CONFLICT),
+    AMENITY_NOT_FOUND("AMN_404", "Amenity not found", HttpStatus.NOT_FOUND);
 
     private final String code;
     private final String message;

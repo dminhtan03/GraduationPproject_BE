@@ -453,6 +453,10 @@ public class RoomServiceImpl implements RoomService {
             if (request.getItems() == null) return;
 
             for (FloorLayoutRequest.RoomLayoutItem item : request.getItems()) {
+                if (item.getRoomId() == null) {
+                    logger.warn("Skipping layout item with null roomId");
+                    continue;
+                }
                 roomRepository.findById(item.getRoomId()).ifPresent(room -> {
                     // Always update if it belongs to the floor or we trust the frontend
                     // Let's add a check to be safe

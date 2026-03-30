@@ -3,6 +3,8 @@ package com.finalProject.BookingMeetingRoom.model.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -16,4 +18,10 @@ public class Amenity {
 
     @Column(name = "NAME")
     private String name;
+
+    @Column(name = "CREATED_AT")
+    private LocalDateTime createdAt;
+
+    @Column(name = "UPDATED_AT")
+    private LocalDateTime updatedAt;
 }
