@@ -9,6 +9,8 @@ import java.util.UUID;
 
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.FloorCreateRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -307,7 +309,6 @@ public class DashboardServiceImpl implements DashboardService {
         }
     }
 
-    // start implement createBuilding
     @Override
     @Transactional
     public void createBuilding(BuildingCreateRequest request) {
@@ -333,6 +334,51 @@ public class DashboardServiceImpl implements DashboardService {
             }
         } catch (Exception e) {
             logger.error("Error creating building: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateBuilding(String buildingId, BuildingUpdateRequest request) {
+        try {
+            Building building = buildingRepository.findById(buildingId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.BUILDING_NOT_FOUND));
+            building.setName(request.getName());
+            building.setUpdatedAt(LocalDateTime.now());
+            buildingRepository.save(building);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error updating building: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void createFloor(FloorCreateRequest request) {
+        try {
+            Building building = buildingRepository.findById(request.getBuildingId())
+                    .orElseThrow(() -> new CustomException(ResponseCode.BUILDING_NOT_FOUND));
+
+            // Logic mới: Tự động đếm số tầng hiện có để đặt tên (ví dụ Floor 3 -> Floor 4)
+            List<AmbiguousFloorResponse> existingFloors = floorRepository.findAllFloorsByBuildingId(request.getBuildingId());
+            int nextFloorNumber = existingFloors.size() + 1;
+            String floorName = "Floor " + nextFloorNumber;
+
+            Floor floor = new Floor();
+            floor.setId(UUID.randomUUID().toString());
+            floor.setName(floorName);
+            floor.setBuilding(building);
+            floor.setDeleted(false);
+            floor.setCreateAt(LocalDateTime.now());
+            floor.setUpdatedAt(LocalDateTime.now());
+            floorRepository.save(floor);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error creating floor: " + e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }

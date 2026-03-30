@@ -82,12 +82,21 @@ public interface BuildingRepository extends JpaRepository<Building, String> {
 
 
     @Query(nativeQuery = true, value = """
-            
+            WITH floor_count AS (
+                SELECT
+                    building_id,
+                    COUNT(*) AS numsOfFloors
+                FROM tbl_floor
+                WHERE is_deleted = false
+                GROUP BY building_id
+            )
             SELECT
                 tb.id as id,
                 tb.building_name AS name,
-                tb.address as address
+                tb.address as address,
+                COALESCE(floor_count.numsOfFloors, 0) AS totalFloors
             FROM tbl_building tb
+            LEFT JOIN floor_count ON tb.id = floor_count.building_id
             WHERE tb.is_deleted = false
             """)
     List<AmbiguousBuildingResponse> findAllBuildings();
