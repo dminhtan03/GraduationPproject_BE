@@ -2,6 +2,7 @@ package com.finalProject.BookingMeetingRoom.controller.room;
 
 import java.util.List;
 
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -54,9 +56,11 @@ public class RoomController {
     }
 
     // start add addRoom api
-    @PostMapping
-    public ResponseEntity<?> addRoom(@RequestBody @Valid RoomCreateRequest request) {
-        roomService.addRoom(request);
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> addRoom(
+            @RequestPart("room") @Valid RoomCreateRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        roomService.addRoom(request, image);
         return ResponseEntity.ok(Response.ofSucceeded("Room added successfully"));
     }
     // end add addRoom api

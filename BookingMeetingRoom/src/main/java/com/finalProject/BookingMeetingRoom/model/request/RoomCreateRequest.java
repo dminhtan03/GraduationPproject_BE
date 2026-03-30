@@ -33,4 +33,8 @@ public class RoomCreateRequest {
     private String floorId;
 
     private List<String> amenityIds;
+
+    // Cloudinary Image Info
+    private String imageUrl;
+    private String publicId;
 }

@@ -24,7 +24,7 @@ public interface RoomService {
     List<Amenity> getAllAmenities();
 
     // start add addRoom method
-    void addRoom(RoomCreateRequest request);
+    void addRoom(RoomCreateRequest request, MultipartFile image);
     // end add addRoom method
 
     // start add updateRoom method
