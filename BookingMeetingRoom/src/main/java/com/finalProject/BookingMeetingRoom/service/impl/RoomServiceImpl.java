@@ -1,13 +1,15 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
+import com.finalProject.BookingMeetingRoom.repository.*;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -29,6 +31,7 @@ import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.model.entity.Amenity;
 import com.finalProject.BookingMeetingRoom.model.entity.Floor;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.entity.RoomImage;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
 import com.finalProject.BookingMeetingRoom.model.request.FloorLayoutRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
@@ -37,11 +40,6 @@ import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
-import com.finalProject.BookingMeetingRoom.repository.AmenityRepository;
-import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
-import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
-import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
-import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
 
 import lombok.RequiredArgsConstructor;
@@ -57,6 +55,8 @@ public class RoomServiceImpl implements RoomService {
     private final FeedbackRepository feedbackRepository;
     // start add repository
     private final AmenityRepository amenityRepository;
+    private final RoomImageRepository roomImageRepository;
+    private final Cloudinary cloudinary;
     // end add repository
 
     /**
@@ -233,7 +233,7 @@ public class RoomServiceImpl implements RoomService {
     // start implement addRoom
     @Override
     @Transactional
-    public void addRoom(RoomCreateRequest request) {
+    public void addRoom(RoomCreateRequest request, MultipartFile image) {
         try {
             Floor floor = floorRepository.findById(request.getFloorId())
                     .orElseThrow(() -> new CustomException(ResponseCode.FLOOR_NOT_FOUND));
@@ -258,6 +258,39 @@ public class RoomServiceImpl implements RoomService {
             }
 
             roomRepository.save(room);
+
+            // Handle Image if provided (from MultipartFile)
+            if (image != null && !image.isEmpty()) {
+                try {
+                    Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                            image.getBytes(),
+                            ObjectUtils.asMap(
+                                    "folder", "meeting-room/" + room.getId(),
+                                    "resource_type", "image"
+                            )
+                    );
+
+                    RoomImage roomImage = new RoomImage();
+                    roomImage.setId(UUID.randomUUID().toString());
+                    roomImage.setImageUrl(uploadResult.get("secure_url").toString());
+                    roomImage.setPublicId(uploadResult.get("public_id").toString());
+                    roomImage.setCreatedAt(LocalDateTime.now());
+                    roomImage.setRoom(room);
+                    roomImageRepository.save(roomImage);
+                } catch (Exception e) {
+                    logger.error("Upload image to Cloudinary failed: " + e.getMessage());
+                }
+            }
+            // Handle Image if provided (from URL - for Excel import fallback or direct URL)
+            else if (request.getImageUrl() != null && !request.getImageUrl().isEmpty()) {
+                RoomImage roomImage = new RoomImage();
+                roomImage.setId(UUID.randomUUID().toString());
+                roomImage.setImageUrl(request.getImageUrl());
+                roomImage.setPublicId(request.getPublicId());
+                roomImage.setCreatedAt(LocalDateTime.now());
+                roomImage.setRoom(room);
+                roomImageRepository.save(roomImage);
+            }
         } catch (CustomException e) {
             throw e;
         } catch (Exception e) {
@@ -325,6 +358,10 @@ public class RoomServiceImpl implements RoomService {
 
                     String targetFloorId = (floorId != null && !floorId.isEmpty()) ? floorId : excelFloorId;
 
+                    // Image from excel (Cột 6 và 7)
+                    String imageUrl = getCellValue(row.getCell(6));
+                    String publicId = getCellValue(row.getCell(7));
+
                     if (locationCode.isEmpty() || targetFloorId.isEmpty()) {
                         logger.warn("Skipping row " + row.getRowNum() + ": locationCode or floorId is missing.");
                         continue;
@@ -347,7 +384,34 @@ public class RoomServiceImpl implements RoomService {
                                     Arrays.asList(amenityIdsStr.split(",")))
                             .build();
 
-                    addRoom(request);
+                    // Handle local image upload if provided in Excel
+                    if (!imageUrl.isEmpty()) {
+                        try {
+                            // Check if imageUrl is actually a local file path
+                            File localFile = new File(imageUrl);
+                            if (localFile.exists() && localFile.isFile()) {
+                                try (FileInputStream fis = new FileInputStream(localFile)) {
+                                    Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                                            fis.readAllBytes(),
+                                            ObjectUtils.asMap(
+                                                    "folder", "meeting-room/imported",
+                                                    "resource_type", "image"
+                                            )
+                                    );
+                                    request.setImageUrl(uploadResult.get("secure_url").toString());
+                                    request.setPublicId(uploadResult.get("public_id").toString());
+                                }
+                            } else {
+                                // Assume it's already a URL
+                                request.setImageUrl(imageUrl);
+                                request.setPublicId(publicId);
+                            }
+                        } catch (Exception e) {
+                            logger.error("Error processing image from excel for room " + locationCode + ": " + e.getMessage());
+                        }
+                    }
+
+                    addRoom(request, null);
                     // Add new room name to the list to prevent duplicates within the same Excel file
                     existingRoomNames.add(locationCode);
                 } catch (Exception e) {
