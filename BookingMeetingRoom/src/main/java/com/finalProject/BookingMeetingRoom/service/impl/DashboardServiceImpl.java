@@ -7,10 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
-import com.finalProject.BookingMeetingRoom.model.entity.Room;
-import com.finalProject.BookingMeetingRoom.model.request.BuildingUpdateRequest;
-import com.finalProject.BookingMeetingRoom.model.request.FloorCreateRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -19,25 +15,29 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.model.dto.RoomDto;
 import com.finalProject.BookingMeetingRoom.model.entity.Building;
 import com.finalProject.BookingMeetingRoom.model.entity.Floor;
-import com.finalProject.BookingMeetingRoom.model.projection.RoomDtoProjection;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.FloorCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousFloorResponse;
+import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
 import com.finalProject.BookingMeetingRoom.model.response.DetailFloorResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
 import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
-import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
 import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
 import com.finalProject.BookingMeetingRoom.service.DashboardService;
 
 import lombok.RequiredArgsConstructor;
@@ -52,6 +52,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final BuildingRepository buildingRepository;
     private final FloorRepository floorRepository;
     private final RoomRepository roomRepository;
+    private final AcademicScheduleService academicScheduleService;
 
     /**
      * Retrieves the employee dashboard data including active reservations, last checked-in details, and hours worked.
@@ -103,7 +104,36 @@ public class DashboardServiceImpl implements DashboardService {
                 RoomDto roomDto = new RoomDto();
                 roomDto.setId(room.getRoomId());
                 roomDto.setLocationCode(room.getLocationCode());
-                roomDto.setStatus(room.getStatus());
+
+                // [HYBRID] Cập nhật trạng thái động cho sơ đồ phòng (Dashboard/Map)
+                RoomStatus status = room.getStatus();
+                LocalDateTime now = LocalDateTime.now();
+                LocalDateTime nextMinute = now.plusMinutes(1);
+
+                // Check for reservation conflict first
+                boolean hasReservationConflict = reservationRepository
+                        .findOverlappingReservations(room.getRoomId(), now, nextMinute)
+                        .stream()
+                        .anyMatch(res ->
+                                res.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.IN_USE ||
+                                        res.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.RESERVED
+                        );
+
+                if (status == RoomStatus.AVAILABLE) {
+                    if (hasReservationConflict) {
+                        status = RoomStatus.UNAVAILABLE;
+                    } else if (academicScheduleService.isRoomBusyWithLearning(room.getRoomId(), now, nextMinute)) {
+                        status = RoomStatus.LEARNING;
+                    }
+                } else if (status == RoomStatus.UNAVAILABLE && !hasReservationConflict) {
+                    if (academicScheduleService.isRoomBusyWithLearning(room.getRoomId(), now, nextMinute)) {
+                        status = RoomStatus.LEARNING;
+                    } else {
+                        status = RoomStatus.AVAILABLE;
+                    }
+                }
+                roomDto.setStatus(status);
+
                 roomDto.setScore(room.getScore());
                 roomDto.setCapacity(room.getCapacity());
                 roomDto.setXPosition(room.getXPosition());
@@ -229,7 +259,36 @@ public class DashboardServiceImpl implements DashboardService {
                          RoomDto dto = new RoomDto();
                          dto.setId(room.getId());
                          dto.setLocationCode(room.getLocationCode());
-                        dto.setStatus(room.getStatus());
+
+                        // [HYBRID] Cập nhật trạng thái động cho danh sách phòng của Admin
+                        RoomStatus status = room.getStatus();
+                        LocalDateTime now = LocalDateTime.now();
+                        LocalDateTime nextMinute = now.plusMinutes(1);
+
+                        // Check for reservation conflict first
+                        boolean hasReservationConflict = reservationRepository
+                                .findOverlappingReservations(room.getId(), now, nextMinute)
+                                .stream()
+                                .anyMatch(res ->
+                                        res.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.IN_USE ||
+                                                res.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.RESERVED
+                                );
+
+                        if (status == RoomStatus.AVAILABLE) {
+                            if (hasReservationConflict) {
+                                status = RoomStatus.UNAVAILABLE;
+                            } else if (academicScheduleService.isRoomBusyWithLearning(room.getId(), now, nextMinute)) {
+                                status = RoomStatus.LEARNING;
+                            }
+                        } else if (status == RoomStatus.UNAVAILABLE && !hasReservationConflict) {
+                            if (academicScheduleService.isRoomBusyWithLearning(room.getId(), now, nextMinute)) {
+                                status = RoomStatus.LEARNING;
+                            } else {
+                                status = RoomStatus.AVAILABLE;
+                            }
+                        }
+                        dto.setStatus(status);
+
                         dto.setScore(room.getScore());
                         dto.setCapacity(room.getCapacity());
                         dto.setXPosition(room.getXPosition());

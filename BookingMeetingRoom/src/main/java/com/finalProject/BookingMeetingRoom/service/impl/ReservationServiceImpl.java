@@ -27,8 +27,8 @@ import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomReserveStatusUpdateRequest;
-import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AdminReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationHistoryResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
@@ -36,15 +36,14 @@ import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.repository.ReservationHistoryRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
-import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserInfoRepository;
+import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
+import com.finalProject.BookingMeetingRoom.service.EmailService;
+import com.finalProject.BookingMeetingRoom.service.NotificationService;
 import com.finalProject.BookingMeetingRoom.service.RealTimeService;
 import com.finalProject.BookingMeetingRoom.service.ReservationHistoryService;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
-import com.finalProject.BookingMeetingRoom.service.EmailService;
-import com.finalProject.BookingMeetingRoom.service.NotificationService;
-import com.finalProject.BookingMeetingRoom.common.enums.EmailTemplateName;
-import com.finalProject.BookingMeetingRoom.model.request.NotificationRequest;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -67,6 +66,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final FeedbackMapper feedbackMapper;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final AcademicScheduleService academicScheduleService;
 
     record ReservationContext(Reservation reservation, Room room) {
     }
@@ -295,6 +295,11 @@ public class ReservationServiceImpl implements ReservationService {
 
             if (conflict) {
                 throw new CustomException(ResponseCode.CANNOT_RESERVE_ROOM);
+            }
+
+            // [HYBRID] Thêm bước kiểm tra lịch học cố định (Academic Schedule)
+            if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                throw new CustomException(ResponseCode.ROOM_IN_ACADEMIC_SCHEDULE);
             }
 
             var reservation = reservationMapper.toEntity(request);

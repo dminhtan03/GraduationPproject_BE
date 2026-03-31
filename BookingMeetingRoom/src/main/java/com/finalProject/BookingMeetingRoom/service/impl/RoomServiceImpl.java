@@ -1,15 +1,16 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
-import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-import com.finalProject.BookingMeetingRoom.repository.*;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -24,6 +25,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
@@ -40,6 +43,13 @@ import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
+import com.finalProject.BookingMeetingRoom.repository.AmenityRepository;
+import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
+import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomImageRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
 
 import lombok.RequiredArgsConstructor;
@@ -57,6 +67,7 @@ public class RoomServiceImpl implements RoomService {
     private final AmenityRepository amenityRepository;
     private final RoomImageRepository roomImageRepository;
     private final Cloudinary cloudinary;
+    private final AcademicScheduleService academicScheduleService;
     // end add repository
 
     /**
@@ -86,6 +97,7 @@ public class RoomServiceImpl implements RoomService {
 
             return rooms.stream()
                     .map(room -> {
+                        // [HYBRID] Kiểm tra đồng thời cả Reservation (đặt phòng thật) và AcademicSchedule (lịch học cố định)
                         boolean hasConflict = reservationRepository
                                 .findOverlappingReservations(room.getId(), startTime, endTime)
                                 .stream()
@@ -94,14 +106,32 @@ public class RoomServiceImpl implements RoomService {
                                                 r.getStatus() == ReservationStatus.RESERVED
                                 );
 
+                        // Nếu không có conflict với reservation, kiểm tra tiếp với lịch học
+                        RoomStatus status = room.getStatus();
+                        if (status == RoomStatus.AVAILABLE) {
+                            if (hasConflict) {
+                                status = RoomStatus.UNAVAILABLE;
+                            } else if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                                status = RoomStatus.LEARNING;
+                            }
+                        } else if (status == RoomStatus.UNAVAILABLE && !hasConflict) {
+                            // Trường hợp phòng trong DB là UNAVAILABLE (có thể do check-in trước đó) 
+                            // nhưng trong khoảng thời gian search mới này lại không có conflict
+                            if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                                status = RoomStatus.LEARNING;
+                            } else {
+                                status = RoomStatus.AVAILABLE;
+                            }
+                        }
+
                         return new RoomSearchResponse(
                                 room.getId(),
                                 room.getLocationCode(),
                                 room.getScore(),
-                                hasConflict ? RoomStatus.UNAVAILABLE : RoomStatus.AVAILABLE
+                                status
                         );
                     })
-                    .filter(roomResponse -> roomResponse.getStatus() == RoomStatus.AVAILABLE)
+                    .filter(roomResponse -> roomResponse.getStatus() == RoomStatus.AVAILABLE || roomResponse.getStatus() == RoomStatus.LEARNING)
                     .collect(Collectors.toList());
         } catch (CustomException e) {
             throw e;
@@ -152,7 +182,8 @@ public class RoomServiceImpl implements RoomService {
     }
 
     private RoomSearchResponse mapToRoomSearchResponse(Room room, LocalDateTime startTime, LocalDateTime endTime) {
-        boolean hasConflict = (room.getStatus() == RoomStatus.BROKEN) || reservationRepository
+        // [HYBRID] Check both real reservations and virtual academic schedules
+        boolean hasReservationConflict = (room.getStatus() == RoomStatus.BROKEN) || reservationRepository
                 .findOverlappingReservations(room.getId(), startTime, endTime)
                 .stream()
                 .anyMatch(r ->
@@ -160,11 +191,26 @@ public class RoomServiceImpl implements RoomService {
                                 r.getStatus() == ReservationStatus.RESERVED
                 );
 
+        RoomStatus finalStatus = room.getStatus();
+        if (finalStatus == RoomStatus.AVAILABLE) {
+            if (hasReservationConflict) {
+                finalStatus = RoomStatus.UNAVAILABLE;
+            } else if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                finalStatus = RoomStatus.LEARNING;
+            }
+        } else if (finalStatus == RoomStatus.UNAVAILABLE && !hasReservationConflict) {
+            if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                finalStatus = RoomStatus.LEARNING;
+            } else {
+                finalStatus = RoomStatus.AVAILABLE;
+            }
+        }
+
         return new RoomSearchResponse(
                 room.getId(),
                 room.getLocationCode(),
                 room.getScore(),
-                hasConflict ? RoomStatus.UNAVAILABLE : RoomStatus.AVAILABLE
+                finalStatus
         );
     }
 
@@ -204,10 +250,17 @@ public class RoomServiceImpl implements RoomService {
                             .build())
                     .collect(Collectors.toList());
 
+            // [HYBRID] Check learning status for room detail
+            RoomStatus status = room.getStatus();
+            LocalDateTime now = LocalDateTime.now();
+            if (status == RoomStatus.AVAILABLE && academicScheduleService.isRoomBusyWithLearning(room.getId(), now, now.plusMinutes(1))) {
+                status = RoomStatus.LEARNING;
+            }
+
             return RoomDetailResponse.builder()
                     .id(room.getId())
                     .locationCode(room.getLocationCode())
-                    .status(room.getStatus())
+                    .status(status)
                     .capacity(room.getCapacity())
                     .amenities(room.getAmenities())
                     .images(images)

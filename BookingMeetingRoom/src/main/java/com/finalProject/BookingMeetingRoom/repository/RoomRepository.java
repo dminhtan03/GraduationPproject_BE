@@ -1,24 +1,22 @@
 package com.finalProject.BookingMeetingRoom.repository;
 
-import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
-import com.finalProject.BookingMeetingRoom.model.dto.RoomDto;
-import com.finalProject.BookingMeetingRoom.model.entity.Floor;
-import com.finalProject.BookingMeetingRoom.model.entity.Room;
-import com.finalProject.BookingMeetingRoom.model.projection.RoomDtoProjection;
-import com.finalProject.BookingMeetingRoom.model.projection.RoomResponseProjection;
-// start add imports
-import jakarta.persistence.LockModeType;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.repository.query.Param;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
-// end add imports
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.model.entity.Floor;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.projection.RoomDtoProjection;
+
+import jakarta.persistence.LockModeType;
 
 public interface RoomRepository extends JpaRepository<Room, String> {
 
@@ -51,6 +49,8 @@ public interface RoomRepository extends JpaRepository<Room, String> {
     Page<Room> findByFloorOrderByLocationCode(Floor floor, Pageable pageable);
 
     List<Room> findByFloor(Floor floor);
+
+    Optional<Room> findByLocationCode(String locationCode);
 
     boolean existsByFloorIdAndLocationCode(String floorId, String locationCode);
 
