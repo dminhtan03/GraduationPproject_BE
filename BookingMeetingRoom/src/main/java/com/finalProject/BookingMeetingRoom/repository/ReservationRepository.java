@@ -20,6 +20,32 @@ import com.finalProject.BookingMeetingRoom.model.projection.MyReservationProject
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, String> {
 
+    @Query("""
+            SELECT DISTINCT r.room.id
+            FROM Reservation r
+            WHERE r.status IN :statuses
+                AND :startTime < r.endTime
+                AND :endTime > r.startTime
+            """)
+    List<String> findConflictingRoomIds(
+            @Param("statuses") List<ReservationStatus> statuses,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime);
+
+    @Query("""
+            SELECT r
+            FROM Reservation r
+            WHERE r.room.id IN :roomIds
+                AND r.status IN :statuses
+                AND :startTime < r.endTime
+                AND :endTime > r.startTime
+            """)
+    List<Reservation> findOverlappingReservationsForRooms(
+            @Param("roomIds") List<String> roomIds,
+            @Param("statuses") List<ReservationStatus> statuses,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime);
+
   Optional<Reservation> findByIdAndStatus(String id, ReservationStatus status);
 
   @Query("SELECT COUNT(r) > 0 FROM Reservation r " +

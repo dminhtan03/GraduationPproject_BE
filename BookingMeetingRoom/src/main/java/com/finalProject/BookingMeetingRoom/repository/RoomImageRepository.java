@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface RoomImageRepository extends JpaRepository<RoomImage, String> {
     List<RoomImage> findByRoomId(String roomId);
+
+    List<RoomImage> findByRoom_IdIn(List<String> roomIds);
 }
