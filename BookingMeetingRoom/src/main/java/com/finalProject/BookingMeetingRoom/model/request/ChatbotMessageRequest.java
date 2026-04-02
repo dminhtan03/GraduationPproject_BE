@@ -1,25 +1,20 @@
 package com.finalProject.BookingMeetingRoom.model.request;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AiChatRequest {
+public class ChatbotMessageRequest {
+
+    @NotBlank
     private String message;
 
-    // Optional: group messages into a chat session
+    // optional for future conversation state
     private String sessionId;
-
-    // optional: if user already picked a timeslot
-    private LocalDateTime startTime;
-    private LocalDateTime endTime;
-    private Integer capacity;
 }
-

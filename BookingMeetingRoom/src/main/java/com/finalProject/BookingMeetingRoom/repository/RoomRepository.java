@@ -16,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -51,6 +52,13 @@ public interface RoomRepository extends JpaRepository<Room, String> {
     Page<Room> findByFloorOrderByLocationCode(Floor floor, Pageable pageable);
 
     List<Room> findByFloor(Floor floor);
+
+        @EntityGraph(attributePaths = {"floor", "floor.building", "amenities"})
+    @Query("SELECT r FROM Room r")
+    List<Room> findAllWithDetails();
+
+        @EntityGraph(attributePaths = {"floor", "floor.building", "amenities"})
+    Optional<Room> findByLocationCodeIgnoreCase(String locationCode);
 
     boolean existsByFloorIdAndLocationCode(String floorId, String locationCode);
 

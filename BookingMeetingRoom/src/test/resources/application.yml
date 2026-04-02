@@ -1,0 +1,59 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:booking_meeting_room_test;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    database-platform: org.hibernate.dialect.H2Dialect
+  main:
+    allow-bean-definition-overriding: true
+
+  mail:
+    host: localhost
+    port: 2525
+    username: test
+    password: test
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls.enable: false
+          connectiontimeout: 1000
+          timeout: 1000
+          writetimeout: 1000
+
+cloudinary:
+  cloud-name: test
+  api-key: test
+  api-secret: test
+
+application:
+  security:
+    jwt:
+      secret-key: test-test-test-test-test-test-test-test
+      expiration: 900000
+      refresh-token:
+        expiration: 604800000
+    google:
+      client-id: test
+  character:
+    value: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
+  mailing:
+    frontend:
+      activation-url: http://localhost/test
+  file:
+    uploads:
+      photos-output-path: ./build/test-uploads
+
+redis:
+  host: localhost
+  port: 6379
+
+# Keep security enabled; tests can use spring-security-test

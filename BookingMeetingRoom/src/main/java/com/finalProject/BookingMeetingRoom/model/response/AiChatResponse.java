@@ -13,6 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AiChatResponse {
+    private String sessionId;
     private String reply;                 // natural language reply from AI
     private List<RoomSearchResponse> suggestions; // suggested rooms if any
     private boolean reservationCreated;   // whether a reservation was created
