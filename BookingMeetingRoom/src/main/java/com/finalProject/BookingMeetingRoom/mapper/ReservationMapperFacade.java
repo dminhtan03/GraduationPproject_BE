@@ -59,6 +59,8 @@ public class ReservationMapperFacade {
         response.setReturnTime(reservation.getReturnTime());
         response.setCreateAt(reservation.getCreateAt());
         response.setUpdatedAt(reservation.getUpdatedAt());
+        response.setReason(reservation.getReason());
+        response.setCancelBy(reservation.getCancelBy());
 
         response.setRoom(roomDto);
         response.setFloor(floorDto);
