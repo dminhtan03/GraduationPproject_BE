@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AcademicScheduleService {
-    
+
     /**
      * Kiểm tra xem một phòng có đang bận lịch học trong khoảng thời gian cho trước hay không.
      */

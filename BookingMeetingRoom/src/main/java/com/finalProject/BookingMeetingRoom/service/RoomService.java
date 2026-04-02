@@ -13,6 +13,8 @@ import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
 
+import com.finalProject.BookingMeetingRoom.model.entity.FloorDecoration;
+
 public interface RoomService {
 
     List<RoomSearchResponse> searchRooms(RoomSearchRequest request);
@@ -38,4 +40,8 @@ public interface RoomService {
     // start add updateFloorLayout method
     void updateFloorLayout(String floorId, FloorLayoutRequest request);
     // end add updateFloorLayout method
+
+    // start add getDecorationsByFloorId method
+    List<FloorDecoration> getDecorationsByFloorId(String floorId);
+    // end add getDecorationsByFloorId method
 }

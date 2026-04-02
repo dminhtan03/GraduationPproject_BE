@@ -92,4 +92,11 @@ public class RoomController {
         return ResponseEntity.ok(Response.ofSucceeded("Floor layout updated successfully"));
     }
     // end add updateFloorLayout api
+
+    // start add getDecorations api
+    @GetMapping("/floors/{floorId}/decorations")
+    public ResponseEntity<?> getDecorations(@PathVariable String floorId) {
+        return ResponseEntity.ok(Response.ofSucceeded(roomService.getDecorationsByFloorId(floorId)));
+    }
+    // end add getDecorations api
 }

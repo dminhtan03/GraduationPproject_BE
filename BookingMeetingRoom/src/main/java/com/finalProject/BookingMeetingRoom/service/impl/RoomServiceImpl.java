@@ -49,6 +49,8 @@ import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomImageRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.model.entity.FloorDecoration;
+import com.finalProject.BookingMeetingRoom.repository.FloorDecorationRepository;
 import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
 
@@ -68,6 +70,7 @@ public class RoomServiceImpl implements RoomService {
     private final RoomImageRepository roomImageRepository;
     private final Cloudinary cloudinary;
     private final AcademicScheduleService academicScheduleService;
+    private final FloorDecorationRepository floorDecorationRepository;
     // end add repository
 
     /**
@@ -503,25 +506,40 @@ public class RoomServiceImpl implements RoomService {
     @Transactional
     public void updateFloorLayout(String floorId, FloorLayoutRequest request) {
         try {
-            if (request.getItems() == null) return;
-
-            for (FloorLayoutRequest.RoomLayoutItem item : request.getItems()) {
-                if (item.getRoomId() == null) {
-                    logger.warn("Skipping layout item with null roomId");
-                    continue;
+            // Update Rooms
+            if (request.getItems() != null) {
+                for (FloorLayoutRequest.RoomLayoutItem item : request.getItems()) {
+                    if (item.getRoomId() == null) continue;
+                    roomRepository.findById(item.getRoomId()).ifPresent(room -> {
+                        if (room.getFloor() != null && room.getFloor().getId().equals(floorId)) {
+                            room.setXPosition(item.getX());
+                            room.setYPosition(item.getY());
+                            room.setWidth(item.getWidth());
+                            room.setHeight(item.getHeight());
+                            room.setPositioned(true);
+                            room.setUpdatedAt(LocalDateTime.now());
+                            roomRepository.save(room);
+                        }
+                    });
                 }
-                roomRepository.findById(item.getRoomId()).ifPresent(room -> {
-                    // Always update if it belongs to the floor or we trust the frontend
-                    // Let's add a check to be safe
-                    if (room.getFloor() != null && room.getFloor().getId().equals(floorId)) {
-                        room.setXPosition(item.getX());
-                        room.setYPosition(item.getY());
-                        room.setWidth(item.getWidth());
-                        room.setHeight(item.getHeight());
-                        room.setPositioned(true);
-                        room.setUpdatedAt(LocalDateTime.now());
-                        roomRepository.save(room);
-                    }
+            }
+
+            // Update Decorations (Delete old ones and save new ones for this floor)
+            if (request.getDecorations() != null) {
+                floorDecorationRepository.deleteByFloorId(floorId);
+                floorRepository.findById(floorId).ifPresent(floor -> {
+                    List<FloorDecoration> decorations = request.getDecorations().stream()
+                            .map(d -> FloorDecoration.builder()
+                                    .floor(floor)
+                                    .type(d.getType())
+                                    .label(d.getLabel())
+                                    .x(d.getX())
+                                    .y(d.getY())
+                                    .width(d.getWidth())
+                                    .height(d.getHeight())
+                                    .build())
+                            .collect(java.util.stream.Collectors.toList());
+                    floorDecorationRepository.saveAll(decorations);
                 });
             }
         } catch (Exception e) {
@@ -530,4 +548,11 @@ public class RoomServiceImpl implements RoomService {
         }
     }
     // end implement updateFloorLayout
+
+    // start implement getDecorationsByFloorId
+    @Override
+    public List<FloorDecoration> getDecorationsByFloorId(String floorId) {
+        return floorDecorationRepository.findByFloorId(floorId);
+    }
+    // end implement getDecorationsByFloorId
 }
