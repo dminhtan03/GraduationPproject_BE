@@ -1,8 +1,8 @@
 package com.finalProject.BookingMeetingRoom.common.exception;
 
-import com.finalProject.BookingMeetingRoom.common.payload.FieldViolation;
-import com.finalProject.BookingMeetingRoom.common.payload.Response;
-import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
@@ -10,9 +10,11 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.finalProject.BookingMeetingRoom.common.payload.FieldViolation;
+import com.finalProject.BookingMeetingRoom.common.payload.Response;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -59,6 +61,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Response<Void>> handleRuntimeException(RuntimeException e, WebRequest request) {
         return buildErrorResponse(e.getMessage(), HttpStatus.BAD_REQUEST, request.getDescription(false), "400");
+    }
+
+    /**
+     * Handle NoResourceFoundException (404 Not Found for static resources).
+     * This suppresses the common "No static resource ." warning in Spring Boot 3.
+     *
+     * @param e       the exception
+     * @param request the web request
+     * @return a standardized 404 response
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Response<Void>> handleNoResourceFoundException(NoResourceFoundException e, WebRequest request) {
+        return buildErrorResponse("Resource not found: " + e.getResourcePath(), HttpStatus.NOT_FOUND, request.getDescription(false), "404");
     }
 
     /**

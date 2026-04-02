@@ -5,12 +5,15 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.finalProject.BookingMeetingRoom.model.entity.Amenity;
 import com.finalProject.BookingMeetingRoom.model.request.FloorLayoutRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
+
+import com.finalProject.BookingMeetingRoom.model.entity.FloorDecoration;
 
 public interface RoomService {
 
@@ -20,8 +23,10 @@ public interface RoomService {
 
     RoomDetailResponse getRoomDetail(String roomId);
 
+    List<Amenity> getAllAmenities();
+
     // start add addRoom method
-    void addRoom(RoomCreateRequest request);
+    void addRoom(RoomCreateRequest request, MultipartFile image);
     // end add addRoom method
 
     // start add updateRoom method
@@ -35,4 +40,8 @@ public interface RoomService {
     // start add updateFloorLayout method
     void updateFloorLayout(String floorId, FloorLayoutRequest request);
     // end add updateFloorLayout method
+
+    // start add getDecorationsByFloorId method
+    List<FloorDecoration> getDecorationsByFloorId(String floorId);
+    // end add getDecorationsByFloorId method
 }

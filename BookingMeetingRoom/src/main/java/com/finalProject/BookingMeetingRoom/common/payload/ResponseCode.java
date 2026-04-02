@@ -52,6 +52,7 @@ public enum ResponseCode {
     ROOM_BROKEN("ROOM_409", "ROOM is broken and cannot be used", HttpStatus.CONFLICT),
     ROOM_ALREADY_EXISTS("ROOM_409", "Room with this location code already exists on this floor", HttpStatus.CONFLICT),
     CANNOT_RESERVE_ROOM("ROOM_410","Someone has already booked a room during your chosen time slot.",HttpStatus.BAD_REQUEST),
+    ROOM_IN_ACADEMIC_SCHEDULE("ROOM_411", "Phòng đang trong thời gian học cố định", HttpStatus.BAD_REQUEST),
 
     // ======= Reservation Errors =======
     RESERVATION_NOT_FOUND("RES_404", "Reservation not found" , HttpStatus.NOT_FOUND),
@@ -89,7 +90,11 @@ public enum ResponseCode {
     AUTH_HEADER_NOT_FOUND("AUTH_401", "Authorization header not found", HttpStatus.UNAUTHORIZED),
     FEEDBACK_ALREADY_EXISTS("FBD_409", "Feedback already exists for this reservation", HttpStatus.CONFLICT),
     CANNOT_FORCE_RETURN("RTN_401","ROOM cannot be force returned",HttpStatus.CONFLICT),
-    INVALID_DATE_FORMAT("DATE_400", "Invalid date format", HttpStatus.BAD_REQUEST);
+    INVALID_DATE_FORMAT("DATE_400", "Invalid date format", HttpStatus.BAD_REQUEST),
+
+    // ======= Amenity Errors =======
+    AMENITY_ALREADY_EXISTS("AMN_409", "Amenity with this name already exists", HttpStatus.CONFLICT),
+    AMENITY_NOT_FOUND("AMN_404", "Amenity not found", HttpStatus.NOT_FOUND);
 
     private final String code;
     private final String message;

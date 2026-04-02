@@ -108,6 +108,29 @@ Response `data` là `ChatbotMessageResponse` (các field thường dùng):
 }
 ```
 
+Các kiểu message đang hỗ trợ (đã cấu hình trong parser/service):
+
+- Date:
+  - `today`, `hôm nay`, `hom nay`
+  - `tomorrow`, `tomorow` (typo), `tmr`, `ngày mai`, `ngay mai`
+  - ISO date: `yyyy-mm-dd`
+  - Slash/Dash date: `d/M/yyyy` (vd `4/4/2026`, cũng hỗ trợ `-`)
+- Time:
+  - Single: `at 10AM`, `lúc 10h` → mặc định endTime = +1h
+  - Range:
+    - `from 14:00 to 15:00` / `từ 14h đến 15h`
+    - `at 6PM to 8PM` / `lúc 18h đến 20h`
+    - Nếu end time thiếu AM/PM (vd `6PM to 8`) thì end sẽ kế thừa AM/PM từ start
+- Room code:
+  - Format có dấu phân tách `-` hoặc `_`: `AL-102`, `V21-024`, `V5-020`
+- Capacity:
+  - `capacity of 20 people`, `accommodate 20`, `20 or more people`, `20+ people`, `sức chứa 20 người`
+- Intents:
+  - `CHECK_AVAILABLE_ROOMS_TODAY`: hỏi phòng trống hôm nay / từ mốc giờ
+  - `SUGGEST_ROOMS_BY_CAPACITY`: gợi ý phòng theo sức chứa (không tính khung giờ)
+  - `BOOK_ROOM`: đặt theo mã phòng + thời gian; hoặc auto-book theo sức chứa + thời gian
+  - `FALLBACK`: không match pattern
+
 Các request phổ biến + response mẫu:
 
 1. Check phòng trống hôm nay
@@ -193,6 +216,48 @@ Nếu overlap, chatbot sẽ trả message theo `ResponseCode` + danh sách phòn
 }
 ```
 
+Các response lỗi nghiệp vụ thường gặp (mẫu):
+
+- Thiếu đăng nhập khi booking
+
+Nếu user gọi intent booking nhưng `Authentication=null` → BE throw `ACCESS_DENIED`:
+
+```json
+{
+  "data": null,
+  "meta": {
+    "code": "ACCESS_DENIED",
+    "message": "..."
+  }
+}
+```
+
+- Thời gian không hợp lệ / quá khứ
+
+```json
+{
+  "data": {
+    "sessionId": "<uuid>",
+    "reply": "That start time is in the past. Please choose a future time.",
+    "intent": "BOOK_ROOM"
+  },
+  "meta": { "code": "200" }
+}
+```
+
+- Range time không hợp lệ (end <= start)
+
+```json
+{
+  "data": {
+    "sessionId": "<uuid>",
+    "reply": "The time range looks invalid. Please make sure the end time is after the start time.",
+    "intent": "BOOK_ROOM"
+  },
+  "meta": { "code": "200" }
+}
+```
+
 3. Suggest rooms theo sức chứa
 
 Request:
@@ -257,6 +322,8 @@ Response mẫu:
   "meta": { "code": "200" }
 }
 ```
+
+Gợi ý: để multi-turn (nhớ ngữ cảnh), các message tiếp theo phải gửi đúng `sessionId`.
 
 ### 4.2 Chatbot — Voice
 
@@ -365,6 +432,60 @@ Response mẫu (rút gọn):
 }
 ```
 
+4. Booking intent đủ field (AI tự tìm phòng và đặt)
+
+Request:
+
+```json
+{
+  "message": "Đặt phòng giúp mình",
+  "sessionId": null,
+  "startTime": "2026-03-29T18:00:00",
+  "endTime": "2026-03-29T19:00:00",
+  "capacity": 8
+}
+```
+
+Response mẫu (rút gọn):
+
+```json
+{
+  "data": {
+    "sessionId": "<uuid>",
+    "reply": "Tôi đã đặt giúp bạn phòng AL-102 từ 2026-03-29T18:00 đến 2026-03-29T19:00.",
+    "reservationCreated": true,
+    "reservation": { "id": "<RESERVATION_ID>", "...": "..." }
+  },
+  "meta": { "code": "200" }
+}
+```
+
+5. Booking intent nhưng không có phòng đủ sức chứa
+
+```json
+{
+  "data": {
+    "sessionId": "<uuid>",
+    "reply": "Hiện tại không tìm thấy phòng nào đủ sức chứa cho 20 người.",
+    "reservationCreated": false
+  },
+  "meta": { "code": "200" }
+}
+```
+
+6. Booking intent nhưng không còn phòng trống phù hợp trong khung giờ
+
+```json
+{
+  "data": {
+    "sessionId": "<uuid>",
+    "reply": "Xin lỗi, không còn phòng trống phù hợp trong khung giờ bạn yêu cầu.",
+    "reservationCreated": false
+  },
+  "meta": { "code": "200" }
+}
+```
+
 ### 4.4 AI — Reserve
 
 **POST** `/api/v1/ai/reserve`
@@ -393,6 +514,8 @@ Response mẫu:
   "meta": { "code": "200" }
 }
 ```
+
+Lưu ý: `/api/v1/ai/reserve` hiện trả `AiChatResponse` nhưng không set `sessionId` và không log `tbl_chat_history` (khác với `/api/v1/ai/chat`).
 
 ## 5) Flow chi tiết nhất — Chatbot
 

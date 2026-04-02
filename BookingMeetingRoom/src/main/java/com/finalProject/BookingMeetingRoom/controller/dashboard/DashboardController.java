@@ -18,13 +18,15 @@ import org.springframework.format.annotation.DateTimeFormat;
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.FloorCreateRequest;
 import com.finalProject.BookingMeetingRoom.service.DashboardService;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
 
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping(value = "/api/v1/dashboard")
+@RequestMapping("/api/v1/dashboard")
 @RequiredArgsConstructor
 public class DashboardController {
 
@@ -100,6 +102,22 @@ public class DashboardController {
     public ResponseEntity<?> createBuilding(@RequestBody BuildingCreateRequest request) {
         dashboardService.createBuilding(request);
         return ResponseEntity.ok(Response.ofSucceeded("Building created successfully"));
+    }
+
+    @PutMapping("/buildings/{buildingId}")
+    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
+    public ResponseEntity<?> updateBuilding(@PathVariable String buildingId, @RequestBody BuildingUpdateRequest request) {
+        dashboardService.updateBuilding(buildingId, request);
+        return ResponseEntity.ok(Response.ofSucceeded("Building updated successfully"));
+    }
+
+    @PostMapping("/buildings/{buildingId}/add-floor")
+    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
+    public ResponseEntity<?> createFloor(@PathVariable String buildingId) {
+        FloorCreateRequest request = new FloorCreateRequest();
+        request.setBuildingId(buildingId);
+        dashboardService.createFloor(request);
+        return ResponseEntity.ok(Response.ofSucceeded("Floor created successfully"));
     }
     // end add createBuilding api
 }

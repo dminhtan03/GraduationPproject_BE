@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -26,8 +27,8 @@ import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomReserveStatusUpdateRequest;
-import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AdminReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationHistoryResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
@@ -35,14 +36,14 @@ import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.repository.ReservationHistoryRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
-import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserInfoRepository;
+import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
+import com.finalProject.BookingMeetingRoom.service.EmailService;
+import com.finalProject.BookingMeetingRoom.service.NotificationService;
 import com.finalProject.BookingMeetingRoom.service.RealTimeService;
 import com.finalProject.BookingMeetingRoom.service.ReservationHistoryService;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
-import com.finalProject.BookingMeetingRoom.service.EmailService;
-import com.finalProject.BookingMeetingRoom.common.enums.EmailTemplateName;
-import com.finalProject.BookingMeetingRoom.model.request.NotificationRequest;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -64,11 +65,13 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationHistoryService reservationHistoryService;
     private final FeedbackMapper feedbackMapper;
     private final EmailService emailService;
+    private final NotificationService notificationService;
+    private final AcademicScheduleService academicScheduleService;
 
-    record ReservationContext(Reservation reservation, Room room) {}
+    record ReservationContext(Reservation reservation, Room room) {
+    }
 
-
-     /**
+    /**
      * Return a seat after use.
      *
      * @param reservationId  the ID of the reservation to return
@@ -89,8 +92,8 @@ public class ReservationServiceImpl implements ReservationService {
             if (!room.getStatus().equals(RoomStatus.UNAVAILABLE)) {
                 throw new CustomException(ResponseCode.ROOM_NOT_UNAVAILABLE);
             }
+            List<Reservation> listReservationReturnRoom = new ArrayList<>();
 
-        
             reservation.setStatus(ReservationStatus.COMPLETED);
             reservation.setReturnTime(LocalDateTime.now());
             reservation.setUpdatedAt(LocalDateTime.now());
@@ -98,9 +101,12 @@ public class ReservationServiceImpl implements ReservationService {
 
             room.setStatus(RoomStatus.AVAILABLE);
             roomRepository.save(room);
+            listReservationReturnRoom.add(reservation);
+            notificationService.noticeReturnRoomReservation(listReservationReturnRoom);
 
             realTimeService.sendRoomStatus(room);
             realTimeService.deleteReservation(reservation);
+
 
         } catch (CustomException e) {
             throw e;
@@ -110,9 +116,7 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
-
-
-     /**
+    /**
      * Extend a reservation for a specified number of hours.
      *
      * @param reservationId the ID of the reservation to extend
@@ -165,19 +169,21 @@ public class ReservationServiceImpl implements ReservationService {
             }
 
             long totalMinutes = reservationRepository.getTotalReservedMinutesForUser(
-                    user.getId(), newStartTime.toLocalDate()
-            );
+                    user.getId(), newStartTime.toLocalDate());
 
             if ((totalMinutes + convertToMinutes(hour)) > convertToMinutes(8)) {
                 throw new CustomException(ResponseCode.USER_TIME_EXCEEDED);
             }
 
+            List<Reservation> listReservationExtend = new ArrayList<>();
             reservationHistoryService.saveHistory(reservation, user.getId(), null,
                     HistoryAction.EXTEND, reservation.getUpdatedAt());
 
             reservation.setEndTime(newEndTime);
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
+            listReservationExtend.add(reservation);
+            notificationService.noticeExtendReservation(listReservationExtend);
 
             realTimeService.addReservation(reservation);
 
@@ -189,7 +195,6 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
-    
     /**
      * Check-in a reservation.
      *
@@ -273,7 +278,8 @@ public class ReservationServiceImpl implements ReservationService {
 
             // Check overlap for user (including PENDING, RESERVED, IN_USE)
             List<Reservation> checkOverlapByUser = reservationRepository.checkOverlapByUser(user.getId(), startTime,
-                    endTime, List.of(ReservationStatus.IN_USE.name(), ReservationStatus.RESERVED.name(), ReservationStatus.PENDING.name()));
+                    endTime, List.of(ReservationStatus.IN_USE.name(), ReservationStatus.RESERVED.name(),
+                            ReservationStatus.PENDING.name()));
 
             if (!checkOverlapByUser.isEmpty()) {
                 throw new CustomException(ResponseCode.USER_TIME_OVERLAP);
@@ -283,11 +289,17 @@ public class ReservationServiceImpl implements ReservationService {
             boolean conflict = reservationRepository
                     .checkOverlappingReservationsByRoom(room.getId(), startTime, endTime)
                     .stream()
-                    .anyMatch(r -> Set.of(ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING)
-                            .contains(r.getStatus()));
+                    .anyMatch(
+                            r -> Set.of(ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING)
+                                    .contains(r.getStatus()));
 
             if (conflict) {
                 throw new CustomException(ResponseCode.CANNOT_RESERVE_ROOM);
+            }
+
+            // [HYBRID] Thêm bước kiểm tra lịch học cố định (Academic Schedule)
+            if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                throw new CustomException(ResponseCode.ROOM_IN_ACADEMIC_SCHEDULE);
             }
 
             var reservation = reservationMapper.toEntity(request);
@@ -330,10 +342,13 @@ public class ReservationServiceImpl implements ReservationService {
 
     // [ADDED] Get all reservations for admin with filtering
     @Override
-    public Page<AdminReservationResponse> getAllReservationsForAdmin(int page, int size, ReservationStatus status, String userName, String userEmail, String roomName, String floorName, String buildingName, LocalDateTime startDate, LocalDateTime endDate) {
+    public Page<AdminReservationResponse> getAllReservationsForAdmin(int page, int size, ReservationStatus status,
+            String userName, String userEmail, String roomName, String floorName, String buildingName,
+            LocalDateTime startDate, LocalDateTime endDate) {
         try {
             Pageable pageable = PageRequest.of(page, size);
-            Page<Reservation> reservations = reservationRepository.findAllWithDetailsForAdmin(pageable, status, userName, userEmail, roomName, floorName, buildingName, startDate, endDate);
+            Page<Reservation> reservations = reservationRepository.findAllWithDetailsForAdmin(pageable, status,
+                    userName, userEmail, roomName, floorName, buildingName, startDate, endDate);
             return reservations.map(reservationMapperFacade::toAdminResponse);
         } catch (Exception e) {
             log.error("Unexpected error during get all reservations for admin", e);
@@ -344,8 +359,7 @@ public class ReservationServiceImpl implements ReservationService {
     public Page<MyReservationResponse> getReservationStatus(
             int page, int size, Authentication connectedUser,
             String locationCode, String address, List<String> statuses,
-            String buildingId, String startTime, String endTime
-    ) {
+            String buildingId, String startTime, String endTime) {
         try {
             var user = userRepository.findByEmail(connectedUser.getName())
                     .orElseThrow(() -> new RuntimeException("User not found"));
@@ -360,8 +374,7 @@ public class ReservationServiceImpl implements ReservationService {
             Set<ReservationStatus> activeStatuses = Set.of(
                     ReservationStatus.PENDING,
                     ReservationStatus.RESERVED,
-                    ReservationStatus.IN_USE
-            );
+                    ReservationStatus.IN_USE);
 
             // start update getReservationStatus to handle invalid status strings safely
             if (statuses != null) {
@@ -390,9 +403,7 @@ public class ReservationServiceImpl implements ReservationService {
             if (isStartTimeProvided) {
                 LocalDateTime parsedStartTime = LocalDateTime.parse(startTime, formatter);
                 effectiveStartTime = parsedStartTime.format(formatter);
-                effectiveEndTime = isEndTimeProvided ?
-                        LocalDateTime.parse(endTime, formatter).format(formatter) :
-                        null;
+                effectiveEndTime = isEndTimeProvided ? LocalDateTime.parse(endTime, formatter).format(formatter) : null;
             } else {
                 if (!containsOnlyActiveStatuses) {
                     effectiveStartTime = LocalDateTime.now().minusMonths(1).format(formatter);
@@ -419,8 +430,7 @@ public class ReservationServiceImpl implements ReservationService {
                     buildingId,
                     effectiveStartTime,
                     effectiveEndTime,
-                    pageable
-            );
+                    pageable);
 
             return myReservation.map(reservationMapperFacade::toMyResponse);
         } catch (CustomException e) {
@@ -438,7 +448,7 @@ public class ReservationServiceImpl implements ReservationService {
      * Cancel a reservation and save the history of the action.
      *
      * @param reservationId the ID of the reservation to cancel
-     * @param reason the reason for cancellation
+     * @param reason        the reason for cancellation
      * @param connectedUser the authentication object containing user details
      */
     @Transactional
@@ -453,6 +463,8 @@ public class ReservationServiceImpl implements ReservationService {
             if (!reservation.getUser().getId().equals(user.getId())) {
                 throw new CustomException(ResponseCode.PERMISSION_DENIED);
             }
+
+             List<Reservation> listReservationCancel = new ArrayList<>();
 
             // start add cancellation limit logic
             LocalDate today = LocalDate.now();
@@ -469,12 +481,13 @@ public class ReservationServiceImpl implements ReservationService {
             userRepository.save(user);
             // end add cancellation limit logic
 
-
             reservation.setStatus(ReservationStatus.CANCELLED);
             reservation.setReason(reason);
             reservation.setCancelBy(user.getId());
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
+            listReservationCancel.add(reservation);
+            notificationService.noticeCancelReservation(listReservationCancel);
 
             realTimeService.deleteReservation(reservation);
         } catch (CustomException e) {
@@ -490,16 +503,14 @@ public class ReservationServiceImpl implements ReservationService {
      * Sends email notification to the user about the cancellation.
      *
      * @param reservationId the ID of the reservation to force cancel
-     * @param reason the reason for force cancellation
-     * @param adminUser the authentication object containing admin details
+     * @param reason        the reason for force cancellation
+     * @param adminUser     the authentication object containing admin details
      */
     @Transactional
     public void forceCancelReservation(String reservationId, String reason, Authentication adminUser) {
         try {
             var reservation = reservationRepository.findById(reservationId)
                     .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
-
-           
 
             var admin = userInfoRepository.findByEmail(adminUser.getName())
                     .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
@@ -514,10 +525,12 @@ public class ReservationServiceImpl implements ReservationService {
                 throw new CustomException(ResponseCode.ROOM_NOT_FOUND);
             }
 
+            List<Reservation> listReservationForceReturned = new ArrayList<>();
+
             // Update reservation status to cancelled
             reservation.setStatus(ReservationStatus.CANCELLED);
             reservation.setReason(reason);
-            reservation.setCancelBy(admin.getEmail());  // Save admin email
+            reservation.setCancelBy(admin.getEmail()); // Save admin email
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
 
@@ -525,13 +538,14 @@ public class ReservationServiceImpl implements ReservationService {
             room.setStatus(RoomStatus.AVAILABLE);
             roomRepository.save(room);
 
+            listReservationForceReturned.add(reservation);
+
             // Send real-time updates
-            realTimeService.sendRoomStatus(room);           // Notify room is available
-            realTimeService.sendReservationStatus(reservation);  // Update reservation status
+            realTimeService.sendRoomStatus(room); // Notify room is available
+            realTimeService.sendReservationStatus(reservation); // Update reservation status
             realTimeService.deleteReservation(reservation); // Remove from booking list
 
-            // Send email notification to user
-            sendForceCancelEmailNotification(bookingUser, reservation, reason);
+            notificationService.noticeForceCancelReservation(listReservationForceReturned);
 
         } catch (CustomException e) {
             throw e;
@@ -540,45 +554,6 @@ public class ReservationServiceImpl implements ReservationService {
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
-
-    /**
-     * Send forceful cancellation email to user with reason
-     *
-     * @param user the user to receive the email
-     * @param reservation the cancelled reservation
-     * @param reason the reason for cancellation
-     */
-    private void sendForceCancelEmailNotification(com.finalProject.BookingMeetingRoom.model.entity.User user,
-                                                   Reservation reservation,
-                                                   String reason) {
-        try {
-            if (user.getUserInfo() == null || user.getUserInfo().getEmail() == null) {
-                log.warn("User email not found for reservation: {}", reservation.getId());
-                return;
-            }
-
-            String fullName = (user.getUserInfo().getFirstName() != null ? user.getUserInfo().getFirstName() : "") +
-                    " " +
-                    (user.getUserInfo().getLastName() != null ? user.getUserInfo().getLastName() : "");
-            fullName = fullName.trim();
-
-            String email = user.getUserInfo().getEmail();
-
-            emailService.sendForceCancelEmail(
-                    email,
-                    fullName,
-                    reason,
-                    "Your Meeting Room Booking Has Been Cancelled by Administrator"
-            );
-
-            log.info("Force cancel email sent to user: {} for reservation: {}", email, reservation.getId());
-        } catch (Exception e) {
-            log.error("Failed to send force cancel email for reservation: {}", reservation.getId(), e);
-            // Don't throw exception, just log it to prevent blocking the cancellation process
-        }
-    }
-
-   
 
     public ReservationDetailResponse getReservationDetail(String reservationId, Authentication authentication) {
         try {
@@ -616,7 +591,9 @@ public class ReservationServiceImpl implements ReservationService {
                             .build())
                     .toList();
 
-            var feedback = reservation.getFeedback() != null ? feedbackMapper.toFeedbackResponse(reservation.getFeedback()) : null;
+            var feedback = reservation.getFeedback() != null
+                    ? feedbackMapper.toFeedbackResponse(reservation.getFeedback())
+                    : null;
 
             return ReservationDetailResponse.builder()
                     .reservation(reservationResponse)
@@ -655,7 +632,6 @@ public class ReservationServiceImpl implements ReservationService {
 
         return new ReservationContext(reservation, room);
     }
-
 
     private long convertToMinutes(double hour) {
         return Math.round(hour * 60);

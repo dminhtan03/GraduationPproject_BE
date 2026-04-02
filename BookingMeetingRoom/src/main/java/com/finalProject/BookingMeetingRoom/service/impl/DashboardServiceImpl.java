@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -16,25 +15,29 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.model.dto.RoomDto;
 import com.finalProject.BookingMeetingRoom.model.entity.Building;
 import com.finalProject.BookingMeetingRoom.model.entity.Floor;
-import com.finalProject.BookingMeetingRoom.model.projection.RoomDtoProjection;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.FloorCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousFloorResponse;
+import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
 import com.finalProject.BookingMeetingRoom.model.response.DetailFloorResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
 import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
-import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
 import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
 import com.finalProject.BookingMeetingRoom.service.DashboardService;
 
 import lombok.RequiredArgsConstructor;
@@ -49,6 +52,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final BuildingRepository buildingRepository;
     private final FloorRepository floorRepository;
     private final RoomRepository roomRepository;
+    private final AcademicScheduleService academicScheduleService;
 
     /**
      * Retrieves the employee dashboard data including active reservations, last checked-in details, and hours worked.
@@ -98,10 +102,40 @@ public class DashboardServiceImpl implements DashboardService {
                         });
 
                 RoomDto roomDto = new RoomDto();
-                roomDto.setRoomId(room.getRoomId());
+                roomDto.setId(room.getRoomId());
                 roomDto.setLocationCode(room.getLocationCode());
-                roomDto.setStatus(room.getStatus());
+
+                // [HYBRID] Cập nhật trạng thái động cho sơ đồ phòng (Dashboard/Map)
+                RoomStatus status = room.getStatus();
+                LocalDateTime now = LocalDateTime.now();
+                LocalDateTime nextMinute = now.plusMinutes(1);
+
+                // Check for reservation conflict first
+                boolean hasReservationConflict = reservationRepository
+                        .findOverlappingReservations(room.getRoomId(), now, nextMinute)
+                        .stream()
+                        .anyMatch(res ->
+                                res.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.IN_USE ||
+                                        res.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.RESERVED
+                        );
+
+                if (status == RoomStatus.AVAILABLE) {
+                    if (hasReservationConflict) {
+                        status = RoomStatus.UNAVAILABLE;
+                    } else if (academicScheduleService.isRoomBusyWithLearning(room.getRoomId(), now, nextMinute)) {
+                        status = RoomStatus.LEARNING;
+                    }
+                } else if (status == RoomStatus.UNAVAILABLE && !hasReservationConflict) {
+                    if (academicScheduleService.isRoomBusyWithLearning(room.getRoomId(), now, nextMinute)) {
+                        status = RoomStatus.LEARNING;
+                    } else {
+                        status = RoomStatus.AVAILABLE;
+                    }
+                }
+                roomDto.setStatus(status);
+
                 roomDto.setScore(room.getScore());
+                roomDto.setCapacity(room.getCapacity());
                 roomDto.setXPosition(room.getXPosition());
                 roomDto.setYPosition(room.getYPosition());
                 roomDto.setWidth(room.getWidth());
@@ -215,23 +249,66 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<RoomDto> getAllRoomsByFloorId(String floorId) {
         try {
-            List<RoomDtoProjection> seats = roomRepository.findRooms(floorId);
+            Floor floor = floorRepository.findById(floorId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.FLOOR_NOT_FOUND));
 
-            return seats.stream()
-                    .map(seat -> new RoomDto(
-                            seat.getRoomId(),
-                            seat.getLocationCode(),
-                            seat.getStatus(),
-                            seat.getScore(),
-                            seat.getXPosition(),
-                            seat.getYPosition(),
-                            seat.getWidth(),
-                            seat.getHeight(),
-                            seat.getPositioned() != null && seat.getPositioned()
-                    )).toList();
+            List<Room> rooms = roomRepository.findByFloorOrderByLocationCode(floor);
+
+            return rooms.stream()
+                    .map(room -> {
+                         RoomDto dto = new RoomDto();
+                         dto.setId(room.getId());
+                         dto.setLocationCode(room.getLocationCode());
+
+                        // [HYBRID] Cập nhật trạng thái động cho danh sách phòng của Admin
+                        RoomStatus status = room.getStatus();
+                        LocalDateTime now = LocalDateTime.now();
+                        LocalDateTime nextMinute = now.plusMinutes(1);
+
+                        // Check for reservation conflict first
+                        boolean hasReservationConflict = reservationRepository
+                                .findOverlappingReservations(room.getId(), now, nextMinute)
+                                .stream()
+                                .anyMatch(res ->
+                                        res.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.IN_USE ||
+                                                res.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.RESERVED
+                                );
+
+                        if (status == RoomStatus.AVAILABLE) {
+                            if (hasReservationConflict) {
+                                status = RoomStatus.UNAVAILABLE;
+                            } else if (academicScheduleService.isRoomBusyWithLearning(room.getId(), now, nextMinute)) {
+                                status = RoomStatus.LEARNING;
+                            }
+                        } else if (status == RoomStatus.UNAVAILABLE && !hasReservationConflict) {
+                            if (academicScheduleService.isRoomBusyWithLearning(room.getId(), now, nextMinute)) {
+                                status = RoomStatus.LEARNING;
+                            } else {
+                                status = RoomStatus.AVAILABLE;
+                            }
+                        }
+                        dto.setStatus(status);
+
+                        dto.setScore(room.getScore());
+                        dto.setCapacity(room.getCapacity());
+                        dto.setXPosition(room.getXPosition());
+                        dto.setYPosition(room.getYPosition());
+                        dto.setWidth(room.getWidth());
+                        dto.setHeight(room.getHeight());
+                        dto.setPositioned(room.getPositioned() != null && room.getPositioned());
+
+                        if (room.getAmenities() != null) {
+                            dto.setAmenities(room.getAmenities().stream()
+                                    .map(a -> new RoomDto.AmenityDto(a.getId(), a.getName()))
+                                    .toList());
+                        }
+
+                        return dto;
+                    }).toList();
         } catch (CustomException e) {
             throw e;
         } catch (Exception e) {
+            logger.error("Error fetching rooms by floor: " + e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
@@ -291,7 +368,6 @@ public class DashboardServiceImpl implements DashboardService {
         }
     }
 
-    // start implement createBuilding
     @Override
     @Transactional
     public void createBuilding(BuildingCreateRequest request) {
@@ -317,6 +393,51 @@ public class DashboardServiceImpl implements DashboardService {
             }
         } catch (Exception e) {
             logger.error("Error creating building: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateBuilding(String buildingId, BuildingUpdateRequest request) {
+        try {
+            Building building = buildingRepository.findById(buildingId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.BUILDING_NOT_FOUND));
+            building.setName(request.getName());
+            building.setUpdatedAt(LocalDateTime.now());
+            buildingRepository.save(building);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error updating building: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void createFloor(FloorCreateRequest request) {
+        try {
+            Building building = buildingRepository.findById(request.getBuildingId())
+                    .orElseThrow(() -> new CustomException(ResponseCode.BUILDING_NOT_FOUND));
+
+            // Logic mới: Tự động đếm số tầng hiện có để đặt tên (ví dụ Floor 3 -> Floor 4)
+            List<AmbiguousFloorResponse> existingFloors = floorRepository.findAllFloorsByBuildingId(request.getBuildingId());
+            int nextFloorNumber = existingFloors.size() + 1;
+            String floorName = "Floor " + nextFloorNumber;
+
+            Floor floor = new Floor();
+            floor.setId(UUID.randomUUID().toString());
+            floor.setName(floorName);
+            floor.setBuilding(building);
+            floor.setDeleted(false);
+            floor.setCreateAt(LocalDateTime.now());
+            floor.setUpdatedAt(LocalDateTime.now());
+            floorRepository.save(floor);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error creating floor: " + e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }

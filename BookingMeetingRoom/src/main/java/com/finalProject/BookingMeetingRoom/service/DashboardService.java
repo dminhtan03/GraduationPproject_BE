@@ -6,6 +6,8 @@ import org.springframework.data.domain.Page;
 
 import com.finalProject.BookingMeetingRoom.model.dto.RoomDto;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.FloorCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AmbiguousFloorResponse;
 import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
@@ -25,5 +27,7 @@ public interface DashboardService {
 
     // start add createBuilding method
     void createBuilding(BuildingCreateRequest request);
+    void updateBuilding(String buildingId, BuildingUpdateRequest request);
+    void createFloor(FloorCreateRequest request);
     // end add createBuilding method
 }

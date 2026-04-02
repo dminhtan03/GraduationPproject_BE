@@ -1,10 +1,13 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -22,12 +25,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.model.entity.Amenity;
 import com.finalProject.BookingMeetingRoom.model.entity.Floor;
+import com.finalProject.BookingMeetingRoom.model.entity.FloorDecoration;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.entity.RoomImage;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
 import com.finalProject.BookingMeetingRoom.model.request.FloorLayoutRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
@@ -38,9 +46,12 @@ import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
 import com.finalProject.BookingMeetingRoom.repository.AmenityRepository;
 import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
+import com.finalProject.BookingMeetingRoom.repository.FloorDecorationRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomImageRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
 
 import lombok.RequiredArgsConstructor;
@@ -56,6 +67,10 @@ public class RoomServiceImpl implements RoomService {
     private final FeedbackRepository feedbackRepository;
     // start add repository
     private final AmenityRepository amenityRepository;
+    private final RoomImageRepository roomImageRepository;
+    private final Cloudinary cloudinary;
+    private final AcademicScheduleService academicScheduleService;
+    private final FloorDecorationRepository floorDecorationRepository;
     // end add repository
 
     /**
@@ -85,6 +100,7 @@ public class RoomServiceImpl implements RoomService {
 
             return rooms.stream()
                     .map(room -> {
+                        // [HYBRID] Kiểm tra đồng thời cả Reservation (đặt phòng thật) và AcademicSchedule (lịch học cố định)
                         boolean hasConflict = reservationRepository
                                 .findOverlappingReservations(room.getId(), startTime, endTime)
                                 .stream()
@@ -93,14 +109,32 @@ public class RoomServiceImpl implements RoomService {
                                                 r.getStatus() == ReservationStatus.RESERVED
                                 );
 
+                        // Nếu không có conflict với reservation, kiểm tra tiếp với lịch học
+                        RoomStatus status = room.getStatus();
+                        if (status == RoomStatus.AVAILABLE) {
+                            if (hasConflict) {
+                                status = RoomStatus.UNAVAILABLE;
+                            } else if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                                status = RoomStatus.LEARNING;
+                            }
+                        } else if (status == RoomStatus.UNAVAILABLE && !hasConflict) {
+                            // Trường hợp phòng trong DB là UNAVAILABLE (có thể do check-in trước đó) 
+                            // nhưng trong khoảng thời gian search mới này lại không có conflict
+                            if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                                status = RoomStatus.LEARNING;
+                            } else {
+                                status = RoomStatus.AVAILABLE;
+                            }
+                        }
+
                         return new RoomSearchResponse(
                                 room.getId(),
                                 room.getLocationCode(),
                                 room.getScore(),
-                                hasConflict ? RoomStatus.UNAVAILABLE : RoomStatus.AVAILABLE
+                                status
                         );
                     })
-                    .filter(roomResponse -> roomResponse.getStatus() == RoomStatus.AVAILABLE)
+                    .filter(roomResponse -> roomResponse.getStatus() == RoomStatus.AVAILABLE || roomResponse.getStatus() == RoomStatus.LEARNING)
                     .collect(Collectors.toList());
         } catch (CustomException e) {
             throw e;
@@ -151,7 +185,8 @@ public class RoomServiceImpl implements RoomService {
     }
 
     private RoomSearchResponse mapToRoomSearchResponse(Room room, LocalDateTime startTime, LocalDateTime endTime) {
-        boolean hasConflict = (room.getStatus() == RoomStatus.BROKEN) || reservationRepository
+        // [HYBRID] Check both real reservations and virtual academic schedules
+        boolean hasReservationConflict = (room.getStatus() == RoomStatus.BROKEN) || reservationRepository
                 .findOverlappingReservations(room.getId(), startTime, endTime)
                 .stream()
                 .anyMatch(r ->
@@ -159,11 +194,26 @@ public class RoomServiceImpl implements RoomService {
                                 r.getStatus() == ReservationStatus.RESERVED
                 );
 
+        RoomStatus finalStatus = room.getStatus();
+        if (finalStatus == RoomStatus.AVAILABLE) {
+            if (hasReservationConflict) {
+                finalStatus = RoomStatus.UNAVAILABLE;
+            } else if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                finalStatus = RoomStatus.LEARNING;
+            }
+        } else if (finalStatus == RoomStatus.UNAVAILABLE && !hasReservationConflict) {
+            if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                finalStatus = RoomStatus.LEARNING;
+            } else {
+                finalStatus = RoomStatus.AVAILABLE;
+            }
+        }
+
         return new RoomSearchResponse(
                 room.getId(),
                 room.getLocationCode(),
                 room.getScore(),
-                hasConflict ? RoomStatus.UNAVAILABLE : RoomStatus.AVAILABLE
+                finalStatus
         );
     }
 
@@ -203,10 +253,17 @@ public class RoomServiceImpl implements RoomService {
                             .build())
                     .collect(Collectors.toList());
 
+            // [HYBRID] Check learning status for room detail
+            RoomStatus status = room.getStatus();
+            LocalDateTime now = LocalDateTime.now();
+            if (status == RoomStatus.AVAILABLE && academicScheduleService.isRoomBusyWithLearning(room.getId(), now, now.plusMinutes(1))) {
+                status = RoomStatus.LEARNING;
+            }
+
             return RoomDetailResponse.builder()
-                    .roomId(room.getId())
+                    .id(room.getId())
                     .locationCode(room.getLocationCode())
-                    .status(room.getStatus())
+                    .status(status)
                     .capacity(room.getCapacity())
                     .amenities(room.getAmenities())
                     .images(images)
@@ -224,16 +281,21 @@ public class RoomServiceImpl implements RoomService {
         }
     }
 
+    @Override
+    public List<Amenity> getAllAmenities() {
+        return amenityRepository.findAll();
+    }
+
     // start implement addRoom
     @Override
     @Transactional
-    public void addRoom(RoomCreateRequest request) {
+    public void addRoom(RoomCreateRequest request, MultipartFile image) {
         try {
             Floor floor = floorRepository.findById(request.getFloorId())
                     .orElseThrow(() -> new CustomException(ResponseCode.FLOOR_NOT_FOUND));
 
-            // [ADDED] Check if room name already exists on this floor
-            if (roomRepository.existsByFloorIdAndLocationCode(request.getFloorId(), request.getLocationCode())) {
+            // [ADDED] Check if room name already exists globally
+            if (roomRepository.existsByLocationCode(request.getLocationCode())) {
                 throw new CustomException(ResponseCode.ROOM_ALREADY_EXISTS);
             }
 
@@ -252,6 +314,39 @@ public class RoomServiceImpl implements RoomService {
             }
 
             roomRepository.save(room);
+
+            // Handle Image if provided (from MultipartFile)
+            if (image != null && !image.isEmpty()) {
+                try {
+                    Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                            image.getBytes(),
+                            ObjectUtils.asMap(
+                                    "folder", "meeting-room/" + room.getId(),
+                                    "resource_type", "image"
+                            )
+                    );
+
+                    RoomImage roomImage = new RoomImage();
+                    roomImage.setId(UUID.randomUUID().toString());
+                    roomImage.setImageUrl(uploadResult.get("secure_url").toString());
+                    roomImage.setPublicId(uploadResult.get("public_id").toString());
+                    roomImage.setCreatedAt(LocalDateTime.now());
+                    roomImage.setRoom(room);
+                    roomImageRepository.save(roomImage);
+                } catch (Exception e) {
+                    logger.error("Upload image to Cloudinary failed: " + e.getMessage());
+                }
+            }
+            // Handle Image if provided (from URL - for Excel import fallback or direct URL)
+            else if (request.getImageUrl() != null && !request.getImageUrl().isEmpty()) {
+                RoomImage roomImage = new RoomImage();
+                roomImage.setId(UUID.randomUUID().toString());
+                roomImage.setImageUrl(request.getImageUrl());
+                roomImage.setPublicId(request.getPublicId());
+                roomImage.setCreatedAt(LocalDateTime.now());
+                roomImage.setRoom(room);
+                roomImageRepository.save(roomImage);
+            }
         } catch (CustomException e) {
             throw e;
         } catch (Exception e) {
@@ -301,9 +396,7 @@ public class RoomServiceImpl implements RoomService {
 
             Sheet sheet = workbook.getSheetAt(0);
             List<String> skippedRooms = new ArrayList<>();
-            List<String> existingRoomNames = (floorId != null && !floorId.isEmpty())
-                    ? roomRepository.findLocationCodesByFloorId(floorId)
-                    : new ArrayList<>();
+            List<String> existingRoomNames = roomRepository.findAllLocationCodes();
 
             for (Row row : sheet) {
                 // Skip header row
@@ -319,12 +412,16 @@ public class RoomServiceImpl implements RoomService {
 
                     String targetFloorId = (floorId != null && !floorId.isEmpty()) ? floorId : excelFloorId;
 
+                    // Image from excel (Cột 6 và 7)
+                    String imageUrl = getCellValue(row.getCell(6));
+                    String publicId = getCellValue(row.getCell(7));
+
                     if (locationCode.isEmpty() || targetFloorId.isEmpty()) {
                         logger.warn("Skipping row " + row.getRowNum() + ": locationCode or floorId is missing.");
                         continue;
                     }
 
-                    // [ADDED] Skip if room already exists on this floor
+                    // [ADDED] Skip if room already exists globally
                     if (existingRoomNames.contains(locationCode)) {
                         logger.warn("Skipping duplicate room: " + locationCode);
                         skippedRooms.add(locationCode);
@@ -341,7 +438,34 @@ public class RoomServiceImpl implements RoomService {
                                     Arrays.asList(amenityIdsStr.split(",")))
                             .build();
 
-                    addRoom(request);
+                    // Handle local image upload if provided in Excel
+                    if (!imageUrl.isEmpty()) {
+                        try {
+                            // Check if imageUrl is actually a local file path
+                            File localFile = new File(imageUrl);
+                            if (localFile.exists() && localFile.isFile()) {
+                                try (FileInputStream fis = new FileInputStream(localFile)) {
+                                    Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                                            fis.readAllBytes(),
+                                            ObjectUtils.asMap(
+                                                    "folder", "meeting-room/imported",
+                                                    "resource_type", "image"
+                                            )
+                                    );
+                                    request.setImageUrl(uploadResult.get("secure_url").toString());
+                                    request.setPublicId(uploadResult.get("public_id").toString());
+                                }
+                            } else {
+                                // Assume it's already a URL
+                                request.setImageUrl(imageUrl);
+                                request.setPublicId(publicId);
+                            }
+                        } catch (Exception e) {
+                            logger.error("Error processing image from excel for room " + locationCode + ": " + e.getMessage());
+                        }
+                    }
+
+                    addRoom(request, null);
                     // Add new room name to the list to prevent duplicates within the same Excel file
                     existingRoomNames.add(locationCode);
                 } catch (Exception e) {
@@ -380,21 +504,40 @@ public class RoomServiceImpl implements RoomService {
     @Transactional
     public void updateFloorLayout(String floorId, FloorLayoutRequest request) {
         try {
-            if (request.getItems() == null) return;
+            // Update Rooms
+            if (request.getItems() != null) {
+                for (FloorLayoutRequest.RoomLayoutItem item : request.getItems()) {
+                    if (item.getRoomId() == null) continue;
+                    roomRepository.findById(item.getRoomId()).ifPresent(room -> {
+                        if (room.getFloor() != null && room.getFloor().getId().equals(floorId)) {
+                            room.setXPosition(item.getX());
+                            room.setYPosition(item.getY());
+                            room.setWidth(item.getWidth());
+                            room.setHeight(item.getHeight());
+                            room.setPositioned(true);
+                            room.setUpdatedAt(LocalDateTime.now());
+                            roomRepository.save(room);
+                        }
+                    });
+                }
+            }
 
-            for (FloorLayoutRequest.RoomLayoutItem item : request.getItems()) {
-                roomRepository.findById(item.getRoomId()).ifPresent(room -> {
-                    // Always update if it belongs to the floor or we trust the frontend
-                    // Let's add a check to be safe
-                    if (room.getFloor() != null && room.getFloor().getId().equals(floorId)) {
-                        room.setXPosition(item.getX());
-                        room.setYPosition(item.getY());
-                        room.setWidth(item.getWidth());
-                        room.setHeight(item.getHeight());
-                        room.setPositioned(true);
-                        room.setUpdatedAt(LocalDateTime.now());
-                        roomRepository.save(room);
-                    }
+            // Update Decorations (Delete old ones and save new ones for this floor)
+            if (request.getDecorations() != null) {
+                floorDecorationRepository.deleteByFloorId(floorId);
+                floorRepository.findById(floorId).ifPresent(floor -> {
+                    List<FloorDecoration> decorations = request.getDecorations().stream()
+                            .map(d -> FloorDecoration.builder()
+                                    .floor(floor)
+                                    .type(d.getType())
+                                    .label(d.getLabel())
+                                    .x(d.getX())
+                                    .y(d.getY())
+                                    .width(d.getWidth())
+                                    .height(d.getHeight())
+                                    .build())
+                            .collect(java.util.stream.Collectors.toList());
+                    floorDecorationRepository.saveAll(decorations);
                 });
             }
         } catch (Exception e) {
@@ -403,4 +546,11 @@ public class RoomServiceImpl implements RoomService {
         }
     }
     // end implement updateFloorLayout
+
+    // start implement getDecorationsByFloorId
+    @Override
+    public List<FloorDecoration> getDecorationsByFloorId(String floorId) {
+        return floorDecorationRepository.findByFloorId(floorId);
+    }
+    // end implement getDecorationsByFloorId
 }

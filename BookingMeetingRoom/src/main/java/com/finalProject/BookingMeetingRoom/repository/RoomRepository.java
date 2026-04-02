@@ -15,8 +15,10 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -61,9 +63,15 @@ public interface RoomRepository extends JpaRepository<Room, String> {
     Optional<Room> findByLocationCodeIgnoreCase(String locationCode);
 
     boolean existsByFloorIdAndLocationCode(String floorId, String locationCode);
+    Optional<Room> findByLocationCode(String locationCode);
+
+    boolean existsByLocationCode(String locationCode);
 
     @Query("SELECT r.locationCode FROM Room r WHERE r.floor.id = :floorId")
     List<String> findLocationCodesByFloorId(@Param("floorId") String floorId);
+
+    @Query("SELECT r.locationCode FROM Room r")
+    List<String> findAllLocationCodes();
 
     int countByStatus(RoomStatus roomStatus);
 
