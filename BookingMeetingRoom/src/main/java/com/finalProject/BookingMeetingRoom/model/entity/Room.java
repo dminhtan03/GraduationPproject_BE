@@ -33,7 +33,7 @@ public class Room {
     @Id
     private String id;
 
-    @Column(name = "LOCATION_CODE")
+    @Column(name = "LOCATION_CODE", unique = true)
     private String locationCode;
 
     @Column(name = "STATUS")

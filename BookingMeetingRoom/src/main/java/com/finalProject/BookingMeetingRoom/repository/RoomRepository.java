@@ -52,10 +52,13 @@ public interface RoomRepository extends JpaRepository<Room, String> {
 
     Optional<Room> findByLocationCode(String locationCode);
 
-    boolean existsByFloorIdAndLocationCode(String floorId, String locationCode);
+    boolean existsByLocationCode(String locationCode);
 
     @Query("SELECT r.locationCode FROM Room r WHERE r.floor.id = :floorId")
     List<String> findLocationCodesByFloorId(@Param("floorId") String floorId);
+
+    @Query("SELECT r.locationCode FROM Room r")
+    List<String> findAllLocationCodes();
 
     int countByStatus(RoomStatus roomStatus);
 

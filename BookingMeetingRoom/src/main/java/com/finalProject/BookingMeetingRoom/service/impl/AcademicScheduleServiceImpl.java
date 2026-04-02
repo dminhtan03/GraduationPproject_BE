@@ -4,6 +4,9 @@ import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.model.entity.AcademicSchedule;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleCreateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.response.AcademicScheduleResponse;
 import com.finalProject.BookingMeetingRoom.repository.AcademicScheduleRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
@@ -12,6 +15,8 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,6 +29,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -161,6 +167,62 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     @Transactional
     public void deleteSchedule(String scheduleId) {
         scheduleRepository.deleteById(scheduleId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<AcademicScheduleResponse> searchSchedules(String roomName, String floorId, String buildingId, LocalDate fromDate, LocalDate toDate, Pageable pageable) {
+        return scheduleRepository.searchSchedules(roomName, floorId, buildingId, fromDate, toDate, pageable)
+                .map(s -> AcademicScheduleResponse.builder()
+                        .id(s.getId())
+                        .roomId(s.getRoom().getId())
+                        .roomName(s.getRoom().getLocationCode())
+                        .floorName(s.getRoom().getFloor() != null ? s.getRoom().getFloor().getName() : "N/A")
+                        .buildingName(s.getRoom().getFloor() != null && s.getRoom().getFloor().getBuilding() != null
+                                ? s.getRoom().getFloor().getBuilding().getName() : "N/A")
+                        .startTime(s.getStartTime())
+                        .endTime(s.getEndTime())
+                        .daysOfWeek(s.getDaysOfWeek())
+                        .fromDate(s.getFromDate())
+                        .toDate(s.getToDate())
+                        .description(s.getDescription())
+                        .build());
+    }
+
+    @Override
+    @Transactional
+    public void createSchedule(AcademicScheduleCreateRequest request) {
+        Room room = roomRepository.findById(request.getRoomId())
+                .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
+
+        AcademicSchedule schedule = AcademicSchedule.builder()
+                .id(UUID.randomUUID().toString())
+                .room(room)
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .daysOfWeek(String.join(",", request.getDaysOfWeek()).toUpperCase())
+                .fromDate(request.getFromDate())
+                .toDate(request.getToDate())
+                .description(request.getDescription())
+                .build();
+
+        scheduleRepository.save(schedule);
+    }
+
+    @Override
+    @Transactional
+    public void updateSchedule(String scheduleId, AcademicScheduleUpdateRequest request) {
+        AcademicSchedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new CustomException(ResponseCode.INTERNAL_SERVER_ERROR, "Schedule not found"));
+
+        schedule.setStartTime(request.getStartTime());
+        schedule.setEndTime(request.getEndTime());
+        schedule.setDaysOfWeek(String.join(",", request.getDaysOfWeek()).toUpperCase());
+        schedule.setFromDate(request.getFromDate());
+        schedule.setToDate(request.getToDate());
+        schedule.setDescription(request.getDescription());
+
+        scheduleRepository.save(schedule);
     }
 
     private String getCellValueAsString(Cell cell) {

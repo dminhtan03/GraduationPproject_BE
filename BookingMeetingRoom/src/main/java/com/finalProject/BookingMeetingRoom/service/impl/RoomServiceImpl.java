@@ -33,6 +33,7 @@ import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.model.entity.Amenity;
 import com.finalProject.BookingMeetingRoom.model.entity.Floor;
+import com.finalProject.BookingMeetingRoom.model.entity.FloorDecoration;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.entity.RoomImage;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
@@ -45,12 +46,11 @@ import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
 import com.finalProject.BookingMeetingRoom.repository.AmenityRepository;
 import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
+import com.finalProject.BookingMeetingRoom.repository.FloorDecorationRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomImageRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
-import com.finalProject.BookingMeetingRoom.model.entity.FloorDecoration;
-import com.finalProject.BookingMeetingRoom.repository.FloorDecorationRepository;
 import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
 
@@ -294,8 +294,8 @@ public class RoomServiceImpl implements RoomService {
             Floor floor = floorRepository.findById(request.getFloorId())
                     .orElseThrow(() -> new CustomException(ResponseCode.FLOOR_NOT_FOUND));
 
-            // [ADDED] Check if room name already exists on this floor
-            if (roomRepository.existsByFloorIdAndLocationCode(request.getFloorId(), request.getLocationCode())) {
+            // [ADDED] Check if room name already exists globally
+            if (roomRepository.existsByLocationCode(request.getLocationCode())) {
                 throw new CustomException(ResponseCode.ROOM_ALREADY_EXISTS);
             }
 
@@ -396,9 +396,7 @@ public class RoomServiceImpl implements RoomService {
 
             Sheet sheet = workbook.getSheetAt(0);
             List<String> skippedRooms = new ArrayList<>();
-            List<String> existingRoomNames = (floorId != null && !floorId.isEmpty())
-                    ? roomRepository.findLocationCodesByFloorId(floorId)
-                    : new ArrayList<>();
+            List<String> existingRoomNames = roomRepository.findAllLocationCodes();
 
             for (Row row : sheet) {
                 // Skip header row
@@ -423,7 +421,7 @@ public class RoomServiceImpl implements RoomService {
                         continue;
                     }
 
-                    // [ADDED] Skip if room already exists on this floor
+                    // [ADDED] Skip if room already exists globally
                     if (existingRoomNames.contains(locationCode)) {
                         logger.warn("Skipping duplicate room: " + locationCode);
                         skippedRooms.add(locationCode);
