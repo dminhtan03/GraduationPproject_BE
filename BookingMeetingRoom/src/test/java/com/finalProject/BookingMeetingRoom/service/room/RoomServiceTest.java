@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.service.seat;
+package com.finalProject.BookingMeetingRoom.service.room;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class SeatServiceTest {
+public class RoomServiceTest {
     @Mock
     private FloorRepository floorRepository;
     @Mock

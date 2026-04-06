@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.service.seat;
+package com.finalProject.BookingMeetingRoom.service.room;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +23,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class SeatServiceTest_getSeatStatus {
+class RoomServiceTest_getRoomStatus {
 
     @Mock
     private SeatRepository seatRepository;

@@ -1,4 +1,4 @@
-package com.finalProject.BookingMeetingRoom.service.seat;
+package com.finalProject.BookingMeetingRoom.service.room;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,7 +12,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class SeatStatusUpdateServiceTest {
+class RoomStatusUpdateServiceTest {
 
     private SimpMessagingTemplate messagingTemplate;
     private SeatStatusUpdateServiceImpl seatStatusUpdateService;
