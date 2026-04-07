@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 public class LastCheckedInDto {
-    private String roomId;
+    private String seatId;
     private String buildingName;
     private String floorName;
     private LocalDateTime lastCheckedInTime;

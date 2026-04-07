@@ -10,8 +10,8 @@ import lombok.Setter;
 public class BuildingOccupancyDto {
     private String buildingName;
     private int occupied;
-    private int totalRooms;
-    private int brokenRooms;
-    private int availableRooms;
+    private int totalSeats;
+    private int brokenSeats;
+    private int availableSeats;
     private int occupancyRate;
 }
