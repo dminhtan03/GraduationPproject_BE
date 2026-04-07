@@ -26,7 +26,7 @@ import static org.mockito.Mockito.*;
 class RoomServiceTest_getRoomStatus {
 
     @Mock
-    private SeatRepository seatRepository;
+    private RoomRepository roomRepository;
 
     @Mock
     private FloorRepository floorRepository;
@@ -38,13 +38,13 @@ class RoomServiceTest_getRoomStatus {
     private Logger logger;
 
     @InjectMocks
-    private SeatServiceImpl seatSearchService;
+    private RoomServiceImpl roomSearchService;
 
-    private SeatSearchRequest validRequest;
+    private RoomSearchRequest validRequest;
     private Floor testFloor;
-    private Seat availableSeat;
-    private Seat brokenSeat;
-    private Seat reservedSeat;
+    private Room availableRoom;
+    private Room brokenRoom;
+    private Room reservedRoom;
     private Reservation overlappingReservation;
 
     @BeforeEach
@@ -54,24 +54,24 @@ class RoomServiceTest_getRoomStatus {
         testFloor.setId("floor-123");
         testFloor.setName("Test Floor");
 
-        // Setup test seats
-        availableSeat = new Seat();
-        availableSeat.setId("seat-available");
-        availableSeat.setLocationCode("A1-01");
-        availableSeat.setStatus(SeatStatus.AVAILABLE);
-        availableSeat.setScore(85.5);
+        // Setup test rooms
+        availableRoom = new Room();
+        availableRoom.setId("room-available");
+        availableRoom.setLocationCode("A1-01");
+        availableRoom.setStatus(RoomStatus.AVAILABLE);
+        availableRoom.setScore(85.5);
 
-        brokenSeat = new Seat();
-        brokenSeat.setId("seat-broken");
-        brokenSeat.setLocationCode("A1-02");
-        brokenSeat.setStatus(SeatStatus.BROKEN);
-        brokenSeat.setScore(90.0);
+        brokenRoom = new Room();
+        brokenRoom.setId("room-broken");
+        brokenRoom.setLocationCode("A1-02");
+        brokenRoom.setStatus(RoomStatus.BROKEN);
+        brokenRoom.setScore(90.0);
 
-        reservedSeat = new Seat();
-        reservedSeat.setId("seat-reserved");
-        reservedSeat.setLocationCode("A1-03");
-        reservedSeat.setStatus(SeatStatus.AVAILABLE);
-        reservedSeat.setScore(80.0);
+        reservedRoom = new Room();
+        reservedRoom.setId("room-reserved");
+        reservedRoom.setLocationCode("A1-03");
+        reservedRoom.setStatus(RoomStatus.AVAILABLE);
+        reservedRoom.setScore(80.0);
 
         // Setup test reservation
         overlappingReservation = new Reservation();
@@ -81,299 +81,299 @@ class RoomServiceTest_getRoomStatus {
         overlappingReservation.setEndTime(LocalDateTime.of(2025, 1, 15, 12, 0));
 
         // Setup valid request
-        validRequest = new SeatSearchRequest();
+        validRequest = new RoomSearchRequest();
         validRequest.setFloorId("floor-123");
         validRequest.setStartTime(LocalDateTime.of(2025, 1, 15, 9, 0));
         validRequest.setEndTime(LocalDateTime.of(2025, 1, 15, 11, 0));
     }
 
-    // ==================== getSeatsStatus Tests ====================
+    // ==================== getRoomsStatus Tests ====================
 
     /**
-     * Test successful getSeatsStatus with available seats
+     * Test successful getRoomsStatus with available rooms
      */
     @Test
-    void testGetSeatsStatus_Success_WithAvailableSeats() {
+    void testGetRoomsStatus_Success_WithAvailableRooms() {
         // Arrange
-        List<Seat> seats = Arrays.asList(availableSeat);
+        List<Room> rooms = Arrays.asList(availableRoom);
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(seats);
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(rooms);
         when(reservationRepository.findOverlappingReservations(
-                eq("seat-available"),
+                eq("room-available"),
                 eq(validRequest.getStartTime()),
                 eq(validRequest.getEndTime())
         )).thenReturn(Collections.emptyList());
 
         // Act
-        List<SeatSearchResponse> result = seatSearchService.getSeatsStatus(validRequest);
+        List<RoomSearchResponse> result = roomSearchService.getRoomsStatus(validRequest);
 
         // Assert
         assertNotNull(result);
         assertEquals(1, result.size());
 
-        SeatSearchResponse response = result.get(0);
-        assertEquals("seat-available", response.getSeatId());
+        RoomSearchResponse response = result.get(0);
+        assertEquals("room-available", response.getRoomId());
         assertEquals("A1-01", response.getLocationCode());
         assertEquals(85.5, response.getScore());
-        assertEquals(SeatStatus.AVAILABLE, response.getStatus());
+        assertEquals(RoomStatus.AVAILABLE, response.getStatus());
 
         verify(floorRepository, times(1)).findById("floor-123");
-        verify(seatRepository, times(1)).findByFloorOrderByLocationCode(testFloor);
+        verify(roomRepository, times(1)).findByFloorOrderByLocationCode(testFloor);
         verify(reservationRepository, times(1)).findOverlappingReservations(
-                "seat-available", validRequest.getStartTime(), validRequest.getEndTime());
+                "room-available", validRequest.getStartTime(), validRequest.getEndTime());
     }
 
     /**
-     * Test successful getSeatsStatus with broken seat
+     * Test successful getRoomsStatus with broken room
      */
     @Test
-    void testGetSeatsStatus_Success_WithBrokenSeat() {
+    void testGetRoomsStatus_Success_WithBrokenRoom() {
         // Arrange
-        List<Seat> seats = Arrays.asList(brokenSeat);
+        List<Room> rooms = Arrays.asList(brokenRoom);
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(seats);
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(rooms);
 
         // Act
-        List<SeatSearchResponse> result = seatSearchService.getSeatsStatus(validRequest);
+        List<RoomSearchResponse> result = roomSearchService.getRoomsStatus(validRequest);
 
         // Assert
         assertNotNull(result);
         assertEquals(1, result.size());
 
-        SeatSearchResponse response = result.get(0);
-        assertEquals("seat-broken", response.getSeatId());
+        RoomSearchResponse response = result.get(0);
+        assertEquals("room-broken", response.getRoomId());
         assertEquals("A1-02", response.getLocationCode());
         assertEquals(90.0, response.getScore());
-        assertEquals(SeatStatus.UNAVAILABLE, response.getStatus()); // Broken seat shows as UNAVAILABLE
+        assertEquals(RoomStatus.UNAVAILABLE, response.getStatus()); // Broken room shows as UNAVAILABLE
 
         verify(floorRepository, times(1)).findById("floor-123");
-        verify(seatRepository, times(1)).findByFloorOrderByLocationCode(testFloor);
-        // Reservation query should not be called for broken seats
+        verify(roomRepository, times(1)).findByFloorOrderByLocationCode(testFloor);
+        // Reservation query should not be called for broken rooms
         verify(reservationRepository, never()).findOverlappingReservations(anyString(), any(), any());
     }
 
     /**
-     * Test successful getSeatsStatus with reserved seat
+     * Test successful getRoomsStatus with reserved room
      */
     @Test
-    void testGetSeatsStatus_Success_WithReservedSeat() {
+    void testGetRoomsStatus_Success_WithReservedRoom() {
         // Arrange
-        List<Seat> seats = Arrays.asList(reservedSeat);
+        List<Room> rooms = Arrays.asList(reservedRoom);
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(seats);
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(rooms);
         when(reservationRepository.findOverlappingReservations(
-                eq("seat-reserved"),
+                eq("room-reserved"),
                 eq(validRequest.getStartTime()),
                 eq(validRequest.getEndTime())
         )).thenReturn(Arrays.asList(overlappingReservation));
 
         // Act
-        List<SeatSearchResponse> result = seatSearchService.getSeatsStatus(validRequest);
+        List<RoomSearchResponse> result = roomSearchService.getRoomsStatus(validRequest);
 
         // Assert
         assertNotNull(result);
         assertEquals(1, result.size());
 
-        SeatSearchResponse response = result.get(0);
-        assertEquals("seat-reserved", response.getSeatId());
+        RoomSearchResponse response = result.get(0);
+        assertEquals("room-reserved", response.getRoomId());
         assertEquals("A1-03", response.getLocationCode());
         assertEquals(80.0, response.getScore());
-        assertEquals(SeatStatus.UNAVAILABLE, response.getStatus()); // Reserved seat shows as UNAVAILABLE
+        assertEquals(RoomStatus.UNAVAILABLE, response.getStatus()); // Reserved room shows as UNAVAILABLE
 
         verify(reservationRepository, times(1)).findOverlappingReservations(
-                "seat-reserved", validRequest.getStartTime(), validRequest.getEndTime());
+                "room-reserved", validRequest.getStartTime(), validRequest.getEndTime());
     }
 
     /**
-     * Test successful getSeatsStatus with mixed seat types
+     * Test successful getRoomsStatus with mixed room types
      */
     @Test
-    void testGetSeatsStatus_Success_WithMixedSeatTypes() {
+    void testGetRoomsStatus_Success_WithMixedRoomTypes() {
         // Arrange
-        List<Seat> seats = Arrays.asList(availableSeat, brokenSeat, reservedSeat);
+        List<Room> rooms = Arrays.asList(availableRoom, brokenRoom, reservedRoom);
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(seats);
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(rooms);
         when(reservationRepository.findOverlappingReservations(
-                eq("seat-available"), any(), any())).thenReturn(Collections.emptyList());
+                eq("room-available"), any(), any())).thenReturn(Collections.emptyList());
         when(reservationRepository.findOverlappingReservations(
-                eq("seat-reserved"), any(), any())).thenReturn(Arrays.asList(overlappingReservation));
+                eq("room-reserved"), any(), any())).thenReturn(Arrays.asList(overlappingReservation));
 
         // Act
-        List<SeatSearchResponse> result = seatSearchService.getSeatsStatus(validRequest);
+        List<RoomSearchResponse> result = roomSearchService.getRoomsStatus(validRequest);
 
         // Assert
         assertNotNull(result);
         assertEquals(3, result.size());
 
-        // Check available seat
-        SeatSearchResponse availableResponse = result.stream()
-                .filter(r -> r.getSeatId().equals("seat-available"))
+        // Check available room
+        RoomSearchResponse availableResponse = result.stream()
+                .filter(r -> r.getRoomId().equals("room-available"))
                 .findFirst().orElseThrow();
-        assertEquals(SeatStatus.AVAILABLE, availableResponse.getStatus());
+        assertEquals(RoomStatus.AVAILABLE, availableResponse.getStatus());
 
-        // Check broken seat
-        SeatSearchResponse brokenResponse = result.stream()
-                .filter(r -> r.getSeatId().equals("seat-broken"))
+        // Check broken room
+        RoomSearchResponse brokenResponse = result.stream()
+                .filter(r -> r.getRoomId().equals("room-broken"))
                 .findFirst().orElseThrow();
-        assertEquals(SeatStatus.UNAVAILABLE, brokenResponse.getStatus());
+        assertEquals(RoomStatus.UNAVAILABLE, brokenResponse.getStatus());
 
-        // Check reserved seat
-        SeatSearchResponse reservedResponse = result.stream()
-                .filter(r -> r.getSeatId().equals("seat-reserved"))
+        // Check reserved room
+        RoomSearchResponse reservedResponse = result.stream()
+                .filter(r -> r.getRoomId().equals("room-reserved"))
                 .findFirst().orElseThrow();
-        assertEquals(SeatStatus.UNAVAILABLE, reservedResponse.getStatus());
+        assertEquals(RoomStatus.UNAVAILABLE, reservedResponse.getStatus());
 
         verify(reservationRepository, times(2)).findOverlappingReservations(anyString(), any(), any());
     }
 
     /**
-     * Test getSeatsStatus with empty seat list
+     * Test getRoomsStatus with empty room list
      */
     @Test
-    void testGetSeatsStatus_Success_WithEmptySeats() {
+    void testGetRoomsStatus_Success_WithEmptyRooms() {
         // Arrange
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(Collections.emptyList());
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(Collections.emptyList());
 
         // Act
-        List<SeatSearchResponse> result = seatSearchService.getSeatsStatus(validRequest);
+        List<RoomSearchResponse> result = roomSearchService.getRoomsStatus(validRequest);
 
         // Assert
         assertNotNull(result);
         assertEquals(0, result.size());
 
         verify(floorRepository, times(1)).findById("floor-123");
-        verify(seatRepository, times(1)).findByFloorOrderByLocationCode(testFloor);
+        verify(roomRepository, times(1)).findByFloorOrderByLocationCode(testFloor);
     }
 
     /**
-     * Test getSeatsStatus when floor is not found
+     * Test getRoomsStatus when floor is not found
      */
     @Test
-    void testGetSeatsStatus_FloorNotFound_ThrowsCustomException() {
+    void testGetRoomsStatus_FloorNotFound_ThrowsCustomException() {
         // Arrange
         when(floorRepository.findById("nonexistent-floor")).thenReturn(Optional.empty());
 
-        SeatSearchRequest invalidRequest = new SeatSearchRequest();
+        RoomSearchRequest invalidRequest = new RoomSearchRequest();
         invalidRequest.setFloorId("nonexistent-floor");
         invalidRequest.setStartTime(LocalDateTime.of(2025, 1, 15, 9, 0));
         invalidRequest.setEndTime(LocalDateTime.of(2025, 1, 15, 11, 0));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            seatSearchService.getSeatsStatus(invalidRequest);
+            roomSearchService.getRoomsStatus(invalidRequest);
         });
 
         assertEquals(ResponseCode.FLOOR_NOT_FOUND, exception.getResponseCode());
 
         verify(floorRepository, times(1)).findById("nonexistent-floor");
-        verify(seatRepository, never()).findByFloorOrderByLocationCode(any());
+        verify(roomRepository, never()).findByFloorOrderByLocationCode(any());
     }
 
     /**
-     * Test getSeatsStatus when repository throws RuntimeException
+     * Test getRoomsStatus when repository throws RuntimeException
      */
     @Test
-    void testGetSeatsStatus_RepositoryThrowsException_ThrowsInternalServerError() {
+    void testGetRoomsStatus_RepositoryThrowsException_ThrowsInternalServerError() {
         // Arrange
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor))
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor))
                 .thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            seatSearchService.getSeatsStatus(validRequest);
+            roomSearchService.getRoomsStatus(validRequest);
         });
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
         verify(floorRepository, times(1)).findById("floor-123");
-        verify(seatRepository, times(1)).findByFloorOrderByLocationCode(testFloor);
+        verify(roomRepository, times(1)).findByFloorOrderByLocationCode(testFloor);
         verify(logger, times(1)).error(anyString(), any(Exception.class));
     }
 
-    // ==================== getSeatStatus (Paginated) Tests ====================
+    // ==================== getRoomStatus (Paginated) Tests ====================
 
     /**
-     * Test successful getSeatStatus with pagination
+     * Test successful getRoomStatus with pagination
      */
     @Test
-    void testGetSeatStatus_Success_WithPagination() {
+    void testGetRoomStatus_Success_WithPagination() {
         // Arrange
         int page = 0;
         int size = 10;
-        List<Seat> seats = Arrays.asList(availableSeat);
+        List<Room> rooms = Arrays.asList(availableRoom);
         Pageable pageable = PageRequest.of(page, size);
-        Page<Seat> seatPage = new PageImpl<>(seats, pageable, 1);
+        Page<Room> roomPage = new PageImpl<>(rooms, pageable, 1);
 
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor, pageable)).thenReturn(seatPage);
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor, pageable)).thenReturn(roomPage);
         when(reservationRepository.findOverlappingReservations(
-                eq("seat-available"), any(), any())).thenReturn(Collections.emptyList());
+                eq("room-available"), any(), any())).thenReturn(Collections.emptyList());
 
         // Act
-        Page<SeatSearchResponse> result = seatSearchService.getSeatStatus(validRequest, page, size);
+        Page<RoomSearchResponse> result = roomSearchService.getRoomStatus(validRequest, page, size);
 
         // Assert
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
         assertEquals(1, result.getContent().size());
 
-        SeatSearchResponse response = result.getContent().get(0);
-        assertEquals("seat-available", response.getSeatId());
+        RoomSearchResponse response = result.getContent().get(0);
+        assertEquals("room-available", response.getRoomId());
         assertEquals("A1-01", response.getLocationCode());
         assertEquals(85.5, response.getScore());
-        assertEquals(SeatStatus.AVAILABLE, response.getStatus());
+        assertEquals(RoomStatus.AVAILABLE, response.getStatus());
 
         verify(floorRepository, times(1)).findById("floor-123");
-        verify(seatRepository, times(1)).findByFloorOrderByLocationCode(testFloor, pageable);
+        verify(roomRepository, times(1)).findByFloorOrderByLocationCode(testFloor, pageable);
     }
 
     /**
-     * Test getSeatStatus with different page parameters
+     * Test getRoomStatus with different page parameters
      */
     @Test
-    void testGetSeatStatus_Success_WithDifferentPageParameters() {
+    void testGetRoomStatus_Success_WithDifferentPageParameters() {
         // Arrange
         int page = 2;
         int size = 20;
-        List<Seat> seats = Arrays.asList(availableSeat);
+        List<Room> rooms = Arrays.asList(availableRoom);
         Pageable pageable = PageRequest.of(page, size);
-        Page<Seat> seatPage = new PageImpl<>(seats, pageable, 1);
+        Page<Room> roomPage = new PageImpl<>(rooms, pageable, 1);
 
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor, pageable)).thenReturn(seatPage);
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor, pageable)).thenReturn(roomPage);
         when(reservationRepository.findOverlappingReservations(anyString(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
         // Act
-        Page<SeatSearchResponse> result = seatSearchService.getSeatStatus(validRequest, page, size);
+        Page<RoomSearchResponse> result = roomSearchService.getRoomStatus(validRequest, page, size);
 
         // Assert
         assertNotNull(result);
         assertEquals(page, result.getNumber());
         assertEquals(size, result.getSize());
 
-        verify(seatRepository, times(1)).findByFloorOrderByLocationCode(testFloor, pageable);
+        verify(roomRepository, times(1)).findByFloorOrderByLocationCode(testFloor, pageable);
     }
 
     /**
-     * Test getSeatStatus when repository throws RuntimeException
+     * Test getRoomStatus when repository throws RuntimeException
      */
     @Test
-    void testGetSeatStatus_RepositoryThrowsException_ThrowsInternalServerError() {
+    void testGetRoomStatus_RepositoryThrowsException_ThrowsInternalServerError() {
         // Arrange
         int page = 0;
         int size = 10;
         Pageable pageable = PageRequest.of(page, size);
 
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor, pageable))
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor, pageable))
                 .thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            seatSearchService.getSeatStatus(validRequest, page, size);
+            roomSearchService.getRoomStatus(validRequest, page, size);
         });
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
@@ -389,17 +389,17 @@ class RoomServiceTest_getRoomStatus {
     @Test
     void testValidateAndGetContext_NullStartTime_ThrowsCustomException() {
         // Arrange
-        SeatSearchRequest invalidRequest = new SeatSearchRequest();
+        RoomSearchRequest invalidRequest = new RoomSearchRequest();
         invalidRequest.setFloorId("floor-123");
         invalidRequest.setStartTime(null);
         invalidRequest.setEndTime(LocalDateTime.of(2025, 1, 15, 11, 0));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            seatSearchService.getSeatsStatus(invalidRequest);
+            roomSearchService.getRoomsStatus(invalidRequest);
         });
 
-        assertEquals(ResponseCode.SEAT_NOT_FOUND, exception.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, exception.getResponseCode());
 
         verify(floorRepository, never()).findById(anyString());
     }
@@ -410,17 +410,17 @@ class RoomServiceTest_getRoomStatus {
     @Test
     void testValidateAndGetContext_NullEndTime_ThrowsCustomException() {
         // Arrange
-        SeatSearchRequest invalidRequest = new SeatSearchRequest();
+        RoomSearchRequest invalidRequest = new RoomSearchRequest();
         invalidRequest.setFloorId("floor-123");
         invalidRequest.setStartTime(LocalDateTime.of(2025, 1, 15, 9, 0));
         invalidRequest.setEndTime(null);
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            seatSearchService.getSeatsStatus(invalidRequest);
+            roomSearchService.getRoomsStatus(invalidRequest);
         });
 
-        assertEquals(ResponseCode.SEAT_NOT_FOUND, exception.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, exception.getResponseCode());
 
         verify(floorRepository, never()).findById(anyString());
     }
@@ -431,17 +431,17 @@ class RoomServiceTest_getRoomStatus {
     @Test
     void testValidateAndGetContext_StartTimeAfterEndTime_ThrowsCustomException() {
         // Arrange
-        SeatSearchRequest invalidRequest = new SeatSearchRequest();
+        RoomSearchRequest invalidRequest = new RoomSearchRequest();
         invalidRequest.setFloorId("floor-123");
         invalidRequest.setStartTime(LocalDateTime.of(2025, 1, 15, 12, 0));
         invalidRequest.setEndTime(LocalDateTime.of(2025, 1, 15, 10, 0));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            seatSearchService.getSeatsStatus(invalidRequest);
+            roomSearchService.getRoomsStatus(invalidRequest);
         });
 
-        assertEquals(ResponseCode.SEAT_NOT_FOUND, exception.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, exception.getResponseCode());
 
         verify(floorRepository, never()).findById(anyString());
     }
@@ -453,51 +453,51 @@ class RoomServiceTest_getRoomStatus {
     void testValidateAndGetContext_EqualStartAndEndTime_ThrowsCustomException() {
         // Arrange
         LocalDateTime sameTime = LocalDateTime.of(2025, 1, 15, 10, 0);
-        SeatSearchRequest invalidRequest = new SeatSearchRequest();
+        RoomSearchRequest invalidRequest = new RoomSearchRequest();
         invalidRequest.setFloorId("floor-123");
         invalidRequest.setStartTime(sameTime);
         invalidRequest.setEndTime(sameTime);
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            seatSearchService.getSeatsStatus(invalidRequest);
+            roomSearchService.getRoomsStatus(invalidRequest);
         });
 
-        assertEquals(ResponseCode.SEAT_NOT_FOUND, exception.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, exception.getResponseCode());
 
         verify(floorRepository, never()).findById(anyString());
     }
 
-    // ==================== mapToSeatSearchResponse Tests ====================
+    // ==================== mapToRoomSearchResponse Tests ====================
 
     /**
-     * Test mapToSeatSearchResponse with IN_USE reservation
+     * Test mapToRoomSearchResponse with IN_USE reservation
      */
     @Test
-    void testMapToSeatSearchResponse_WithInUseReservation() {
+    void testMapToRoomSearchResponse_WithInUseReservation() {
         // Arrange
         Reservation inUseReservation = new Reservation();
         inUseReservation.setStatus(ReservationStatus.IN_USE);
 
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor))
-                .thenReturn(Arrays.asList(availableSeat));
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor))
+                .thenReturn(Arrays.asList(availableRoom));
         when(reservationRepository.findOverlappingReservations(anyString(), any(), any()))
                 .thenReturn(Arrays.asList(inUseReservation));
 
         // Act
-        List<SeatSearchResponse> result = seatSearchService.getSeatsStatus(validRequest);
+        List<RoomSearchResponse> result = roomSearchService.getRoomsStatus(validRequest);
 
         // Assert
         assertEquals(1, result.size());
-        assertEquals(SeatStatus.UNAVAILABLE, result.get(0).getStatus());
+        assertEquals(RoomStatus.UNAVAILABLE, result.get(0).getStatus());
     }
 
     /**
-     * Test mapToSeatSearchResponse with non-conflicting reservation statuses
+     * Test mapToRoomSearchResponse with non-conflicting reservation statuses
      */
     @Test
-    void testMapToSeatSearchResponse_WithNonConflictingReservations() {
+    void testMapToRoomSearchResponse_WithNonConflictingReservations() {
         // Arrange
         Reservation completedReservation = new Reservation();
         completedReservation.setStatus(ReservationStatus.COMPLETED);
@@ -506,24 +506,24 @@ class RoomServiceTest_getRoomStatus {
         failedReservation.setStatus(ReservationStatus.FAILED);
 
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor))
-                .thenReturn(Arrays.asList(availableSeat));
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor))
+                .thenReturn(Arrays.asList(availableRoom));
         when(reservationRepository.findOverlappingReservations(anyString(), any(), any()))
                 .thenReturn(Arrays.asList(completedReservation, failedReservation));
 
         // Act
-        List<SeatSearchResponse> result = seatSearchService.getSeatsStatus(validRequest);
+        List<RoomSearchResponse> result = roomSearchService.getRoomsStatus(validRequest);
 
         // Assert
         assertEquals(1, result.size());
-        assertEquals(SeatStatus.AVAILABLE, result.get(0).getStatus()); // Should be available as no conflicting reservations
+        assertEquals(RoomStatus.AVAILABLE, result.get(0).getStatus()); // Should be available as no conflicting reservations
     }
 
     /**
-     * Test mapToSeatSearchResponse with mixed reservation statuses
+     * Test mapToRoomSearchResponse with mixed reservation statuses
      */
     @Test
-    void testMapToSeatSearchResponse_WithMixedReservationStatuses() {
+    void testMapToRoomSearchResponse_WithMixedReservationStatuses() {
         // Arrange
         Reservation reservedReservation = new Reservation();
         reservedReservation.setStatus(ReservationStatus.RESERVED);
@@ -532,17 +532,17 @@ class RoomServiceTest_getRoomStatus {
         completedReservation.setStatus(ReservationStatus.COMPLETED);
 
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor))
-                .thenReturn(Arrays.asList(availableSeat));
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor))
+                .thenReturn(Arrays.asList(availableRoom));
         when(reservationRepository.findOverlappingReservations(anyString(), any(), any()))
                 .thenReturn(Arrays.asList(reservedReservation, completedReservation));
 
         // Act
-        List<SeatSearchResponse> result = seatSearchService.getSeatsStatus(validRequest);
+        List<RoomSearchResponse> result = roomSearchService.getRoomsStatus(validRequest);
 
         // Assert
         assertEquals(1, result.size());
-        assertEquals(SeatStatus.UNAVAILABLE, result.get(0).getStatus()); // Should be unavailable due to RESERVED status
+        assertEquals(RoomStatus.UNAVAILABLE, result.get(0).getStatus()); // Should be unavailable due to RESERVED status
     }
 
     // ==================== Integration Tests ====================
@@ -552,60 +552,60 @@ class RoomServiceTest_getRoomStatus {
      */
     @Test
     void testCompleteFlow_Success_ComplexScenario() {
-        // Arrange - Create multiple seats with different scenarios
-        Seat seat1 = new Seat();
-        seat1.setId("seat-1");
-        seat1.setLocationCode("A1-01");
-        seat1.setStatus(SeatStatus.AVAILABLE);
-        seat1.setScore(85.0);
+        // Arrange - Create multiple rooms with different scenarios
+        Room room1 = new Room();
+        room1.setId("room-1");
+        room1.setLocationCode("A1-01");
+        room1.setStatus(RoomStatus.AVAILABLE);
+        room1.setScore(85.0);
 
-        Seat seat2 = new Seat();
-        seat2.setId("seat-2");
-        seat2.setLocationCode("A1-02");
-        seat2.setStatus(SeatStatus.BROKEN);
-        seat2.setScore(90.0);
+        Room room2 = new Room();
+        room2.setId("room-2");
+        room2.setLocationCode("A1-02");
+        room2.setStatus(RoomStatus.BROKEN);
+        room2.setScore(90.0);
 
-        Seat seat3 = new Seat();
-        seat3.setId("seat-3");
-        seat3.setLocationCode("A1-03");
-        seat3.setStatus(SeatStatus.AVAILABLE);
-        seat3.setScore(80.0);
+        Room room3 = new Room();
+        room3.setId("room-3");
+        room3.setLocationCode("A1-03");
+        room3.setStatus(RoomStatus.AVAILABLE);
+        room3.setScore(80.0);
 
-        List<Seat> seats = Arrays.asList(seat1, seat2, seat3);
+        List<Room> rooms = Arrays.asList(room1, room2, room3);
 
         Reservation conflictingReservation = new Reservation();
         conflictingReservation.setStatus(ReservationStatus.IN_USE);
 
         when(floorRepository.findById("floor-123")).thenReturn(Optional.of(testFloor));
-        when(seatRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(seats);
-        when(reservationRepository.findOverlappingReservations("seat-1", validRequest.getStartTime(), validRequest.getEndTime()))
+        when(roomRepository.findByFloorOrderByLocationCode(testFloor)).thenReturn(rooms);
+        when(reservationRepository.findOverlappingReservations("room-1", validRequest.getStartTime(), validRequest.getEndTime()))
                 .thenReturn(Collections.emptyList());
-        when(reservationRepository.findOverlappingReservations("seat-3", validRequest.getStartTime(), validRequest.getEndTime()))
+        when(reservationRepository.findOverlappingReservations("room-3", validRequest.getStartTime(), validRequest.getEndTime()))
                 .thenReturn(Arrays.asList(conflictingReservation));
 
         // Act
-        List<SeatSearchResponse> result = seatSearchService.getSeatsStatus(validRequest);
+        List<RoomSearchResponse> result = roomSearchService.getRoomsStatus(validRequest);
 
         // Assert
         assertEquals(3, result.size());
 
-        // Seat 1 should be available
-        SeatSearchResponse response1 = result.stream()
-                .filter(r -> r.getSeatId().equals("seat-1"))
+        // Room 1 should be available
+        RoomSearchResponse response1 = result.stream()
+                .filter(r -> r.getRoomId().equals("room-1"))
                 .findFirst().orElseThrow();
-        assertEquals(SeatStatus.AVAILABLE, response1.getStatus());
+        assertEquals(RoomStatus.AVAILABLE, response1.getStatus());
 
-        // Seat 2 should be unavailable (broken)
-        SeatSearchResponse response2 = result.stream()
-                .filter(r -> r.getSeatId().equals("seat-2"))
+        // Room 2 should be unavailable (broken)
+        RoomSearchResponse response2 = result.stream()
+                .filter(r -> r.getRoomId().equals("room-2"))
                 .findFirst().orElseThrow();
-        assertEquals(SeatStatus.UNAVAILABLE, response2.getStatus());
+        assertEquals(RoomStatus.UNAVAILABLE, response2.getStatus());
 
-        // Seat 3 should be unavailable (conflicting reservation)
-        SeatSearchResponse response3 = result.stream()
-                .filter(r -> r.getSeatId().equals("seat-3"))
+        // Room 3 should be unavailable (conflicting reservation)
+        RoomSearchResponse response3 = result.stream()
+                .filter(r -> r.getRoomId().equals("room-3"))
                 .findFirst().orElseThrow();
-        assertEquals(SeatStatus.UNAVAILABLE, response3.getStatus());
+        assertEquals(RoomStatus.UNAVAILABLE, response3.getStatus());
 
         verify(reservationRepository, times(2)).findOverlappingReservations(anyString(), any(), any());
     }
@@ -616,21 +616,21 @@ class RoomServiceTest_getRoomStatus {
     @Test
     void testBothMethods_UseSameValidation() {
         // Arrange
-        SeatSearchRequest invalidRequest = new SeatSearchRequest();
+        RoomSearchRequest invalidRequest = new RoomSearchRequest();
         invalidRequest.setFloorId("floor-123");
         invalidRequest.setStartTime(LocalDateTime.of(2025, 1, 15, 12, 0));
         invalidRequest.setEndTime(LocalDateTime.of(2025, 1, 15, 10, 0)); // Invalid: start after end
 
         // Act & Assert - Both methods should throw same exception
         CustomException exception1 = assertThrows(CustomException.class, () -> {
-            seatSearchService.getSeatsStatus(invalidRequest);
+            roomSearchService.getRoomsStatus(invalidRequest);
         });
 
         CustomException exception2 = assertThrows(CustomException.class, () -> {
-            seatSearchService.getSeatStatus(invalidRequest, 0, 10);
+            roomSearchService.getRoomStatus(invalidRequest, 0, 10);
         });
 
-        assertEquals(ResponseCode.SEAT_NOT_FOUND, exception1.getResponseCode());
-        assertEquals(ResponseCode.SEAT_NOT_FOUND, exception2.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, exception1.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, exception2.getResponseCode());
     }
 }

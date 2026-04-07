@@ -28,7 +28,7 @@ class FeedbackServiceImplTest {
     private FeedbackMapper feedbackMapper;
 
     @Mock
-    private SeatRepository seatRepository;
+    private RoomRepository roomRepository;
 
     @Mock
     private UserRepository userRepository;
@@ -47,7 +47,7 @@ class FeedbackServiceImplTest {
 
     private User testUser;
     private UserInfo testUserInfo;
-    private Seat testSeat;
+    private Room testRoom;
     private Reservation testReservation;
     private Feedback testFeedback;
     private FeedbackRequest feedbackRequest;
@@ -66,24 +66,24 @@ class FeedbackServiceImplTest {
         testUser.setId("user-123");
         testUser.setUserInfo(testUserInfo);
 
-        // Setup Seat
-        testSeat = new Seat();
-        testSeat.setId("seat-123");
-        testSeat.setScore(85.5);
-        testSeat.setUpdatedAt(LocalDateTime.now());
+        // Setup Room
+        testRoom = new Room();
+        testRoom.setId("room-123");
+        testRoom.setScore(85.5);
+        testRoom.setUpdatedAt(LocalDateTime.now());
 
         // Setup Reservation
         testReservation = new Reservation();
         testReservation.setId("reservation-123");
         testReservation.setUser(testUser);
-        testReservation.setSeat(testSeat);
+        testReservation.setRoom(testRoom);
         testReservation.setFeedback(null); // No existing feedback
 
         // Setup Feedback
         testFeedback = new Feedback();
         testFeedback.setId("feedback-123");
         testFeedback.setRating(5);
-        testFeedback.setDescription("Great seat!");
+        testFeedback.setDescription("Great room!");
         testFeedback.setReservation(testReservation);
         testFeedback.setCreatedAt(LocalDateTime.now());
 
@@ -91,24 +91,24 @@ class FeedbackServiceImplTest {
         feedbackRequest = new FeedbackRequest();
         feedbackRequest.setReservationId("reservation-123");
         feedbackRequest.setRating(5);
-        feedbackRequest.setDescription("Great seat!");
+        feedbackRequest.setDescription("Great room!");
 
         // Setup FeedbackResponse
         feedbackResponse = new FeedbackResponse();
         feedbackResponse.setId(UUID.randomUUID());
         feedbackResponse.setRating(5);
-        feedbackResponse.setDescription("Great seat!");
+        feedbackResponse.setDescription("Great room!");
     }
 
-    // ==================== getFeedbackOfASeat Tests ====================
+    // ==================== getFeedbackOfARoom Tests ====================
 
     /**
-     * Test successful getFeedbackOfASeat with data
+     * Test successful getFeedbackOfARoom with data
      */
     @Test
-    void testGetFeedbackOfASeat_Success_WithData() {
+    void testGetFeedbackOfARoom_Success_WithData() {
         // Arrange
-        String seatId = "seat-123";
+        String roomId = "room-123";
         int pageNum = 0;
         int pageSize = 10;
 
@@ -116,12 +116,12 @@ class FeedbackServiceImplTest {
         Pageable expectedPageable = PageRequest.of(pageNum, pageSize, Sort.by("created_at").descending());
         Page<Feedback> feedbackPage = new PageImpl<>(feedbacks, expectedPageable, 1);
 
-        when(feedbackRepository.findAllFeedbackOfASeat(eq(seatId), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq(roomId), any(Pageable.class)))
                 .thenReturn(feedbackPage);
         when(feedbackMapper.toFeedbackResponse(testFeedback)).thenReturn(feedbackResponse);
 
         // Act
-        Page<FeedbackResponse> result = feedbackService.getFeedbackOfASeat(seatId, pageNum, pageSize);
+        Page<FeedbackResponse> result = feedbackService.getFeedbackOfARoom(roomId, pageNum, pageSize);
 
         // Assert
         assertNotNull(result);
@@ -130,46 +130,46 @@ class FeedbackServiceImplTest {
 
         FeedbackResponse response = result.getContent().get(0);
         assertEquals(5, response.getRating());
-        assertEquals("Great seat!", response.getDescription());
+        assertEquals("Great room!", response.getDescription());
         assertEquals("John Doe", response.getUserName()); // First + Last name
 
-        verify(feedbackRepository, times(1)).findAllFeedbackOfASeat(eq(seatId), any(Pageable.class));
+        verify(feedbackRepository, times(1)).findAllFeedbackOfARoom(eq(roomId), any(Pageable.class));
         verify(feedbackMapper, times(1)).toFeedbackResponse(testFeedback);
     }
 
     /**
-     * Test getFeedbackOfASeat with empty results
+     * Test getFeedbackOfARoom with empty results
      */
     @Test
-    void testGetFeedbackOfASeat_Success_WithEmptyResults() {
+    void testGetFeedbackOfARoom_Success_WithEmptyResults() {
         // Arrange
-        String seatId = "seat-123";
+        String roomId = "room-123";
         int pageNum = 0;
         int pageSize = 10;
 
         Page<Feedback> emptyPage = new PageImpl<>(Collections.emptyList(), PageRequest.of(pageNum, pageSize), 0);
-        when(feedbackRepository.findAllFeedbackOfASeat(eq(seatId), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq(roomId), any(Pageable.class)))
                 .thenReturn(emptyPage);
 
         // Act
-        Page<FeedbackResponse> result = feedbackService.getFeedbackOfASeat(seatId, pageNum, pageSize);
+        Page<FeedbackResponse> result = feedbackService.getFeedbackOfARoom(roomId, pageNum, pageSize);
 
         // Assert
         assertNotNull(result);
         assertEquals(0, result.getTotalElements());
         assertEquals(0, result.getContent().size());
 
-        verify(feedbackRepository, times(1)).findAllFeedbackOfASeat(eq(seatId), any(Pageable.class));
+        verify(feedbackRepository, times(1)).findAllFeedbackOfARoom(eq(roomId), any(Pageable.class));
         verify(feedbackMapper, never()).toFeedbackResponse(any());
     }
 
     /**
-     * Test getFeedbackOfASeat with null first name
+     * Test getFeedbackOfARoom with null first name
      */
     @Test
-    void testGetFeedbackOfASeat_Success_WithNullFirstName() {
+    void testGetFeedbackOfARoom_Success_WithNullFirstName() {
         // Arrange
-        String seatId = "seat-123";
+        String roomId = "room-123";
         int pageNum = 0;
         int pageSize = 10;
 
@@ -179,12 +179,12 @@ class FeedbackServiceImplTest {
         List<Feedback> feedbacks = Arrays.asList(testFeedback);
         Page<Feedback> feedbackPage = new PageImpl<>(feedbacks, PageRequest.of(pageNum, pageSize), 1);
 
-        when(feedbackRepository.findAllFeedbackOfASeat(eq(seatId), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq(roomId), any(Pageable.class)))
                 .thenReturn(feedbackPage);
         when(feedbackMapper.toFeedbackResponse(testFeedback)).thenReturn(feedbackResponse);
 
         // Act
-        Page<FeedbackResponse> result = feedbackService.getFeedbackOfASeat(seatId, pageNum, pageSize);
+        Page<FeedbackResponse> result = feedbackService.getFeedbackOfARoom(roomId, pageNum, pageSize);
 
         // Assert
         FeedbackResponse response = result.getContent().get(0);
@@ -194,12 +194,12 @@ class FeedbackServiceImplTest {
     }
 
     /**
-     * Test getFeedbackOfASeat with null last name
+     * Test getFeedbackOfARoom with null last name
      */
     @Test
-    void testGetFeedbackOfASeat_Success_WithNullLastName() {
+    void testGetFeedbackOfARoom_Success_WithNullLastName() {
         // Arrange
-        String seatId = "seat-123";
+        String roomId = "room-123";
         int pageNum = 0;
         int pageSize = 10;
 
@@ -209,12 +209,12 @@ class FeedbackServiceImplTest {
         List<Feedback> feedbacks = Arrays.asList(testFeedback);
         Page<Feedback> feedbackPage = new PageImpl<>(feedbacks, PageRequest.of(pageNum, pageSize), 1);
 
-        when(feedbackRepository.findAllFeedbackOfASeat(eq(seatId), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq(roomId), any(Pageable.class)))
                 .thenReturn(feedbackPage);
         when(feedbackMapper.toFeedbackResponse(testFeedback)).thenReturn(feedbackResponse);
 
         // Act
-        Page<FeedbackResponse> result = feedbackService.getFeedbackOfASeat(seatId, pageNum, pageSize);
+        Page<FeedbackResponse> result = feedbackService.getFeedbackOfARoom(roomId, pageNum, pageSize);
 
         // Assert
         FeedbackResponse response = result.getContent().get(0);
@@ -224,12 +224,12 @@ class FeedbackServiceImplTest {
     }
 
     /**
-     * Test getFeedbackOfASeat with both names null
+     * Test getFeedbackOfARoom with both names null
      */
     @Test
-    void testGetFeedbackOfASeat_Success_WithBothNamesNull() {
+    void testGetFeedbackOfARoom_Success_WithBothNamesNull() {
         // Arrange
-        String seatId = "seat-123";
+        String roomId = "room-123";
         int pageNum = 0;
         int pageSize = 10;
 
@@ -239,12 +239,12 @@ class FeedbackServiceImplTest {
         List<Feedback> feedbacks = Arrays.asList(testFeedback);
         Page<Feedback> feedbackPage = new PageImpl<>(feedbacks, PageRequest.of(pageNum, pageSize), 1);
 
-        when(feedbackRepository.findAllFeedbackOfASeat(eq(seatId), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq(roomId), any(Pageable.class)))
                 .thenReturn(feedbackPage);
         when(feedbackMapper.toFeedbackResponse(testFeedback)).thenReturn(feedbackResponse);
 
         // Act
-        Page<FeedbackResponse> result = feedbackService.getFeedbackOfASeat(seatId, pageNum, pageSize);
+        Page<FeedbackResponse> result = feedbackService.getFeedbackOfARoom(roomId, pageNum, pageSize);
 
         // Assert
         FeedbackResponse response = result.getContent().get(0);
@@ -254,27 +254,27 @@ class FeedbackServiceImplTest {
     }
 
     /**
-     * Test getFeedbackOfASeat with different page parameters
+     * Test getFeedbackOfARoom with different page parameters
      */
     @Test
-    void testGetFeedbackOfASeat_Success_WithDifferentPageParameters() {
+    void testGetFeedbackOfARoom_Success_WithDifferentPageParameters() {
         // Arrange
-        String seatId = "seat-123";
+        String roomId = "room-123";
         int pageNum = 2;
         int pageSize = 20;
 
         Page<Feedback> feedbackPage = new PageImpl<>(Collections.emptyList(), PageRequest.of(pageNum, pageSize), 0);
-        when(feedbackRepository.findAllFeedbackOfASeat(eq(seatId), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq(roomId), any(Pageable.class)))
                 .thenReturn(feedbackPage);
 
         // Act
-        Page<FeedbackResponse> result = feedbackService.getFeedbackOfASeat(seatId, pageNum, pageSize);
+        Page<FeedbackResponse> result = feedbackService.getFeedbackOfARoom(roomId, pageNum, pageSize);
 
         // Assert
         assertNotNull(result);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(feedbackRepository, times(1)).findAllFeedbackOfASeat(eq(seatId), pageableCaptor.capture());
+        verify(feedbackRepository, times(1)).findAllFeedbackOfARoom(eq(roomId), pageableCaptor.capture());
 
         Pageable capturedPageable = pageableCaptor.getValue();
         assertEquals(pageNum, capturedPageable.getPageNumber());
@@ -283,50 +283,50 @@ class FeedbackServiceImplTest {
     }
 
     /**
-     * Test getFeedbackOfASeat when repository throws exception
+     * Test getFeedbackOfARoom when repository throws exception
      */
     @Test
-    void testGetFeedbackOfASeat_RepositoryThrowsException_ThrowsInternalServerError() {
+    void testGetFeedbackOfARoom_RepositoryThrowsException_ThrowsInternalServerError() {
         // Arrange
-        String seatId = "seat-123";
+        String roomId = "room-123";
         int pageNum = 0;
         int pageSize = 10;
 
-        when(feedbackRepository.findAllFeedbackOfASeat(eq(seatId), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq(roomId), any(Pageable.class)))
                 .thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            feedbackService.getFeedbackOfASeat(seatId, pageNum, pageSize);
+            feedbackService.getFeedbackOfARoom(roomId, pageNum, pageSize);
         });
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
-        verify(feedbackRepository, times(1)).findAllFeedbackOfASeat(eq(seatId), any(Pageable.class));
+        verify(feedbackRepository, times(1)).findAllFeedbackOfARoom(eq(roomId), any(Pageable.class));
         verify(logger, times(1)).error(anyString());
     }
 
     /**
-     * Test getFeedbackOfASeat when mapper throws exception
+     * Test getFeedbackOfARoom when mapper throws exception
      */
     @Test
-    void testGetFeedbackOfASeat_MapperThrowsException_ThrowsInternalServerError() {
+    void testGetFeedbackOfARoom_MapperThrowsException_ThrowsInternalServerError() {
         // Arrange
-        String seatId = "seat-123";
+        String roomId = "room-123";
         int pageNum = 0;
         int pageSize = 10;
 
         List<Feedback> feedbacks = Arrays.asList(testFeedback);
         Page<Feedback> feedbackPage = new PageImpl<>(feedbacks, PageRequest.of(pageNum, pageSize), 1);
 
-        when(feedbackRepository.findAllFeedbackOfASeat(eq(seatId), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq(roomId), any(Pageable.class)))
                 .thenReturn(feedbackPage);
         when(feedbackMapper.toFeedbackResponse(testFeedback))
                 .thenThrow(new RuntimeException("Mapping error"));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            feedbackService.getFeedbackOfASeat(seatId, pageNum, pageSize);
+            feedbackService.getFeedbackOfARoom(roomId, pageNum, pageSize);
         });
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
@@ -347,7 +347,7 @@ class FeedbackServiceImplTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(reservationRepository.findById("reservation-123")).thenReturn(Optional.of(testReservation));
         when(feedbackRepository.save(any(Feedback.class))).thenReturn(testFeedback);
-        when(seatRepository.save(any(Seat.class))).thenReturn(testSeat);
+        when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
 
         // Act
         feedbackService.addFeedback(feedbackRequest, connectedUser);
@@ -359,14 +359,14 @@ class FeedbackServiceImplTest {
         Feedback savedFeedback = feedbackCaptor.getValue();
         assertNotNull(savedFeedback.getId());
         assertEquals(5, savedFeedback.getRating());
-        assertEquals("Great seat!", savedFeedback.getDescription());
+        assertEquals("Great room!", savedFeedback.getDescription());
         assertEquals(testReservation, savedFeedback.getReservation());
         assertNotNull(savedFeedback.getCreatedAt());
 
-        ArgumentCaptor<Seat> seatCaptor = ArgumentCaptor.forClass(Seat.class);
-        verify(seatRepository, times(1)).save(seatCaptor.capture());
+        ArgumentCaptor<Room> roomCaptor = ArgumentCaptor.forClass(Room.class);
+        verify(roomRepository, times(1)).save(roomCaptor.capture());
 
-        Seat updatedSeat = seatCaptor.getValue();
+        Room updatedRoom = roomCaptor.getValue();
 
         verify(userRepository, times(1)).findByEmail("test@example.com");
         verify(reservationRepository, times(1)).findById("reservation-123");
@@ -406,7 +406,7 @@ class FeedbackServiceImplTest {
         FeedbackRequest invalidRequest = new FeedbackRequest();
         invalidRequest.setReservationId("nonexistent-reservation");
         invalidRequest.setRating(5);
-        invalidRequest.setDescription("Great seat!");
+        invalidRequest.setDescription("Great room!");
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -443,7 +443,7 @@ class FeedbackServiceImplTest {
         verify(userRepository, times(1)).findByEmail("test@example.com");
         verify(reservationRepository, times(1)).findById("reservation-123");
         verify(feedbackRepository, never()).save(any());
-        verify(seatRepository, never()).save(any());
+        verify(roomRepository, never()).save(any());
     }
 
     /**
@@ -470,16 +470,16 @@ class FeedbackServiceImplTest {
     }
 
     /**
-     * Test addFeedback when seat repository throws exception
+     * Test addFeedback when room repository throws exception
      */
     @Test
-    void testAddFeedback_SeatRepositoryThrowsException_ThrowsInternalServerError() {
+    void testAddFeedback_RoomRepositoryThrowsException_ThrowsInternalServerError() {
         // Arrange
         when(connectedUser.getName()).thenReturn("test@example.com");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(reservationRepository.findById("reservation-123")).thenReturn(Optional.of(testReservation));
         when(feedbackRepository.save(any(Feedback.class))).thenReturn(testFeedback);
-        when(seatRepository.save(any(Seat.class)))
+        when(roomRepository.save(any(Room.class)))
                 .thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
@@ -490,7 +490,7 @@ class FeedbackServiceImplTest {
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
         verify(feedbackRepository, times(1)).save(any(Feedback.class));
-        verify(seatRepository, times(1)).save(any(Seat.class));
+        verify(roomRepository, times(1)).save(any(Room.class));
         verify(logger, times(1)).error(anyString());
     }
 
@@ -504,7 +504,7 @@ class FeedbackServiceImplTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(reservationRepository.findById("reservation-123")).thenReturn(Optional.of(testReservation));
 
-        CustomException customException = new CustomException(ResponseCode.SEAT_NOT_FOUND);
+        CustomException customException = new CustomException(ResponseCode.ROOM_NOT_FOUND);
         when(feedbackRepository.save(any(Feedback.class))).thenThrow(customException);
 
         // Act & Assert
@@ -512,7 +512,7 @@ class FeedbackServiceImplTest {
             feedbackService.addFeedback(feedbackRequest, connectedUser);
         });
 
-        assertEquals(ResponseCode.SEAT_NOT_FOUND, exception.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, exception.getResponseCode());
         assertSame(customException, exception);
 
         verify(feedbackRepository, times(1)).save(any(Feedback.class));
@@ -548,7 +548,7 @@ class FeedbackServiceImplTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(reservationRepository.findById("reservation-123")).thenReturn(Optional.of(testReservation));
         when(feedbackRepository.save(any(Feedback.class))).thenReturn(testFeedback);
-        when(seatRepository.save(any(Seat.class))).thenReturn(testSeat);
+        when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
 
         // Act
         feedbackService.addFeedback(feedbackRequest, connectedUser);
@@ -590,13 +590,13 @@ class FeedbackServiceImplTest {
         FeedbackResponse response1 = new FeedbackResponse();
         FeedbackResponse response2 = new FeedbackResponse();
 
-        when(feedbackRepository.findAllFeedbackOfASeat(eq("seat-123"), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq("room-123"), any(Pageable.class)))
                 .thenReturn(feedbackPage);
         when(feedbackMapper.toFeedbackResponse(feedback1)).thenReturn(response1);
         when(feedbackMapper.toFeedbackResponse(feedback2)).thenReturn(response2);
 
         // Act
-        Page<FeedbackResponse> result = feedbackService.getFeedbackOfASeat("seat-123", 0, 10);
+        Page<FeedbackResponse> result = feedbackService.getFeedbackOfARoom("room-123", 0, 10);
 
         // Assert
         assertEquals(2, result.getTotalElements());
@@ -613,7 +613,7 @@ class FeedbackServiceImplTest {
      * Test edge case with empty/whitespace names
      */
     @Test
-    void testGetFeedbackOfASeat_Success_WithWhitespaceNames() {
+    void testGetFeedbackOfARoom_Success_WithWhitespaceNames() {
         // Arrange
         testUserInfo.setFirstName("  ");
         testUserInfo.setLastName("  ");
@@ -621,12 +621,12 @@ class FeedbackServiceImplTest {
         List<Feedback> feedbacks = Arrays.asList(testFeedback);
         Page<Feedback> feedbackPage = new PageImpl<>(feedbacks, PageRequest.of(0, 10), 1);
 
-        when(feedbackRepository.findAllFeedbackOfASeat(eq("seat-123"), any(Pageable.class)))
+        when(feedbackRepository.findAllFeedbackOfARoom(eq("room-123"), any(Pageable.class)))
                 .thenReturn(feedbackPage);
         when(feedbackMapper.toFeedbackResponse(testFeedback)).thenReturn(feedbackResponse);
 
         // Act
-        Page<FeedbackResponse> result = feedbackService.getFeedbackOfASeat("seat-123", 0, 10);
+        Page<FeedbackResponse> result = feedbackService.getFeedbackOfARoom("room-123", 0, 10);
 
         // Assert
         FeedbackResponse response = result.getContent().get(0);

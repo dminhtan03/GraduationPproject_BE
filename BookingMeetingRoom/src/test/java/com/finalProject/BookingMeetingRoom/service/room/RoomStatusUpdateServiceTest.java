@@ -15,80 +15,80 @@ import static org.mockito.Mockito.*;
 class RoomStatusUpdateServiceTest {
 
     private SimpMessagingTemplate messagingTemplate;
-    private SeatStatusUpdateServiceImpl seatStatusUpdateService;
+    private RoomStatusUpdateServiceImpl roomStatusUpdateService;
 
     @BeforeEach
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
-        seatStatusUpdateService = new SeatStatusUpdateServiceImpl(messagingTemplate);
+        roomStatusUpdateService = new RoomStatusUpdateServiceImpl(messagingTemplate);
     }
 
     @Test
-    void sendRealTimeSeatStatusUpdate_shouldSendMessageSuccessfully() {
-        SeatStatusUpdateRequest request = SeatStatusUpdateRequest.builder()
-                .seatId("S001")
-                .newStatus(SeatStatus.AVAILABLE)
+    void sendRealTimeRoomStatusUpdate_shouldSendMessageSuccessfully() {
+        RoomStatusUpdateRequest request = RoomStatusUpdateRequest.builder()
+                .roomId("S001")
+                .newStatus(RoomStatus.AVAILABLE)
                 .build();
 
-        seatStatusUpdateService.sendRealTimeSeatStatusUpdate(request);
+        roomStatusUpdateService.sendRealTimeRoomStatusUpdate(request);
 
         verify(messagingTemplate, times(1))
-                .convertAndSend(eq("/topic/seats"), eq(request));
+                .convertAndSend(eq("/topic/rooms"), eq(request));
     }
 
     @Test
-    void sendRealTimeSeatStatusUpdate_whenGenericExceptionThrown_shouldWrapInCustomException() {
-        SeatStatusUpdateRequest request = SeatStatusUpdateRequest.builder()
-                .seatId("S002")
-                .newStatus(SeatStatus.BROKEN)
+    void sendRealTimeRoomStatusUpdate_whenGenericExceptionThrown_shouldWrapInCustomException() {
+        RoomStatusUpdateRequest request = RoomStatusUpdateRequest.builder()
+                .roomId("S002")
+                .newStatus(RoomStatus.BROKEN)
                 .build();
 
         doThrow(new RuntimeException("Unexpected error"))
-                .when(messagingTemplate).convertAndSend(anyString(), any(SeatStatusUpdateRequest.class));
+                .when(messagingTemplate).convertAndSend(anyString(), any(RoomStatusUpdateRequest.class));
 
         CustomException exception = assertThrows(CustomException.class,
-                () -> seatStatusUpdateService.sendRealTimeSeatStatusUpdate(request));
+                () -> roomStatusUpdateService.sendRealTimeRoomStatusUpdate(request));
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
     }
 
     @Test
-    void sendRealTimeSeatStatusUpdate_whenCustomExceptionThrown_shouldRethrowIt() {
-        SeatStatusUpdateRequest request = SeatStatusUpdateRequest.builder()
-                .seatId("S003")
-                .newStatus(SeatStatus.UNAVAILABLE)
+    void sendRealTimeRoomStatusUpdate_whenCustomExceptionThrown_shouldRethrowIt() {
+        RoomStatusUpdateRequest request = RoomStatusUpdateRequest.builder()
+                .roomId("S003")
+                .newStatus(RoomStatus.UNAVAILABLE)
                 .build();
 
-        doThrow(new CustomException(ResponseCode.SEAT_NOT_FOUND))
-                .when(messagingTemplate).convertAndSend(anyString(), any(SeatStatusUpdateRequest.class));
+        doThrow(new CustomException(ResponseCode.ROOM_NOT_FOUND))
+                .when(messagingTemplate).convertAndSend(anyString(), any(RoomStatusUpdateRequest.class));
 
         CustomException exception = assertThrows(CustomException.class,
-                () -> seatStatusUpdateService.sendRealTimeSeatStatusUpdate(request));
+                () -> roomStatusUpdateService.sendRealTimeRoomStatusUpdate(request));
 
-        assertEquals(ResponseCode.SEAT_NOT_FOUND, exception.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, exception.getResponseCode());
     }
 
     @Test
-    void sendRealTimeSeatStatusUpdate_withNullSeatId_shouldStillAttemptToSend() {
-        SeatStatusUpdateRequest request = SeatStatusUpdateRequest.builder()
-                .seatId(null)
-                .newStatus(SeatStatus.BROKEN)
+    void sendRealTimeRoomStatusUpdate_withNullRoomId_shouldStillAttemptToSend() {
+        RoomStatusUpdateRequest request = RoomStatusUpdateRequest.builder()
+                .roomId(null)
+                .newStatus(RoomStatus.BROKEN)
                 .build();
-        seatStatusUpdateService.sendRealTimeSeatStatusUpdate(request);
+        roomStatusUpdateService.sendRealTimeRoomStatusUpdate(request);
         verify(messagingTemplate, times(1))
-                .convertAndSend(eq("/topic/seats"), eq(request));
+                .convertAndSend(eq("/topic/rooms"), eq(request));
     }
 
     @Test
-    void sendRealTimeSeatStatusUpdate_withNullStatus_shouldStillAttemptToSend() {
-        SeatStatusUpdateRequest request = SeatStatusUpdateRequest.builder()
-                .seatId("S004")
+    void sendRealTimeRoomStatusUpdate_withNullStatus_shouldStillAttemptToSend() {
+        RoomStatusUpdateRequest request = RoomStatusUpdateRequest.builder()
+                .roomId("S004")
                 .newStatus(null)
                 .build();
 
-        seatStatusUpdateService.sendRealTimeSeatStatusUpdate(request);
+        roomStatusUpdateService.sendRealTimeRoomStatusUpdate(request);
 
         verify(messagingTemplate, times(1))
-                .convertAndSend(eq("/topic/seats"), eq(request));
+                .convertAndSend(eq("/topic/rooms"), eq(request));
     }
 }
 

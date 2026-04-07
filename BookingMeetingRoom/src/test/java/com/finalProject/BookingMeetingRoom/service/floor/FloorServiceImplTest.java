@@ -26,7 +26,7 @@ class FloorServiceImplTest {
     private FloorRepository floorRepository;
 
     @Mock
-    private SeatRepository seatRepository;
+    private RoomRepository roomRepository;
 
     @InjectMocks
     private FloorServiceImpl floorService;
@@ -36,7 +36,7 @@ class FloorServiceImplTest {
     private FloorRequest floorRequest;
     private UpdateFloorRequest updateFloorRequest;
     private AdminFloorDto adminFloorDto;
-    private SeatDtoProjection seatProjection;
+    private RoomDtoProjection roomProjection;
 
     @BeforeEach
     void setUp() {
@@ -65,28 +65,28 @@ class FloorServiceImplTest {
                 "building-123"
         );
 
-        seatProjection = new SeatDtoProjection() {
+        roomProjection = new RoomDtoProjection() {
             @Override
-            public String getSeatId() { return "seat-123"; }
+            public String getRoomId() { return "room-123"; }
             @Override
             public String getLocationCode() { return "A1-01"; }
             @Override
-            public SeatStatus getStatus() { return SeatStatus.AVAILABLE; }
+            public RoomStatus getStatus() { return RoomStatus.AVAILABLE; }
             @Override
             public Double getScore() { return 85.5; }
         };
     }
 
-    // Helper method để tạo SeatDtoProjection
-    private SeatDtoProjection createSeatProjection(String seatId, String locationCode,
-                                                   SeatStatus status, Double score) {
-        return new SeatDtoProjection() {
+    // Helper method để tạo RoomDtoProjection
+    private RoomDtoProjection createRoomProjection(String roomId, String locationCode,
+                                                   RoomStatus status, Double score) {
+        return new RoomDtoProjection() {
             @Override
-            public String getSeatId() { return seatId; }
+            public String getRoomId() { return roomId; }
             @Override
             public String getLocationCode() { return locationCode; }
             @Override
-            public SeatStatus getStatus() { return status; }
+            public RoomStatus getStatus() { return status; }
             @Override
             public Double getScore() { return score; }
         };
@@ -325,20 +325,20 @@ class FloorServiceImplTest {
     // ==================== getFloorById Tests ====================
 
     /**
-     * Test successful floor retrieval by ID with seats
+     * Test successful floor retrieval by ID with rooms
      */
     @Test
-    void testGetFloorById_Success_WithSeats() {
+    void testGetFloorById_Success_WithRooms() {
         // Arrange
         String floorId = "floor-123";
 
         when(floorRepository.findFloor(floorId)).thenReturn(Optional.of(adminFloorDto));
 
-        List<SeatDtoProjection> seats = Arrays.asList(
-                createSeatProjection("seat-1", "A1-01", SeatStatus.AVAILABLE, 85.5),
-                createSeatProjection("seat-2", "A1-02", SeatStatus.UNAVAILABLE, 90.0)
+        List<RoomDtoProjection> rooms = Arrays.asList(
+                createRoomProjection("room-1", "A1-01", RoomStatus.AVAILABLE, 85.5),
+                createRoomProjection("room-2", "A1-02", RoomStatus.UNAVAILABLE, 90.0)
         );
-        when(seatRepository.findSeats(floorId)).thenReturn(seats);
+        when(roomRepository.findRooms(floorId)).thenReturn(rooms);
 
         // Act
         DetailFloorResponse result = floorService.getFloorById(floorId);
@@ -346,34 +346,34 @@ class FloorServiceImplTest {
         // Assert
         assertNotNull(result);
         assertEquals("Test Floor", result.getFloorName());
-        assertEquals(2, result.getSeats().size());
+        assertEquals(2, result.getRooms().size());
 
-        SeatDto seat1 = result.getSeats().get(0);
-        assertEquals("seat-1", seat1.getSeatId());
-        assertEquals("A1-01", seat1.getLocationCode());
-        assertEquals(SeatStatus.AVAILABLE, seat1.getStatus());
-        assertEquals(85.5, seat1.getScore());
+        RoomDto room1 = result.getRooms().get(0);
+        assertEquals("room-1", room1.getRoomId());
+        assertEquals("A1-01", room1.getLocationCode());
+        assertEquals(RoomStatus.AVAILABLE, room1.getStatus());
+        assertEquals(85.5, room1.getScore());
 
-        SeatDto seat2 = result.getSeats().get(1);
-        assertEquals("seat-2", seat2.getSeatId());
-        assertEquals("A1-02", seat2.getLocationCode());
-        assertEquals(SeatStatus.UNAVAILABLE, seat2.getStatus());
-        assertEquals(90.0, seat2.getScore());
+        RoomDto room2 = result.getRooms().get(1);
+        assertEquals("room-2", room2.getRoomId());
+        assertEquals("A1-02", room2.getLocationCode());
+        assertEquals(RoomStatus.UNAVAILABLE, room2.getStatus());
+        assertEquals(90.0, room2.getScore());
 
         verify(floorRepository, times(1)).findFloor(floorId);
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 
     /**
-     * Test successful floor retrieval by ID with no seats
+     * Test successful floor retrieval by ID with no rooms
      */
     @Test
-    void testGetFloorById_Success_WithNoSeats() {
+    void testGetFloorById_Success_WithNoRooms() {
         // Arrange
         String floorId = "floor-123";
 
         when(floorRepository.findFloor(floorId)).thenReturn(Optional.of(adminFloorDto));
-        when(seatRepository.findSeats(floorId)).thenReturn(Collections.emptyList());
+        when(roomRepository.findRooms(floorId)).thenReturn(Collections.emptyList());
 
         // Act
         DetailFloorResponse result = floorService.getFloorById(floorId);
@@ -381,10 +381,10 @@ class FloorServiceImplTest {
         // Assert
         assertNotNull(result);
         assertEquals("Test Floor", result.getFloorName());
-        assertEquals(0, result.getSeats().size());
+        assertEquals(0, result.getRooms().size());
 
         verify(floorRepository, times(1)).findFloor(floorId);
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 
     /**
@@ -405,7 +405,7 @@ class FloorServiceImplTest {
         assertEquals(ResponseCode.FLOOR_NOT_FOUND, exception.getResponseCode());
 
         verify(floorRepository, times(1)).findFloor(floorId);
-        verify(seatRepository, never()).findSeats(anyString());
+        verify(roomRepository, never()).findRooms(anyString());
     }
 
     /**
@@ -430,15 +430,15 @@ class FloorServiceImplTest {
     }
 
     /**
-     * Test getFloorById when seat repository throws exception
+     * Test getFloorById when room repository throws exception
      */
     @Test
-    void testGetFloorById_SeatRepositoryThrowsException_ThrowsInternalServerError() {
+    void testGetFloorById_RoomRepositoryThrowsException_ThrowsInternalServerError() {
         // Arrange
         String floorId = "floor-123";
 
         when(floorRepository.findFloor(floorId)).thenReturn(Optional.of(adminFloorDto));
-        when(seatRepository.findSeats(floorId))
+        when(roomRepository.findRooms(floorId))
                 .thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
@@ -449,7 +449,7 @@ class FloorServiceImplTest {
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
         verify(floorRepository, times(1)).findFloor(floorId);
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 
     // ==================== updateFloor Tests ====================
@@ -669,37 +669,37 @@ class FloorServiceImplTest {
     }
 
     /**
-     * Test with multiple seats and different statuses
+     * Test with multiple rooms and different statuses
      */
     @Test
-    void testGetFloorById_Success_WithMultipleSeatStatuses() {
+    void testGetFloorById_Success_WithMultipleRoomStatuses() {
         // Arrange
         String floorId = "floor-123";
 
         when(floorRepository.findFloor(floorId)).thenReturn(Optional.of(adminFloorDto));
 
-        List<SeatDtoProjection> seats = Arrays.asList(
-                createSeatProjection("seat-1", "A1-01", SeatStatus.AVAILABLE, 85.5),
-                createSeatProjection("seat-2", "A1-02", SeatStatus.UNAVAILABLE, 90.0),
-                createSeatProjection("seat-3", "A1-03", SeatStatus.BROKEN, 75.0)
+        List<RoomDtoProjection> rooms = Arrays.asList(
+                createRoomProjection("room-1", "A1-01", RoomStatus.AVAILABLE, 85.5),
+                createRoomProjection("room-2", "A1-02", RoomStatus.UNAVAILABLE, 90.0),
+                createRoomProjection("room-3", "A1-03", RoomStatus.BROKEN, 75.0)
         );
-        when(seatRepository.findSeats(floorId)).thenReturn(seats);
+        when(roomRepository.findRooms(floorId)).thenReturn(rooms);
 
         // Act
         DetailFloorResponse result = floorService.getFloorById(floorId);
 
         // Assert
         assertNotNull(result);
-        assertEquals(3, result.getSeats().size());
+        assertEquals(3, result.getRooms().size());
 
-        // Verify all seat statuses are present
-        List<SeatStatus> statuses = result.getSeats().stream()
-                .map(SeatDto::getStatus)
+        // Verify all room statuses are present
+        List<RoomStatus> statuses = result.getRooms().stream()
+                .map(RoomDto::getStatus)
                 .toList();
 
-        assertTrue(statuses.contains(SeatStatus.AVAILABLE));
-        assertTrue(statuses.contains(SeatStatus.UNAVAILABLE));
-        assertTrue(statuses.contains(SeatStatus.BROKEN));
+        assertTrue(statuses.contains(RoomStatus.AVAILABLE));
+        assertTrue(statuses.contains(RoomStatus.UNAVAILABLE));
+        assertTrue(statuses.contains(RoomStatus.BROKEN));
     }
 
     /**
@@ -712,11 +712,11 @@ class FloorServiceImplTest {
 
         when(floorRepository.findFloor(floorId)).thenReturn(Optional.of(adminFloorDto));
 
-        List<SeatDtoProjection> seats = Arrays.asList(
-                seatProjection,
+        List<RoomDtoProjection> rooms = Arrays.asList(
+                roomProjection,
                 null // This will cause NPE during stream processing
         );
-        when(seatRepository.findSeats(floorId)).thenReturn(seats);
+        when(roomRepository.findRooms(floorId)).thenReturn(rooms);
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -726,6 +726,6 @@ class FloorServiceImplTest {
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
         verify(floorRepository, times(1)).findFloor(floorId);
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 }

@@ -44,8 +44,8 @@ class DashboardServiceTest_getDashboard {
 
         lastCheckedInProjection = new LastCheckedInDtoProjection() {
             @Override
-            public String getSeatId() {
-                return "SEAT-001";
+            public String getRoomId() {
+                return "ROOM-001";
             }
 
             @Override
@@ -93,7 +93,7 @@ class DashboardServiceTest_getDashboard {
 
         // Verify LastCheckedInDto
         assertNotNull(result.getLastCheckedInDto());
-        assertEquals("SEAT-001", result.getLastCheckedInDto().getSeatId());
+        assertEquals("ROOM-001", result.getLastCheckedInDto().getRoomId());
         assertEquals("Building A", result.getLastCheckedInDto().getBuildingName());
         assertEquals("Floor 1", result.getLastCheckedInDto().getFloorName());
         assertEquals(LocalDateTime.of(2025, 1, 15, 9, 30), result.getLastCheckedInDto().getLastCheckedInTime());
@@ -362,7 +362,7 @@ class DashboardServiceTest_getDashboard {
         // Arrange
         LastCheckedInDtoProjection nullProjection = new LastCheckedInDtoProjection() {
             @Override
-            public String getSeatId() {
+            public String getRoomId() {
                 return null;
             }
 
@@ -397,7 +397,7 @@ class DashboardServiceTest_getDashboard {
         // Assert
         assertNotNull(result);
         assertNotNull(result.getLastCheckedInDto());
-        assertNull(result.getLastCheckedInDto().getSeatId());
+        assertNull(result.getLastCheckedInDto().getRoomId());
         assertNull(result.getLastCheckedInDto().getBuildingName());
         assertNull(result.getLastCheckedInDto().getFloorName());
         assertNull(result.getLastCheckedInDto().getLastCheckedInTime());

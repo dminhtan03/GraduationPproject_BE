@@ -26,14 +26,14 @@ public class DashboardServiceTest_getMulti {
     private FloorRepository floorRepository;
 
     @Mock
-    private SeatRepository seatRepository;
+    private RoomRepository roomRepository;
 
     @InjectMocks
     private DashboardServiceImpl dashboardService;
 
     private AmbiguousBuildingResponse buildingResponse;
     private AmbiguousFloorResponse floorResponse;
-    private SeatDtoProjection seatProjection;
+    private RoomDtoProjection roomProjection;
 
     @BeforeEach
     void setUp() {
@@ -45,28 +45,28 @@ public class DashboardServiceTest_getMulti {
         floorResponse.setId("F1");
         floorResponse.setName("Floor 1");
 
-        seatProjection = new SeatDtoProjection() {
+        roomProjection = new RoomDtoProjection() {
             @Override
-            public String getSeatId() { return "S1"; }
+            public String getRoomId() { return "S1"; }
             @Override
             public String getLocationCode() { return "A1-01"; }
             @Override
-            public SeatStatus getStatus() { return SeatStatus.AVAILABLE; }
+            public RoomStatus getStatus() { return RoomStatus.AVAILABLE; }
             @Override
             public Double getScore() { return 85.5; }
         };
     }
 
-    // Helper method để tạo SeatDtoProjection
-    private SeatDtoProjection createSeatProjection(String seatId, String locationCode,
-                                                   SeatStatus status, Double score) {
-        return new SeatDtoProjection() {
+    // Helper method để tạo RoomDtoProjection
+    private RoomDtoProjection createRoomProjection(String roomId, String locationCode,
+                                                   RoomStatus status, Double score) {
+        return new RoomDtoProjection() {
             @Override
-            public String getSeatId() { return seatId; }
+            public String getRoomId() { return roomId; }
             @Override
             public String getLocationCode() { return locationCode; }
             @Override
-            public SeatStatus getStatus() { return status; }
+            public RoomStatus getStatus() { return status; }
             @Override
             public Double getScore() { return score; }
         };
@@ -314,214 +314,214 @@ public class DashboardServiceTest_getMulti {
         verify(floorRepository, times(1)).findAllFloorsByBuildingId(buildingId);
     }
 
-    // ==================== getAllSeatsByFloorId Tests ====================
+    // ==================== getAllRoomsByFloorId Tests ====================
 
     /**
-     * Test successful retrieval of seats by floor ID with data
+     * Test successful retrieval of rooms by floor ID with data
      */
     @Test
-    void testGetAllSeatsByFloorId_Success_WithData() {
+    void testGetAllRoomsByFloorId_Success_WithData() {
         // Arrange
         String floorId = "F1";
-        List<SeatDtoProjection> seatProjections = Arrays.asList(
-                createSeatProjection("S1", "A1-01", SeatStatus.AVAILABLE, 85.5),
-                createSeatProjection("S2", "A1-02", SeatStatus.UNAVAILABLE, 90.0),
-                createSeatProjection("S3", "A1-03", SeatStatus.BROKEN, 75.5)
+        List<RoomDtoProjection> roomProjections = Arrays.asList(
+                createRoomProjection("S1", "A1-01", RoomStatus.AVAILABLE, 85.5),
+                createRoomProjection("S2", "A1-02", RoomStatus.UNAVAILABLE, 90.0),
+                createRoomProjection("S3", "A1-03", RoomStatus.BROKEN, 75.5)
         );
 
-        when(seatRepository.findSeats(floorId)).thenReturn(seatProjections);
+        when(roomRepository.findRooms(floorId)).thenReturn(roomProjections);
 
         // Act
-        List<SeatDto> result = dashboardService.getAllSeatsByFloorId(floorId);
+        List<RoomDto> result = dashboardService.getAllRoomsByFloorId(floorId);
 
         // Assert
         assertNotNull(result);
         assertEquals(3, result.size());
 
-        SeatDto seat1 = result.get(0);
-        assertEquals("S1", seat1.getSeatId());
-        assertEquals("A1-01", seat1.getLocationCode());
-        assertEquals(SeatStatus.AVAILABLE, seat1.getStatus());
-        assertEquals(85.5, seat1.getScore());
+        RoomDto room1 = result.get(0);
+        assertEquals("S1", room1.getRoomId());
+        assertEquals("A1-01", room1.getLocationCode());
+        assertEquals(RoomStatus.AVAILABLE, room1.getStatus());
+        assertEquals(85.5, room1.getScore());
 
-        SeatDto seat2 = result.get(1);
-        assertEquals("S2", seat2.getSeatId());
-        assertEquals("A1-02", seat2.getLocationCode());
-        assertEquals(SeatStatus.UNAVAILABLE, seat2.getStatus());
-        assertEquals(90.0, seat2.getScore());
+        RoomDto room2 = result.get(1);
+        assertEquals("S2", room2.getRoomId());
+        assertEquals("A1-02", room2.getLocationCode());
+        assertEquals(RoomStatus.UNAVAILABLE, room2.getStatus());
+        assertEquals(90.0, room2.getScore());
 
-        SeatDto seat3 = result.get(2);
-        assertEquals("S3", seat3.getSeatId());
-        assertEquals("A1-03", seat3.getLocationCode());
-        assertEquals(SeatStatus.BROKEN, seat3.getStatus());
-        assertEquals(75.5, seat3.getScore());
+        RoomDto room3 = result.get(2);
+        assertEquals("S3", room3.getRoomId());
+        assertEquals("A1-03", room3.getLocationCode());
+        assertEquals(RoomStatus.BROKEN, room3.getStatus());
+        assertEquals(75.5, room3.getScore());
 
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 
     /**
-     * Test successful retrieval of seats with empty data
+     * Test successful retrieval of rooms with empty data
      */
     @Test
-    void testGetAllSeatsByFloorId_Success_WithEmptyData() {
+    void testGetAllRoomsByFloorId_Success_WithEmptyData() {
         // Arrange
         String floorId = "F1";
-        when(seatRepository.findSeats(floorId)).thenReturn(Collections.emptyList());
+        when(roomRepository.findRooms(floorId)).thenReturn(Collections.emptyList());
 
         // Act
-        List<SeatDto> result = dashboardService.getAllSeatsByFloorId(floorId);
+        List<RoomDto> result = dashboardService.getAllRoomsByFloorId(floorId);
 
         // Assert
         assertNotNull(result);
         assertEquals(0, result.size());
 
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 
     /**
-     * Test when seatRepository throws RuntimeException
+     * Test when roomRepository throws RuntimeException
      */
     @Test
-    void testGetAllSeatsByFloorId_RepositoryThrowsRuntimeException_ThrowsInternalServerError() {
+    void testGetAllRoomsByFloorId_RepositoryThrowsRuntimeException_ThrowsInternalServerError() {
         // Arrange
         String floorId = "F1";
-        when(seatRepository.findSeats(floorId))
+        when(roomRepository.findRooms(floorId))
                 .thenThrow(new RuntimeException("Database connection failed"));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            dashboardService.getAllSeatsByFloorId(floorId);
+            dashboardService.getAllRoomsByFloorId(floorId);
         });
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 
     /**
      * Test when stream processing throws exception due to null projection
      */
     @Test
-    void testGetAllSeatsByFloorId_NullProjectionInList_ThrowsInternalServerError() {
+    void testGetAllRoomsByFloorId_NullProjectionInList_ThrowsInternalServerError() {
         // Arrange
         String floorId = "F1";
-        List<SeatDtoProjection> seatProjections = Arrays.asList(
-                seatProjection,
+        List<RoomDtoProjection> roomProjections = Arrays.asList(
+                roomProjection,
                 null // This will cause NPE during stream processing
         );
 
-        when(seatRepository.findSeats(floorId)).thenReturn(seatProjections);
+        when(roomRepository.findRooms(floorId)).thenReturn(roomProjections);
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            dashboardService.getAllSeatsByFloorId(floorId);
+            dashboardService.getAllRoomsByFloorId(floorId);
         });
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 
     /**
-     * Test when CustomException is thrown by seat repository - should be re-thrown
+     * Test when CustomException is thrown by room repository - should be re-thrown
      */
     @Test
-    void testGetAllSeatsByFloorId_RepositoryThrowsCustomException_ReThrowsCustomException() {
+    void testGetAllRoomsByFloorId_RepositoryThrowsCustomException_ReThrowsCustomException() {
         // Arrange
         String floorId = "F1";
         CustomException customException = new CustomException(ResponseCode.USER_NOT_FOUND);
-        when(seatRepository.findSeats(floorId)).thenThrow(customException);
+        when(roomRepository.findRooms(floorId)).thenThrow(customException);
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            dashboardService.getAllSeatsByFloorId(floorId);
+            dashboardService.getAllRoomsByFloorId(floorId);
         });
 
         assertEquals(ResponseCode.USER_NOT_FOUND, exception.getResponseCode());
         assertSame(customException, exception);
 
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 
     /**
      * Test with null values in projection
      */
     @Test
-    void testGetAllSeatsByFloorId_Success_WithNullValues() {
+    void testGetAllRoomsByFloorId_Success_WithNullValues() {
         // Arrange
         String floorId = "F1";
-        List<SeatDtoProjection> seatProjections = Arrays.asList(
-                createSeatProjection(null, null, null, null),
-                createSeatProjection("S2", "", SeatStatus.AVAILABLE, 0.0)
+        List<RoomDtoProjection> roomProjections = Arrays.asList(
+                createRoomProjection(null, null, null, null),
+                createRoomProjection("S2", "", RoomStatus.AVAILABLE, 0.0)
         );
 
-        when(seatRepository.findSeats(floorId)).thenReturn(seatProjections);
+        when(roomRepository.findRooms(floorId)).thenReturn(roomProjections);
 
         // Act
-        List<SeatDto> result = dashboardService.getAllSeatsByFloorId(floorId);
+        List<RoomDto> result = dashboardService.getAllRoomsByFloorId(floorId);
 
         // Assert
         assertNotNull(result);
         assertEquals(2, result.size());
 
-        SeatDto seat1 = result.get(0);
-        assertNull(seat1.getSeatId());
-        assertNull(seat1.getLocationCode());
-        assertNull(seat1.getStatus());
-        assertNull(seat1.getScore());
+        RoomDto room1 = result.get(0);
+        assertNull(room1.getRoomId());
+        assertNull(room1.getLocationCode());
+        assertNull(room1.getStatus());
+        assertNull(room1.getScore());
 
-        SeatDto seat2 = result.get(1);
-        assertEquals("S2", seat2.getSeatId());
-        assertEquals("", seat2.getLocationCode());
-        assertEquals(SeatStatus.AVAILABLE, seat2.getStatus());
-        assertEquals(0.0, seat2.getScore());
+        RoomDto room2 = result.get(1);
+        assertEquals("S2", room2.getRoomId());
+        assertEquals("", room2.getLocationCode());
+        assertEquals(RoomStatus.AVAILABLE, room2.getStatus());
+        assertEquals(0.0, room2.getScore());
     }
 
     /**
-     * Test with all SeatStatus enum values
+     * Test with all RoomStatus enum values
      */
     @Test
-    void testGetAllSeatsByFloorId_Success_WithAllSeatStatuses() {
+    void testGetAllRoomsByFloorId_Success_WithAllRoomStatuses() {
         // Arrange
         String floorId = "F1";
-        List<SeatDtoProjection> seatProjections = Arrays.asList(
-                createSeatProjection("S1", "A1-01", SeatStatus.AVAILABLE, 85.5),
-                createSeatProjection("S2", "A1-02", SeatStatus.UNAVAILABLE, 90.0),
-                createSeatProjection("S3", "A1-03", SeatStatus.BROKEN, 75.5)
+        List<RoomDtoProjection> roomProjections = Arrays.asList(
+                createRoomProjection("S1", "A1-01", RoomStatus.AVAILABLE, 85.5),
+                createRoomProjection("S2", "A1-02", RoomStatus.UNAVAILABLE, 90.0),
+                createRoomProjection("S3", "A1-03", RoomStatus.BROKEN, 75.5)
         );
 
-        when(seatRepository.findSeats(floorId)).thenReturn(seatProjections);
+        when(roomRepository.findRooms(floorId)).thenReturn(roomProjections);
 
         // Act
-        List<SeatDto> result = dashboardService.getAllSeatsByFloorId(floorId);
+        List<RoomDto> result = dashboardService.getAllRoomsByFloorId(floorId);
 
         // Assert
         assertNotNull(result);
         assertEquals(3, result.size());
 
-        // Verify all seat statuses are present
-        List<SeatStatus> statuses = result.stream()
-                .map(SeatDto::getStatus)
+        // Verify all room statuses are present
+        List<RoomStatus> statuses = result.stream()
+                .map(RoomDto::getStatus)
                 .toList();
 
-        assertTrue(statuses.contains(SeatStatus.AVAILABLE));
-        assertTrue(statuses.contains(SeatStatus.UNAVAILABLE));
-        assertTrue(statuses.contains(SeatStatus.BROKEN));
+        assertTrue(statuses.contains(RoomStatus.AVAILABLE));
+        assertTrue(statuses.contains(RoomStatus.UNAVAILABLE));
+        assertTrue(statuses.contains(RoomStatus.BROKEN));
     }
 
     /**
      * Test with large dataset
      */
     @Test
-    void testGetAllSeatsByFloorId_Success_WithLargeDataset() {
+    void testGetAllRoomsByFloorId_Success_WithLargeDataset() {
         // Arrange
         String floorId = "F1";
-        List<SeatDtoProjection> seatProjections = new ArrayList<>();
-        SeatStatus[] statuses = {SeatStatus.AVAILABLE, SeatStatus.UNAVAILABLE, SeatStatus.BROKEN};
+        List<RoomDtoProjection> roomProjections = new ArrayList<>();
+        RoomStatus[] statuses = {RoomStatus.AVAILABLE, RoomStatus.UNAVAILABLE, RoomStatus.BROKEN};
 
-        // Create 100 seats
+        // Create 100 rooms
         for (int i = 1; i <= 100; i++) {
-            seatProjections.add(createSeatProjection(
+            roomProjections.add(createRoomProjection(
                     "S" + i,
                     "A1-" + String.format("%02d", i),
                     statuses[i % 3],
@@ -529,42 +529,42 @@ public class DashboardServiceTest_getMulti {
             ));
         }
 
-        when(seatRepository.findSeats(floorId)).thenReturn(seatProjections);
+        when(roomRepository.findRooms(floorId)).thenReturn(roomProjections);
 
         // Act
         long startTime = System.currentTimeMillis();
-        List<SeatDto> result = dashboardService.getAllSeatsByFloorId(floorId);
+        List<RoomDto> result = dashboardService.getAllRoomsByFloorId(floorId);
         long endTime = System.currentTimeMillis();
 
         // Assert
         assertNotNull(result);
         assertEquals(100, result.size());
 
-        // Verify first and last seats
-        assertEquals("S1", result.get(0).getSeatId());
-        assertEquals("S100", result.get(99).getSeatId());
+        // Verify first and last rooms
+        assertEquals("S1", result.get(0).getRoomId());
+        assertEquals("S100", result.get(99).getRoomId());
 
-        System.out.println("Processing time for 100 seats: " + (endTime - startTime) + "ms");
+        System.out.println("Processing time for 100 rooms: " + (endTime - startTime) + "ms");
 
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 
     /**
      * Test with null floor ID
      */
     @Test
-    void testGetAllSeatsByFloorId_WithNullFloorId() {
+    void testGetAllRoomsByFloorId_WithNullFloorId() {
         // Arrange
         String floorId = null;
-        when(seatRepository.findSeats(floorId)).thenReturn(Collections.emptyList());
+        when(roomRepository.findRooms(floorId)).thenReturn(Collections.emptyList());
 
         // Act
-        List<SeatDto> result = dashboardService.getAllSeatsByFloorId(floorId);
+        List<RoomDto> result = dashboardService.getAllRoomsByFloorId(floorId);
 
         // Assert
         assertNotNull(result);
         assertEquals(0, result.size());
 
-        verify(seatRepository, times(1)).findSeats(floorId);
+        verify(roomRepository, times(1)).findRooms(floorId);
     }
 }

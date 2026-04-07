@@ -1,5 +1,16 @@
 package com.finalProject.BookingMeetingRoom.service.batch;
 
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.request.RoomStatusUpdateRequest;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.service.NotificationService;
+import com.finalProject.BookingMeetingRoom.service.impl.BatchServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,8 +23,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
@@ -25,30 +35,30 @@ class BatchServiceTest_processReservation {
     private ReservationRepository reservationRepository;
 
     @Mock
-    private SeatRepository seatRepository;
+    private RoomRepository roomRepository;
 
     @Mock
     private NotificationService notificationService;
 
     @Mock
-    private SeatStatusUpdateService seatStatusUpdateService;
+    private RoomStatusUpdateService roomStatusUpdateService;
 
     @InjectMocks
     private BatchServiceImpl batchService;
 
     private Reservation reservation;
-    private Seat seat;
+    private Room room;
 
     @BeforeEach
     void setUp() {
-        seat = new Seat();
-        seat.setId("a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d");
-        seat.setStatus(SeatStatus.AVAILABLE);
+        room = new Room();
+        room.setId("a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d");
+        room.setStatus(RoomStatus.AVAILABLE);
 
         reservation = new Reservation();
         reservation.setId("d5f2a2ae-711f-47f0-908c-da0f55411c69");
         reservation.setStatus(ReservationStatus.RESERVED);
-        reservation.setSeat(seat);
+        reservation.setRoom(room);
     }
 
     @Test
@@ -80,7 +90,7 @@ class BatchServiceTest_processReservation {
     }
 
     @Test
-    void processReservation_NoShowStatus_ShouldUpdateReservationAndSeat() {
+    void processReservation_NoShowStatus_ShouldUpdateReservationAndRoom() {
         // Given
         List<Reservation> reservations = Arrays.asList(reservation);
         when(reservationRepository.findReservationsOverStartTime()).thenReturn(reservations);
@@ -91,16 +101,16 @@ class BatchServiceTest_processReservation {
         // Then
         assertEquals(ReservationStatus.NO_SHOW, reservation.getStatus());
         assertNotNull(reservation.getUpdatedAt());
-        assertEquals(SeatStatus.AVAILABLE, seat.getStatus());
+        assertEquals(RoomStatus.AVAILABLE, room.getStatus());
 
         verify(notificationService).noticeNoCheckInReservation(reservations);
-        verify(seatRepository).save(seat);
+        verify(roomRepository).save(room);
         verify(reservationRepository).saveAll(reservations);
-        verify(seatStatusUpdateService).sendRealTimeSeatStatusUpdate(any(SeatStatusUpdateRequest.class));
+        verify(roomStatusUpdateService).sendRealTimeRoomStatusUpdate(any(RoomStatusUpdateRequest.class));
     }
 
     @Test
-    void processReservation_CompletedStatus_ShouldUpdateReservationAndSeat() {
+    void processReservation_CompletedStatus_ShouldUpdateReservationAndRoom() {
         // Given
         List<Reservation> reservations = Arrays.asList(reservation);
         when(reservationRepository.findReservationsOverEndTime()).thenReturn(reservations);
@@ -111,12 +121,12 @@ class BatchServiceTest_processReservation {
         // Then
         assertEquals(ReservationStatus.COMPLETED, reservation.getStatus());
         assertNotNull(reservation.getUpdatedAt());
-        assertEquals(SeatStatus.AVAILABLE, seat.getStatus());
+        assertEquals(RoomStatus.AVAILABLE, room.getStatus());
 
         verify(notificationService).noticeOverTimeReservation(reservations);
-        verify(seatRepository).save(seat);
+        verify(roomRepository).save(room);
         verify(reservationRepository).saveAll(reservations);
-        verify(seatStatusUpdateService).sendRealTimeSeatStatusUpdate(any(SeatStatusUpdateRequest.class));
+        verify(roomStatusUpdateService).sendRealTimeRoomStatusUpdate(any(RoomStatusUpdateRequest.class));
     }
 
     @Test
@@ -129,7 +139,7 @@ class BatchServiceTest_processReservation {
 
         // Then
         verify(notificationService, never()).noticeNoCheckInReservation(any());
-        verify(seatRepository, never()).save(any());
+        verify(roomRepository, never()).save(any());
         verify(reservationRepository).saveAll(Collections.emptyList());
     }
 
@@ -143,14 +153,14 @@ class BatchServiceTest_processReservation {
 
         // Then
         verify(notificationService, never()).noticeOverTimeReservation(any());
-        verify(seatRepository, never()).save(any());
+        verify(roomRepository, never()).save(any());
         verify(reservationRepository).saveAll(Collections.emptyList());
     }
 
     @Test
-    void processReservation_WithNullSeat_ShouldSkipSeatUpdate() {
+    void processReservation_WithNullRoom_ShouldSkipRoomUpdate() {
         // Given
-        reservation.setSeat(null);
+        reservation.setRoom(null);
         List<Reservation> reservations = Arrays.asList(reservation);
         when(reservationRepository.findReservationsOverStartTime()).thenReturn(reservations);
 
@@ -159,22 +169,22 @@ class BatchServiceTest_processReservation {
 
         // Then
         assertEquals(ReservationStatus.NO_SHOW, reservation.getStatus());
-        verify(seatRepository, never()).save(any());
-        verify(seatStatusUpdateService, never()).sendRealTimeSeatStatusUpdate(any());
+        verify(roomRepository, never()).save(any());
+        verify(roomStatusUpdateService, never()).sendRealTimeRoomStatusUpdate(any());
         verify(reservationRepository).saveAll(reservations);
     }
 
     @Test
     void processReservation_WithMultipleReservations_ShouldProcessAll() {
         // Given
-        Seat seat2 = new Seat();
-        seat2.setId("b2c3d4e5-f6g7-8h9i-j0k1-l2m3n4o5p6q7");
-        seat2.setStatus(SeatStatus.AVAILABLE);
+        Room room2 = new Room();
+        room2.setId("b2c3d4e5-f6g7-8h9i-j0k1-l2m3n4o5p6q7");
+        room2.setStatus(RoomStatus.AVAILABLE);
 
         Reservation reservation2 = new Reservation();
         reservation2.setId("e6f7g8h9-i0j1-k2l3-m4n5-o6p7q8r9s0t1");
         reservation2.setStatus(ReservationStatus.RESERVED);
-        reservation2.setSeat(seat2);
+        reservation2.setRoom(room2);
 
         List<Reservation> reservations = Arrays.asList(reservation, reservation2);
         when(reservationRepository.findReservationsOverStartTime()).thenReturn(reservations);
@@ -185,16 +195,16 @@ class BatchServiceTest_processReservation {
         // Then
         assertEquals(ReservationStatus.NO_SHOW, reservation.getStatus());
         assertEquals(ReservationStatus.NO_SHOW, reservation2.getStatus());
-        assertEquals(SeatStatus.AVAILABLE, seat.getStatus());
-        assertEquals(SeatStatus.AVAILABLE, seat2.getStatus());
+        assertEquals(RoomStatus.AVAILABLE, room.getStatus());
+        assertEquals(RoomStatus.AVAILABLE, room2.getStatus());
 
-        verify(seatRepository, times(2)).save(any(Seat.class));
-        verify(seatStatusUpdateService, times(2)).sendRealTimeSeatStatusUpdate(any(SeatStatusUpdateRequest.class));
+        verify(roomRepository, times(2)).save(any(Room.class));
+        verify(roomStatusUpdateService, times(2)).sendRealTimeRoomStatusUpdate(any(RoomStatusUpdateRequest.class));
         verify(reservationRepository).saveAll(reservations);
     }
 
     @Test
-    void processReservation_ShouldSetCorrectSeatStatusUpdateRequest() {
+    void processReservation_ShouldSetCorrectRoomStatusUpdateRequest() {
         // Given
         List<Reservation> reservations = Arrays.asList(reservation);
         when(reservationRepository.findReservationsOverStartTime()).thenReturn(reservations);
@@ -203,10 +213,10 @@ class BatchServiceTest_processReservation {
         batchService.processReservation(ReservationStatus.NO_SHOW);
 
         // Then
-        verify(seatStatusUpdateService).sendRealTimeSeatStatusUpdate(
+        verify(roomStatusUpdateService).sendRealTimeRoomStatusUpdate(
                 argThat(request ->
-                        request.getSeatId().equals(seat.getId()) &&
-                                request.getNewStatus().equals(SeatStatus.AVAILABLE)
+                        request.getRoomId().equals(room.getId()) &&
+                                request.getNewStatus().equals(RoomStatus.AVAILABLE)
                 )
         );
     }

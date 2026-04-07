@@ -137,12 +137,12 @@ class NotificationServiceImplTest {
         Reservation reservation = new Reservation();
         reservation.setUser(user);
 
-        Seat seat = new Seat();
-        seat.setLocationCode("A1");
+        Room room = new Room();
+        room.setLocationCode("A1");
         Floor floor = new Floor();
         floor.setName("F1");
-        seat.setFloor(floor);
-        reservation.setSeat(seat);
+        room.setFloor(floor);
+        reservation.setRoom(room);
         reservation.setStartTime(LocalDateTime.now());
         reservation.setEndTime(LocalDateTime.now().plusMinutes(30));
 
@@ -159,13 +159,13 @@ class NotificationServiceImplTest {
     @Test
     void notifyUsersAboutReservation_ShouldCallSendNotice_WhenReservationsNotEmpty() {
         Reservation reservation = mock(Reservation.class);
-        Seat seat = mock(Seat.class);
+        Room room = mock(Room.class);
         Floor floor = mock(Floor.class);
         User user = mock(User.class);
 
-        when(reservation.getSeat()).thenReturn(seat);
-        when(seat.getLocationCode()).thenReturn("A1");
-        when(seat.getFloor()).thenReturn(floor);
+        when(reservation.getRoom()).thenReturn(room);
+        when(room.getLocationCode()).thenReturn("A1");
+        when(room.getFloor()).thenReturn(floor);
         when(floor.getName()).thenReturn("Floor 1");
 
         when(reservation.getStartTime()).thenReturn(LocalDateTime.now());
@@ -191,13 +191,13 @@ class NotificationServiceImplTest {
     @Test
     void remindCheckIn_ShouldCallNotifyUsers_WhenReservationsExist() {
         Reservation reservation = mock(Reservation.class);
-        Seat seat = mock(Seat.class);
+        Room room = mock(Room.class);
         Floor floor = mock(Floor.class);
         User user = mock(User.class);
 
-        when(reservation.getSeat()).thenReturn(seat);
-        when(seat.getLocationCode()).thenReturn("B2");
-        when(seat.getFloor()).thenReturn(floor);
+        when(reservation.getRoom()).thenReturn(room);
+        when(room.getLocationCode()).thenReturn("B2");
+        when(room.getFloor()).thenReturn(floor);
         when(floor.getName()).thenReturn("Floor 2");
 
         when(reservation.getStartTime()).thenReturn(LocalDateTime.now());
@@ -340,15 +340,15 @@ class NotificationServiceImplTest {
 
     private Reservation createMockReservation() {
         Reservation reservation = mock(Reservation.class);
-        Seat seat = mock(Seat.class);
+        Room room = mock(Room.class);
         Floor floor = mock(Floor.class);
         User user = mock(User.class);
 
-        when(seat.getLocationCode()).thenReturn("A1");
-        when(seat.getFloor()).thenReturn(floor);
+        when(room.getLocationCode()).thenReturn("A1");
+        when(room.getFloor()).thenReturn(floor);
         when(floor.getName()).thenReturn("Floor 1");
         when(user.getId()).thenReturn("user-id");
-        when(reservation.getSeat()).thenReturn(seat);
+        when(reservation.getRoom()).thenReturn(room);
         when(reservation.getStartTime()).thenReturn(LocalDateTime.now());
         when(reservation.getEndTime()).thenReturn(LocalDateTime.now().plusHours(1));
         when(reservation.getUser()).thenReturn(user);

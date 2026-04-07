@@ -23,107 +23,107 @@ public class RoomServiceTest {
     @Mock
     private FloorRepository floorRepository;
     @Mock
-    private SeatRepository seatRepository;
+    private RoomRepository roomRepository;
     @Mock
     private ReservationRepository reservationRepository;
     @InjectMocks
-    private SeatServiceImpl seatService;
+    private RoomServiceImpl roomService;
 
     @BeforeEach
     void setUp() {
         floorRepository = mock(FloorRepository.class);
-        seatRepository = mock(SeatRepository.class);
+        roomRepository = mock(RoomRepository.class);
         reservationRepository = mock(ReservationRepository.class);
-        seatService = new SeatServiceImpl(floorRepository, seatRepository, reservationRepository);
+        roomService = new RoomServiceImpl(floorRepository, roomRepository, reservationRepository);
     }
 
     @Test
-    void testSearchSeats_returnsAvailableSeats() {
+    void testSearchRooms_returnsAvailableRooms() {
         var floor = new Floor();
-        var seat = new Seat();
-        seat.setId("seat1");
-        seat.setLocationCode("A1");
-        seat.setScore(10.0);
+        var room = new Room();
+        room.setId("room1");
+        room.setLocationCode("A1");
+        room.setScore(10.0);
 
-        var request = new SeatSearchRequest();
+        var request = new RoomSearchRequest();
         request.setFloorId("1L");
         request.setStartTime(LocalDateTime.now());
         request.setEndTime(LocalDateTime.now().plusHours(1));
 
         when(floorRepository.findById("1L")).thenReturn(Optional.of(floor));
-        when(seatRepository.findByFloor(floor)).thenReturn(List.of(seat));
-        when(reservationRepository.findOverlappingReservations(eq("seat1"), any(), any()))
+        when(roomRepository.findByFloor(floor)).thenReturn(List.of(room));
+        when(reservationRepository.findOverlappingReservations(eq("room1"), any(), any()))
                 .thenReturn(Collections.emptyList());
 
-        var result = seatService.searchSeats(request);
+        var result = roomService.searchRooms(request);
 
         assertEquals(1, result.size());
-        assertEquals(SeatStatus.AVAILABLE, result.get(0).getStatus());
+        assertEquals(RoomStatus.AVAILABLE, result.get(0).getStatus());
         verify(floorRepository, times(1)).findById("1L");
     }
 
     @Test
-    void testSearchSeats_whenSeatReserved_thenFilteredOut() {
+    void testSearchRooms_whenRoomReserved_thenFilteredOut() {
         var floor = new Floor();
-        var seat = new Seat();
-        seat.setId("seat1");
+        var room = new Room();
+        room.setId("room1");
 
-        var request = new SeatSearchRequest();
+        var request = new RoomSearchRequest();
         request.setFloorId("1L");
         request.setStartTime(LocalDateTime.now());
         request.setEndTime(LocalDateTime.now().plusHours(1));
 
         when(floorRepository.findById("1L")).thenReturn(Optional.of(floor));
-        when(seatRepository.findByFloor(floor)).thenReturn(List.of(seat));
+        when(roomRepository.findByFloor(floor)).thenReturn(List.of(room));
 
         Reservation reservation = new Reservation();
         reservation.setStatus(ReservationStatus.RESERVED);
 
-        when(reservationRepository.findOverlappingReservations(eq("seat1"), any(), any()))
+        when(reservationRepository.findOverlappingReservations(eq("room1"), any(), any()))
                 .thenReturn(List.of(reservation));
 
-        var result = seatService.searchSeats(request);
+        var result = roomService.searchRooms(request);
 
         assertEquals(0, result.size());
     }
 
     @Test
-    void testSearchSeats_floorNotFound_throwsCustomException() {
-        SeatSearchRequest request = new SeatSearchRequest();
+    void testSearchRooms_floorNotFound_throwsCustomException() {
+        RoomSearchRequest request = new RoomSearchRequest();
         request.setFloorId("999L");
 
         when(floorRepository.findById("999L")).thenReturn(Optional.empty());
 
         CustomException exception = assertThrows(CustomException.class,
-                () -> seatService.searchSeats(request));
+                () -> roomService.searchRooms(request));
 
         assertEquals(ResponseCode.FLOOR_NOT_FOUND, exception.getResponseCode());
     }
 
     @Test
-    void testSearchSeats_unexpectedError_throwsInternalServerError() {
-        SeatSearchRequest request = new SeatSearchRequest();
+    void testSearchRooms_unexpectedError_throwsInternalServerError() {
+        RoomSearchRequest request = new RoomSearchRequest();
         request.setFloorId("1L");
 
         when(floorRepository.findById("1L")).thenThrow(new RuntimeException("DB failure"));
 
         CustomException exception = assertThrows(CustomException.class,
-                () -> seatService.searchSeats(request));
+                () -> roomService.searchRooms(request));
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
     }
 
     @Test
-    void testGetSeatDetails_success() {
-        SeatResponseProjection mockProjection = mock(SeatResponseProjection.class);
+    void testGetRoomDetails_success() {
+        RoomResponseProjection mockProjection = mock(RoomResponseProjection.class);
 
         when(mockProjection.getUserId()).thenReturn("u1");
         when(mockProjection.getUserName()).thenReturn("John Doe");
         when(mockProjection.getCheckInTime()).thenReturn(LocalDateTime.of(2025, 7, 10, 14, 0));
 
-        when(seatRepository.findSeatInMap("seat123")).thenReturn(mockProjection);
+        when(roomRepository.findRoomInMap("room123")).thenReturn(mockProjection);
 
-        var result = seatService.getSeatDetails("seat123");
+        var result = roomService.getRoomDetails("room123");
 
         assertEquals("u1", result.getUserId());
         assertEquals("John Doe", result.getUserName());
@@ -131,34 +131,34 @@ public class RoomServiceTest {
     }
 
     @Test
-    void testGetSeatDetails_seatNotFound() {
-        when(seatRepository.findSeatInMap("invalid")).thenReturn(null);
+    void testGetRoomDetails_roomNotFound() {
+        when(roomRepository.findRoomInMap("invalid")).thenReturn(null);
 
         CustomException ex = assertThrows(CustomException.class,
-                () -> seatService.getSeatDetails("invalid"));
+                () -> roomService.getRoomDetails("invalid"));
 
-        assertEquals(ResponseCode.SEAT_NOT_FOUND, ex.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, ex.getResponseCode());
     }
 
     @Test
-    void testGetSeatDetails_unexpectedError() {
-        when(seatRepository.findSeatInMap("seatX")).thenThrow(new RuntimeException());
+    void testGetRoomDetails_unexpectedError() {
+        when(roomRepository.findRoomInMap("roomX")).thenThrow(new RuntimeException());
 
         CustomException ex = assertThrows(CustomException.class,
-                () -> seatService.getSeatDetails("seatX"));
+                () -> roomService.getRoomDetails("roomX"));
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, ex.getResponseCode());
     }
 
     @Test
-    void testSearchSeats_reservationNotOverlapping() {
+    void testSearchRooms_reservationNotOverlapping() {
         var floor = new Floor();
-        var seat = new Seat();
-        seat.setId("seat2");
-        seat.setLocationCode("A2");
-        seat.setScore(20.0);
+        var room = new Room();
+        room.setId("room2");
+        room.setLocationCode("A2");
+        room.setScore(20.0);
 
-        var request = new SeatSearchRequest();
+        var request = new RoomSearchRequest();
         request.setFloorId("2L");
         request.setStartTime(LocalDateTime.of(2025, 7, 10, 10, 0));
         request.setEndTime(LocalDateTime.of(2025, 7, 10, 11, 0));
@@ -170,37 +170,37 @@ public class RoomServiceTest {
         reservation.setEndTime(LocalDateTime.of(2025, 7, 10, 9, 0));
 
         when(floorRepository.findById("2L")).thenReturn(Optional.of(floor));
-        when(seatRepository.findByFloor(floor)).thenReturn(List.of(seat));
-        when(reservationRepository.findOverlappingReservations(eq("seat2"), any(), any()))
+        when(roomRepository.findByFloor(floor)).thenReturn(List.of(room));
+        when(reservationRepository.findOverlappingReservations(eq("room2"), any(), any()))
                 .thenReturn(Collections.emptyList()); // giả định logic overlap được filter ở query
 
-        var result = seatService.searchSeats(request);
+        var result = roomService.searchRooms(request);
 
         assertEquals(1, result.size());
-        assertEquals("seat2", result.get(0).getSeatId());
+        assertEquals("room2", result.get(0).getRoomId());
     }
 
     @Test
-    void testSearchSeats_floorExistsButNoSeats() {
+    void testSearchRooms_floorExistsButNoRooms() {
         var floor = new Floor();
 
-        var request = new SeatSearchRequest();
+        var request = new RoomSearchRequest();
         request.setFloorId("5L");
         request.setStartTime(LocalDateTime.of(2025, 7, 10, 9, 0));
         request.setEndTime(LocalDateTime.of(2025, 7, 10, 10, 0));
 
         when(floorRepository.findById("5L")).thenReturn(Optional.of(floor));
-        when(seatRepository.findByFloor(floor)).thenReturn(Collections.emptyList());
+        when(roomRepository.findByFloor(floor)).thenReturn(Collections.emptyList());
 
-        var result = seatService.searchSeats(request);
+        var result = roomService.searchRooms(request);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void testSearchSeats_startTimeAfterEndTime_shouldThrowException() {
-        SeatSearchRequest request = new SeatSearchRequest();
+    void testSearchRooms_startTimeAfterEndTime_shouldThrowException() {
+        RoomSearchRequest request = new RoomSearchRequest();
         request.setFloorId("1L");
         request.setStartTime(LocalDateTime.of(2025, 7, 10, 12, 0));
         request.setEndTime(LocalDateTime.of(2025, 7, 10, 10, 0));  // startTime > endTime
@@ -208,32 +208,32 @@ public class RoomServiceTest {
         when(floorRepository.findById("1L")).thenReturn(Optional.of(new Floor()));
 
         CustomException ex = assertThrows(CustomException.class,
-                () -> seatService.searchSeats(request));
+                () -> roomService.searchRooms(request));
 
         assertEquals(ResponseCode.VALIDATION_FAILED, ex.getResponseCode());
     }
 
     @Test
-    void testSearchSeats_startTimeNull_shouldThrowException() {
-        SeatSearchRequest request = new SeatSearchRequest();
+    void testSearchRooms_startTimeNull_shouldThrowException() {
+        RoomSearchRequest request = new RoomSearchRequest();
         request.setFloorId("1L");
         request.setStartTime(null);
         request.setEndTime(LocalDateTime.now().plusHours(1));
         when(floorRepository.findById("1L")).thenReturn(Optional.of(new Floor()));
         CustomException exception = assertThrows(CustomException.class,
-                () -> seatService.searchSeats(request));
+                () -> roomService.searchRooms(request));
         assertEquals(ResponseCode.VALIDATION_FAILED, exception.getResponseCode());
     }
 
     @Test
-    void testSearchSeats_endTimeNull_shouldThrowException() {
-        SeatSearchRequest request = new SeatSearchRequest();
+    void testSearchRooms_endTimeNull_shouldThrowException() {
+        RoomSearchRequest request = new RoomSearchRequest();
         request.setFloorId("1L");
         request.setStartTime(LocalDateTime.now());
         request.setEndTime(null);
         when(floorRepository.findById("1L")).thenReturn(Optional.of(new Floor()));
         CustomException exception = assertThrows(CustomException.class,
-                () -> seatService.searchSeats(request));
+                () -> roomService.searchRooms(request));
         assertEquals(ResponseCode.VALIDATION_FAILED, exception.getResponseCode());
     }
 }

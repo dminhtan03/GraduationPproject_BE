@@ -1,5 +1,13 @@
 package com.finalProject.BookingMeetingRoom.service.batch;
 
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.service.NotificationService;
+import com.finalProject.BookingMeetingRoom.service.RealTimeService;
+import com.finalProject.BookingMeetingRoom.service.impl.BatchServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +40,7 @@ class BatchServiceTest_processPendingReservation {
     private RealTimeService realTimeService;
 
     private User user;
-    private Seat seat;
+    private Room room;
     private Reservation reservation;
 
     @BeforeEach
@@ -40,13 +48,13 @@ class BatchServiceTest_processPendingReservation {
         user = new User();
         user.setId("U1");
 
-        seat = new Seat();
-        seat.setId("S1");
+        room = new Room();
+        room.setId("S1");
 
         reservation = new Reservation();
         reservation.setId("R1");
         reservation.setUser(user);
-        reservation.setSeat(seat);
+        reservation.setRoom(room);
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setCreateAt(LocalDateTime.now().minusMinutes(10));
         reservation.setStartTime(LocalDateTime.now().plusMinutes(30));
@@ -81,7 +89,7 @@ class BatchServiceTest_processPendingReservation {
                 anySet(), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{"U1", 0}));
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(
+        when(reservationRepository.findByRoomIdsAndStatusIn(
                 anySet(), anyList()))
                 .thenReturn(Collections.emptyList());
 
@@ -112,11 +120,11 @@ class BatchServiceTest_processPendingReservation {
 
         Reservation overlapping = new Reservation();
         overlapping.setId("R2");
-        overlapping.setSeat(seat);
+        overlapping.setRoom(room);
         overlapping.setStartTime(reservation.getStartTime().minusMinutes(15));
         overlapping.setEndTime(reservation.getEndTime().plusMinutes(15));
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(anySet(), anyList()))
+        when(reservationRepository.findByRoomIdsAndStatusIn(anySet(), anyList()))
                 .thenReturn(List.of(overlapping));
 
         batchService.processPendingReservations();
@@ -132,18 +140,18 @@ class BatchServiceTest_processPendingReservation {
     }
 
     /**
-     * Test case for processing pending reservations when two users compete for the same seat.
+     * Test case for processing pending reservations when two users compete for the same room.
      * This should select the user with the lower count of reservations today.
      */
     @Test
-    void testProcessPendingReservations_whenTwoUsersCompeteForSameSeat_shouldSelectLowerCountUser() {
+    void testProcessPendingReservations_whenTwoUsersCompeteForSameRoom_shouldSelectLowerCountUser() {
         User user2 = new User();
         user2.setId("U2");
 
         Reservation reservation2 = new Reservation();
         reservation2.setId("R2");
         reservation2.setUser(user2);
-        reservation2.setSeat(seat);
+        reservation2.setRoom(room);
         reservation2.setStatus(ReservationStatus.PENDING);
         reservation2.setCreateAt(LocalDateTime.now().minusMinutes(10));
         reservation2.setStartTime(LocalDateTime.now().plusMinutes(30));
@@ -159,7 +167,7 @@ class BatchServiceTest_processPendingReservation {
                         new Object[]{"U2", 0}
                 ));
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(anySet(), anyList()))
+        when(reservationRepository.findByRoomIdsAndStatusIn(anySet(), anyList()))
                 .thenReturn(Collections.emptyList());
 
         batchService.processPendingReservations();
@@ -179,18 +187,18 @@ class BatchServiceTest_processPendingReservation {
     }
 
     /**
-     * Test case for processing pending reservations when two users compete for the same seat.
+     * Test case for processing pending reservations when two users compete for the same room.
      * This should select the user with the earlier created reservation.
      */
     @Test
-    void testProcessPendingReservations_whenTwoUsersCompeteForSameSeat_shouldSelectEarlierCreatedReservation() {
+    void testProcessPendingReservations_whenTwoUsersCompeteForSameRoom_shouldSelectEarlierCreatedReservation() {
         User user2 = new User();
         user2.setId("U2");
 
         Reservation reservation2 = new Reservation();
         reservation2.setId("R2");
         reservation2.setUser(user2);
-        reservation2.setSeat(seat);
+        reservation2.setRoom(room);
         reservation2.setStatus(ReservationStatus.PENDING);
         reservation2.setCreateAt(LocalDateTime.now().minusMinutes(5));
         reservation2.setStartTime(LocalDateTime.now().plusMinutes(30));
@@ -206,7 +214,7 @@ class BatchServiceTest_processPendingReservation {
                         new Object[]{"U2", 2}
                 ));
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(anySet(), anyList()))
+        when(reservationRepository.findByRoomIdsAndStatusIn(anySet(), anyList()))
                 .thenReturn(Collections.emptyList());
 
         batchService.processPendingReservations();
@@ -237,7 +245,7 @@ class BatchServiceTest_processPendingReservation {
         Reservation reservation2 = new Reservation();
         reservation2.setId("R2");
         reservation2.setUser(user2);
-        reservation2.setSeat(seat);
+        reservation2.setRoom(room);
         reservation2.setStatus(ReservationStatus.PENDING);
         reservation2.setCreateAt(LocalDateTime.now().minusMinutes(10));
         reservation2.setStartTime(reservation.getEndTime()); // Starts when R1 ends
@@ -252,7 +260,7 @@ class BatchServiceTest_processPendingReservation {
                         new Object[]{"U2", 0}
                 ));
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(anySet(), anyList()))
+        when(reservationRepository.findByRoomIdsAndStatusIn(anySet(), anyList()))
                 .thenReturn(Collections.emptyList());
 
         batchService.processPendingReservations();
@@ -275,7 +283,7 @@ class BatchServiceTest_processPendingReservation {
         Reservation reservation2 = new Reservation();
         reservation2.setId("R2");
         reservation2.setUser(user);
-        reservation2.setSeat(seat);
+        reservation2.setRoom(room);
         reservation2.setStatus(ReservationStatus.PENDING);
         reservation2.setCreateAt(LocalDateTime.now().minusMinutes(5));
         reservation2.setStartTime(reservation.getStartTime().plusMinutes(15));
@@ -287,7 +295,7 @@ class BatchServiceTest_processPendingReservation {
         when(reservationRepository.countReservationsTodayByUserIds(anySet(), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[]{"U1", 1}));
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(anySet(), anyList()))
+        when(reservationRepository.findByRoomIdsAndStatusIn(anySet(), anyList()))
                 .thenReturn(Collections.emptyList());
 
         batchService.processPendingReservations();
@@ -304,13 +312,13 @@ class BatchServiceTest_processPendingReservation {
     }
 
     /**
-     * Test case for multiple seats processing
-     * Scenario: Different seats should be processed independently
+     * Test case for multiple rooms processing
+     * Scenario: Different rooms should be processed independently
      */
     @Test
-    void testProcessPendingReservations_whenMultipleSeats_shouldProcessIndependently() {
-        Seat seat2 = new Seat();
-        seat2.setId("S2");
+    void testProcessPendingReservations_whenMultipleRooms_shouldProcessIndependently() {
+        Room room2 = new Room();
+        room2.setId("S2");
 
         User user2 = new User();
         user2.setId("U2");
@@ -318,7 +326,7 @@ class BatchServiceTest_processPendingReservation {
         Reservation reservation2 = new Reservation();
         reservation2.setId("R2");
         reservation2.setUser(user2);
-        reservation2.setSeat(seat2);
+        reservation2.setRoom(room2);
         reservation2.setStatus(ReservationStatus.PENDING);
         reservation2.setCreateAt(LocalDateTime.now().minusMinutes(10));
         reservation2.setStartTime(reservation.getStartTime());
@@ -333,7 +341,7 @@ class BatchServiceTest_processPendingReservation {
                         new Object[]{"U2", 0}
                 ));
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(anySet(), anyList()))
+        when(reservationRepository.findByRoomIdsAndStatusIn(anySet(), anyList()))
                 .thenReturn(Collections.emptyList());
 
         batchService.processPendingReservations();
@@ -360,7 +368,7 @@ class BatchServiceTest_processPendingReservation {
         Reservation reservation2 = new Reservation();
         reservation2.setId("R2");
         reservation2.setUser(user2);
-        reservation2.setSeat(seat);
+        reservation2.setRoom(room);
         reservation2.setStatus(ReservationStatus.PENDING);
         reservation2.setCreateAt(LocalDateTime.now().minusMinutes(8));
         reservation2.setStartTime(reservation.getStartTime());
@@ -369,7 +377,7 @@ class BatchServiceTest_processPendingReservation {
         Reservation reservation3 = new Reservation();
         reservation3.setId("R3");
         reservation3.setUser(user3);
-        reservation3.setSeat(seat);
+        reservation3.setRoom(room);
         reservation3.setStatus(ReservationStatus.PENDING);
         reservation3.setCreateAt(LocalDateTime.now().minusMinutes(12)); // Earliest
         reservation3.setStartTime(reservation.getStartTime());
@@ -385,7 +393,7 @@ class BatchServiceTest_processPendingReservation {
                         new Object[]{"U3", 0}  // Highest priority
                 ));
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(anySet(), anyList()))
+        when(reservationRepository.findByRoomIdsAndStatusIn(anySet(), anyList()))
                 .thenReturn(Collections.emptyList());
 
         batchService.processPendingReservations();
@@ -412,18 +420,18 @@ class BatchServiceTest_processPendingReservation {
         List<Reservation> reservations = new ArrayList<>();
         List<Object[]> counts = new ArrayList<>();
 
-        // Create 50 reservations for 10 different seats
+        // Create 50 reservations for 10 different rooms
         for (int i = 1; i <= 50; i++) {
             User u = new User();
             u.setId("U" + i);
 
-            Seat s = new Seat();
+            Room s = new Room();
             s.setId("S" + ((i - 1) % 10 + 1));
 
             Reservation r = new Reservation();
             r.setId("R" + i);
             r.setUser(u);
-            r.setSeat(s);
+            r.setRoom(s);
             r.setStatus(ReservationStatus.PENDING);
             r.setCreateAt(LocalDateTime.now().minusMinutes(i));
             r.setStartTime(LocalDateTime.now().plusMinutes(30));
@@ -439,7 +447,7 @@ class BatchServiceTest_processPendingReservation {
         when(reservationRepository.countReservationsTodayByUserIds(anySet(), any(), any()))
                 .thenReturn(counts);
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(anySet(), anyList()))
+        when(reservationRepository.findByRoomIdsAndStatusIn(anySet(), anyList()))
                 .thenReturn(Collections.emptyList());
 
         batchService.processPendingReservations();
@@ -450,22 +458,22 @@ class BatchServiceTest_processPendingReservation {
 
         assertEquals(50, updated.size());
 
-        // Each seat should have only 1 reserved (highest priority user)
-        Map<String, List<Reservation>> bySeat = updated.stream()
-                .collect(Collectors.groupingBy(r -> r.getSeat().getId()));
+        // Each room should have only 1 reserved (highest priority user)
+        Map<String, List<Reservation>> byRoom = updated.stream()
+                .collect(Collectors.groupingBy(r -> r.getRoom().getId()));
 
-        assertEquals(10, bySeat.size()); // 10 different seats
+        assertEquals(10, byRoom.size()); // 10 different rooms
 
-        bySeat.values().forEach(seatReservations -> {
-            long reservedCount = seatReservations.stream()
+        byRoom.values().forEach(roomReservations -> {
+            long reservedCount = roomReservations.stream()
                     .mapToLong(r -> r.getStatus() == ReservationStatus.RESERVED ? 1 : 0)
                     .sum();
-            assertEquals(1, reservedCount); // Only 1 should be reserved per seat
+            assertEquals(1, reservedCount); // Only 1 should be reserved per room
         });
     }
 
     /**
-     * Test case for large batch processing - 1000 reservations, 200 seats, 100 users
+     * Test case for large batch processing - 1000 reservations, 200 rooms, 100 users
      * Scenario: Stress test with realistic large volume
      */
     @Test
@@ -473,18 +481,18 @@ class BatchServiceTest_processPendingReservation {
         List<Reservation> reservations = new ArrayList<>();
         List<Object[]> counts = new ArrayList<>();
 
-        // Create 1000 reservations for 200 different seats and 100 users
+        // Create 1000 reservations for 200 different rooms and 100 users
         for (int i = 1; i <= 1000; i++) {
             User u = new User();
             u.setId("U" + ((i - 1) % 100 + 1)); // 100 users: U1-U100
 
-            Seat s = new Seat();
-            s.setId("S" + ((i - 1) % 200 + 1)); // 200 seats: S1-S200
+            Room s = new Room();
+            s.setId("S" + ((i - 1) % 200 + 1)); // 200 rooms: S1-S200
 
             Reservation r = new Reservation();
             r.setId("R" + i);
             r.setUser(u);
-            r.setSeat(s);
+            r.setRoom(s);
             r.setStatus(ReservationStatus.PENDING);
             r.setCreateAt(LocalDateTime.now().minusMinutes(i % 120)); // Vary creation time
             r.setStartTime(LocalDateTime.now().plusMinutes(30));
@@ -504,7 +512,7 @@ class BatchServiceTest_processPendingReservation {
         when(reservationRepository.countReservationsTodayByUserIds(anySet(), any(), any()))
                 .thenReturn(counts);
 
-        when(reservationRepository.findBySeatIdsAndStatusIn(anySet(), anyList()))
+        when(reservationRepository.findByRoomIdsAndStatusIn(anySet(), anyList()))
                 .thenReturn(Collections.emptyList());
 
         // Measure execution time
@@ -524,19 +532,19 @@ class BatchServiceTest_processPendingReservation {
 
         assertEquals(1000, updated.size());
 
-        // Group by seat and verify only 1 reservation per seat is confirmed
-        Map<String, List<Reservation>> bySeat = updated.stream()
-                .collect(Collectors.groupingBy(r -> r.getSeat().getId()));
+        // Group by room and verify only 1 reservation per room is confirmed
+        Map<String, List<Reservation>> byRoom = updated.stream()
+                .collect(Collectors.groupingBy(r -> r.getRoom().getId()));
 
-        assertEquals(200, bySeat.size());
+        assertEquals(200, byRoom.size());
 
-        bySeat.forEach((seatId, seatReservations) -> {
-            Optional<Reservation> maybeReserved = seatReservations.stream()
+        byRoom.forEach((roomId, roomReservations) -> {
+            Optional<Reservation> maybeReserved = roomReservations.stream()
                     .filter(r -> r.getStatus() == ReservationStatus.RESERVED)
                     .findFirst();
 
             if (maybeReserved.isEmpty()) {
-                // Không có reservation nào được xác nhận cho seat này → bỏ qua
+                // Không có reservation nào được xác nhận cho room này → bỏ qua
                 return;
             }
 
@@ -544,7 +552,7 @@ class BatchServiceTest_processPendingReservation {
             String winnerUserId = reserved.getUser().getId();
             int winnerCount = Integer.parseInt(winnerUserId.substring(1)) % 10;
 
-            seatReservations.stream()
+            roomReservations.stream()
                     .filter(r -> r.getStatus() == ReservationStatus.FAILED)
                     .forEach(failed -> {
                         String failedUserId = failed.getUser().getId();
@@ -556,7 +564,7 @@ class BatchServiceTest_processPendingReservation {
                     });
         });
 
-        System.out.println("✅ Successfully processed 1000 reservations across 200 seats for 100 users");
+        System.out.println("✅ Successfully processed 1000 reservations across 200 rooms for 100 users");
     }
 
     @Test

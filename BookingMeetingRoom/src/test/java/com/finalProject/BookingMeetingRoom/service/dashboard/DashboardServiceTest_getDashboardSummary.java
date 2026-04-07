@@ -16,7 +16,7 @@ import static org.mockito.Mockito.*;
 class DashboardServiceTest_getDashboardSummary {
 
     @Mock
-    private SeatRepository seatRepository;
+    private RoomRepository roomRepository;
 
     @Mock
     private UserRepository userRepository;
@@ -33,9 +33,9 @@ class DashboardServiceTest_getDashboardSummary {
     @Test
     void testGetDashboardSummary_Success_WithAllData() {
         // Arrange
-        when(seatRepository.count()).thenReturn(100L);
-        when(seatRepository.countOccupiedSeats()).thenReturn(25);
-        when(seatRepository.countBrokenSeats()).thenReturn(5);
+        when(roomRepository.count()).thenReturn(100L);
+        when(roomRepository.countOccupiedRooms()).thenReturn(25);
+        when(roomRepository.countBrokenRooms()).thenReturn(5);
         when(userRepository.count()).thenReturn(50L);
 
         // Act
@@ -43,15 +43,15 @@ class DashboardServiceTest_getDashboardSummary {
 
         // Assert
         assertNotNull(result);
-        assertEquals(100, result.getTotalSeats());
-        assertEquals(25, result.getOccupiedSeats());
-        assertEquals(5, result.getBrokenSeats());
+        assertEquals(100, result.getTotalRooms());
+        assertEquals(25, result.getOccupiedRooms());
+        assertEquals(5, result.getBrokenRooms());
         assertEquals(50, result.getTotalUsers());
 
         // Verify all repository methods were called
-        verify(seatRepository, times(1)).count();
-        verify(seatRepository, times(1)).countOccupiedSeats();
-        verify(seatRepository, times(1)).countBrokenSeats();
+        verify(roomRepository, times(1)).count();
+        verify(roomRepository, times(1)).countOccupiedRooms();
+        verify(roomRepository, times(1)).countBrokenRooms();
         verify(userRepository, times(1)).count();
     }
 
@@ -61,9 +61,9 @@ class DashboardServiceTest_getDashboardSummary {
     @Test
     void testGetDashboardSummary_Success_WithZeroValues() {
         // Arrange
-        when(seatRepository.count()).thenReturn(0L);
-        when(seatRepository.countOccupiedSeats()).thenReturn(0);
-        when(seatRepository.countBrokenSeats()).thenReturn(0);
+        when(roomRepository.count()).thenReturn(0L);
+        when(roomRepository.countOccupiedRooms()).thenReturn(0);
+        when(roomRepository.countBrokenRooms()).thenReturn(0);
         when(userRepository.count()).thenReturn(0L);
 
         // Act
@@ -71,9 +71,9 @@ class DashboardServiceTest_getDashboardSummary {
 
         // Assert
         assertNotNull(result);
-        assertEquals(0, result.getTotalSeats());
-        assertEquals(0, result.getOccupiedSeats());
-        assertEquals(0, result.getBrokenSeats());
+        assertEquals(0, result.getTotalRooms());
+        assertEquals(0, result.getOccupiedRooms());
+        assertEquals(0, result.getBrokenRooms());
         assertEquals(0, result.getTotalUsers());
     }
 
@@ -83,9 +83,9 @@ class DashboardServiceTest_getDashboardSummary {
     @Test
     void testGetDashboardSummary_Success_WithLargeNumbers() {
         // Arrange
-        when(seatRepository.count()).thenReturn(Long.MAX_VALUE);
-        when(seatRepository.countOccupiedSeats()).thenReturn(Integer.MAX_VALUE);
-        when(seatRepository.countBrokenSeats()).thenReturn(Integer.MAX_VALUE);
+        when(roomRepository.count()).thenReturn(Long.MAX_VALUE);
+        when(roomRepository.countOccupiedRooms()).thenReturn(Integer.MAX_VALUE);
+        when(roomRepository.countBrokenRooms()).thenReturn(Integer.MAX_VALUE);
         when(userRepository.count()).thenReturn(Long.MAX_VALUE);
 
         // Act
@@ -93,19 +93,19 @@ class DashboardServiceTest_getDashboardSummary {
 
         // Assert
         assertNotNull(result);
-        assertEquals((int) Long.MAX_VALUE, result.getTotalSeats()); // Note: This will overflow
-        assertEquals(Integer.MAX_VALUE, result.getOccupiedSeats());
-        assertEquals(Integer.MAX_VALUE, result.getBrokenSeats());
+        assertEquals((int) Long.MAX_VALUE, result.getTotalRooms()); // Note: This will overflow
+        assertEquals(Integer.MAX_VALUE, result.getOccupiedRooms());
+        assertEquals(Integer.MAX_VALUE, result.getBrokenRooms());
         assertEquals((int) Long.MAX_VALUE, result.getTotalUsers()); // Note: This will overflow
     }
 
     /**
-     * Test when seatRepository.count() throws RuntimeException
+     * Test when roomRepository.count() throws RuntimeException
      */
     @Test
-    void testGetDashboardSummary_SeatRepositoryCountThrowsException_ThrowsInternalServerError() {
+    void testGetDashboardSummary_RoomRepositoryCountThrowsException_ThrowsInternalServerError() {
         // Arrange
-        when(seatRepository.count()).thenThrow(new RuntimeException("Database connection failed"));
+        when(roomRepository.count()).thenThrow(new RuntimeException("Database connection failed"));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -114,20 +114,20 @@ class DashboardServiceTest_getDashboardSummary {
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
-        verify(seatRepository, times(1)).count();
-        verify(seatRepository, never()).countOccupiedSeats();
-        verify(seatRepository, never()).countBrokenSeats();
+        verify(roomRepository, times(1)).count();
+        verify(roomRepository, never()).countOccupiedRooms();
+        verify(roomRepository, never()).countBrokenRooms();
         verify(userRepository, never()).count();
     }
 
     /**
-     * Test when seatRepository.countOccupiedSeats() throws RuntimeException
+     * Test when roomRepository.countOccupiedRooms() throws RuntimeException
      */
     @Test
-    void testGetDashboardSummary_CountOccupiedSeatsThrowsException_ThrowsInternalServerError() {
+    void testGetDashboardSummary_CountOccupiedRoomsThrowsException_ThrowsInternalServerError() {
         // Arrange
-        when(seatRepository.count()).thenReturn(100L);
-        when(seatRepository.countOccupiedSeats()).thenThrow(new RuntimeException("Database error"));
+        when(roomRepository.count()).thenReturn(100L);
+        when(roomRepository.countOccupiedRooms()).thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -136,21 +136,21 @@ class DashboardServiceTest_getDashboardSummary {
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
-        verify(seatRepository, times(1)).count();
-        verify(seatRepository, times(1)).countOccupiedSeats();
-        verify(seatRepository, never()).countBrokenSeats();
+        verify(roomRepository, times(1)).count();
+        verify(roomRepository, times(1)).countOccupiedRooms();
+        verify(roomRepository, never()).countBrokenRooms();
         verify(userRepository, never()).count();
     }
 
     /**
-     * Test when seatRepository.countBrokenSeats() throws RuntimeException
+     * Test when roomRepository.countBrokenRooms() throws RuntimeException
      */
     @Test
-    void testGetDashboardSummary_CountBrokenSeatsThrowsException_ThrowsInternalServerError() {
+    void testGetDashboardSummary_CountBrokenRoomsThrowsException_ThrowsInternalServerError() {
         // Arrange
-        when(seatRepository.count()).thenReturn(100L);
-        when(seatRepository.countOccupiedSeats()).thenReturn(25);
-        when(seatRepository.countBrokenSeats()).thenThrow(new RuntimeException("Database error"));
+        when(roomRepository.count()).thenReturn(100L);
+        when(roomRepository.countOccupiedRooms()).thenReturn(25);
+        when(roomRepository.countBrokenRooms()).thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -159,9 +159,9 @@ class DashboardServiceTest_getDashboardSummary {
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
-        verify(seatRepository, times(1)).count();
-        verify(seatRepository, times(1)).countOccupiedSeats();
-        verify(seatRepository, times(1)).countBrokenSeats();
+        verify(roomRepository, times(1)).count();
+        verify(roomRepository, times(1)).countOccupiedRooms();
+        verify(roomRepository, times(1)).countBrokenRooms();
         verify(userRepository, never()).count();
     }
 
@@ -171,9 +171,9 @@ class DashboardServiceTest_getDashboardSummary {
     @Test
     void testGetDashboardSummary_UserRepositoryCountThrowsException_ThrowsInternalServerError() {
         // Arrange
-        when(seatRepository.count()).thenReturn(100L);
-        when(seatRepository.countOccupiedSeats()).thenReturn(25);
-        when(seatRepository.countBrokenSeats()).thenReturn(5);
+        when(roomRepository.count()).thenReturn(100L);
+        when(roomRepository.countOccupiedRooms()).thenReturn(25);
+        when(roomRepository.countBrokenRooms()).thenReturn(5);
         when(userRepository.count()).thenThrow(new RuntimeException("Database error"));
 
         // Act & Assert
@@ -183,19 +183,19 @@ class DashboardServiceTest_getDashboardSummary {
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
-        verify(seatRepository, times(1)).count();
-        verify(seatRepository, times(1)).countOccupiedSeats();
-        verify(seatRepository, times(1)).countBrokenSeats();
+        verify(roomRepository, times(1)).count();
+        verify(roomRepository, times(1)).countOccupiedRooms();
+        verify(roomRepository, times(1)).countBrokenRooms();
         verify(userRepository, times(1)).count();
     }
 
     /**
-     * Test when seatRepository throws SQLException
+     * Test when roomRepository throws SQLException
      */
     @Test
-    void testGetDashboardSummary_SeatRepositoryThrowsSQLException_ThrowsInternalServerError() {
+    void testGetDashboardSummary_RoomRepositoryThrowsSQLException_ThrowsInternalServerError() {
         // Arrange
-        when(seatRepository.count()).thenThrow(new RuntimeException("SQL error", new SQLException("Connection timeout")));
+        when(roomRepository.count()).thenThrow(new RuntimeException("SQL error", new SQLException("Connection timeout")));
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -204,7 +204,7 @@ class DashboardServiceTest_getDashboardSummary {
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
 
-        verify(seatRepository, times(1)).count();
+        verify(roomRepository, times(1)).count();
     }
 
     /**
@@ -213,9 +213,9 @@ class DashboardServiceTest_getDashboardSummary {
     @Test
     void testGetDashboardSummary_UserRepositoryThrowsSQLException_ThrowsInternalServerError() {
         // Arrange
-        when(seatRepository.count()).thenReturn(100L);
-        when(seatRepository.countOccupiedSeats()).thenReturn(25);
-        when(seatRepository.countBrokenSeats()).thenReturn(5);
+        when(roomRepository.count()).thenReturn(100L);
+        when(roomRepository.countOccupiedRooms()).thenReturn(25);
+        when(roomRepository.countBrokenRooms()).thenReturn(5);
         when(userRepository.count()).thenThrow(new RuntimeException("SQL error", new SQLException("Table not found")));
 
         // Act & Assert
@@ -235,7 +235,7 @@ class DashboardServiceTest_getDashboardSummary {
     void testGetDashboardSummary_RepositoryThrowsCustomException_ReThrowsCustomException() {
         // Arrange
         CustomException customException = new CustomException(ResponseCode.USER_NOT_FOUND);
-        when(seatRepository.count()).thenThrow(customException);
+        when(roomRepository.count()).thenThrow(customException);
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -245,7 +245,7 @@ class DashboardServiceTest_getDashboardSummary {
         assertEquals(ResponseCode.USER_NOT_FOUND, exception.getResponseCode());
         assertSame(customException, exception); // Should be the exact same exception
 
-        verify(seatRepository, times(1)).count();
+        verify(roomRepository, times(1)).count();
         verify(logger, never()).error(anyString(), any(Exception.class)); // Logger not called for CustomException
     }
 
@@ -256,8 +256,8 @@ class DashboardServiceTest_getDashboardSummary {
     void testGetDashboardSummary_CustomExceptionIsRethrownCorrectly() {
         // Arrange
         CustomException customException = new CustomException(ResponseCode.USER_NOT_FOUND);
-        when(seatRepository.countOccupiedSeats()).thenThrow(customException);
-        when(seatRepository.count()).thenReturn(100L);
+        when(roomRepository.countOccupiedRooms()).thenThrow(customException);
+        when(roomRepository.count()).thenReturn(100L);
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -276,9 +276,9 @@ class DashboardServiceTest_getDashboardSummary {
     @Test
     void testGetDashboardSummary_Success_WithNegativeValues() {
         // Arrange - This shouldn't happen in real scenarios but tests robustness
-        when(seatRepository.count()).thenReturn(-1L);
-        when(seatRepository.countOccupiedSeats()).thenReturn(-5);
-        when(seatRepository.countBrokenSeats()).thenReturn(-2);
+        when(roomRepository.count()).thenReturn(-1L);
+        when(roomRepository.countOccupiedRooms()).thenReturn(-5);
+        when(roomRepository.countBrokenRooms()).thenReturn(-2);
         when(userRepository.count()).thenReturn(-10L);
 
         // Act
@@ -286,9 +286,9 @@ class DashboardServiceTest_getDashboardSummary {
 
         // Assert
         assertNotNull(result);
-        assertEquals(-1, result.getTotalSeats());
-        assertEquals(-5, result.getOccupiedSeats());
-        assertEquals(-2, result.getBrokenSeats());
+        assertEquals(-1, result.getTotalRooms());
+        assertEquals(-5, result.getOccupiedRooms());
+        assertEquals(-2, result.getBrokenRooms());
         assertEquals(-10, result.getTotalUsers());
     }
 
@@ -298,9 +298,9 @@ class DashboardServiceTest_getDashboardSummary {
     @Test
     void testGetDashboardSummary_Success_WithRealisticValues() {
         // Arrange
-        when(seatRepository.count()).thenReturn(1000L);
-        when(seatRepository.countOccupiedSeats()).thenReturn(750);
-        when(seatRepository.countBrokenSeats()).thenReturn(50);
+        when(roomRepository.count()).thenReturn(1000L);
+        when(roomRepository.countOccupiedRooms()).thenReturn(750);
+        when(roomRepository.countBrokenRooms()).thenReturn(50);
         when(userRepository.count()).thenReturn(500L);
 
         // Act
@@ -308,15 +308,15 @@ class DashboardServiceTest_getDashboardSummary {
 
         // Assert
         assertNotNull(result);
-        assertEquals(1000, result.getTotalSeats());
-        assertEquals(750, result.getOccupiedSeats());
-        assertEquals(50, result.getBrokenSeats());
+        assertEquals(1000, result.getTotalRooms());
+        assertEquals(750, result.getOccupiedRooms());
+        assertEquals(50, result.getBrokenRooms());
         assertEquals(500, result.getTotalUsers());
 
         // Verify business logic makes sense
-        assertTrue(result.getOccupiedSeats() <= result.getTotalSeats());
-        assertTrue(result.getBrokenSeats() <= result.getTotalSeats());
-        assertTrue(result.getTotalUsers() <= result.getTotalSeats()); // Assuming one user per seat max
+        assertTrue(result.getOccupiedRooms() <= result.getTotalRooms());
+        assertTrue(result.getBrokenRooms() <= result.getTotalRooms());
+        assertTrue(result.getTotalUsers() <= result.getTotalRooms()); // Assuming one user per room max
     }
 
     /**
@@ -326,9 +326,9 @@ class DashboardServiceTest_getDashboardSummary {
     void testGetDashboardSummary_Success_WithOverflowValues() {
         // Arrange - Values that will overflow when cast to int
         long veryLargeValue = Long.MAX_VALUE;
-        when(seatRepository.count()).thenReturn(veryLargeValue);
-        when(seatRepository.countOccupiedSeats()).thenReturn(1000);
-        when(seatRepository.countBrokenSeats()).thenReturn(50);
+        when(roomRepository.count()).thenReturn(veryLargeValue);
+        when(roomRepository.countOccupiedRooms()).thenReturn(1000);
+        when(roomRepository.countBrokenRooms()).thenReturn(50);
         when(userRepository.count()).thenReturn(veryLargeValue);
 
         // Act
@@ -337,14 +337,14 @@ class DashboardServiceTest_getDashboardSummary {
         // Assert
         assertNotNull(result);
         // Note: These will overflow due to long to int casting
-        assertEquals((int) veryLargeValue, result.getTotalSeats());
-        assertEquals(1000, result.getOccupiedSeats());
-        assertEquals(50, result.getBrokenSeats());
+        assertEquals((int) veryLargeValue, result.getTotalRooms());
+        assertEquals(1000, result.getOccupiedRooms());
+        assertEquals(50, result.getBrokenRooms());
         assertEquals((int) veryLargeValue, result.getTotalUsers());
 
-        verify(seatRepository, times(1)).count();
-        verify(seatRepository, times(1)).countOccupiedSeats();
-        verify(seatRepository, times(1)).countBrokenSeats();
+        verify(roomRepository, times(1)).count();
+        verify(roomRepository, times(1)).countOccupiedRooms();
+        verify(roomRepository, times(1)).countBrokenRooms();
         verify(userRepository, times(1)).count();
     }
 
@@ -354,9 +354,9 @@ class DashboardServiceTest_getDashboardSummary {
     @Test
     void testGetDashboardSummary_Success_ConcurrentRepositoryCalls() {
         // Arrange
-        when(seatRepository.count()).thenReturn(100L);
-        when(seatRepository.countOccupiedSeats()).thenReturn(25);
-        when(seatRepository.countBrokenSeats()).thenReturn(5);
+        when(roomRepository.count()).thenReturn(100L);
+        when(roomRepository.countOccupiedRooms()).thenReturn(25);
+        when(roomRepository.countBrokenRooms()).thenReturn(5);
         when(userRepository.count()).thenReturn(50L);
 
         // Act
@@ -366,15 +366,15 @@ class DashboardServiceTest_getDashboardSummary {
         // Assert
         assertNotNull(result1);
         assertNotNull(result2);
-        assertEquals(result1.getTotalSeats(), result2.getTotalSeats());
-        assertEquals(result1.getOccupiedSeats(), result2.getOccupiedSeats());
-        assertEquals(result1.getBrokenSeats(), result2.getBrokenSeats());
+        assertEquals(result1.getTotalRooms(), result2.getTotalRooms());
+        assertEquals(result1.getOccupiedRooms(), result2.getOccupiedRooms());
+        assertEquals(result1.getBrokenRooms(), result2.getBrokenRooms());
         assertEquals(result1.getTotalUsers(), result2.getTotalUsers());
 
         // Verify repository methods were called twice
-        verify(seatRepository, times(2)).count();
-        verify(seatRepository, times(2)).countOccupiedSeats();
-        verify(seatRepository, times(2)).countBrokenSeats();
+        verify(roomRepository, times(2)).count();
+        verify(roomRepository, times(2)).countOccupiedRooms();
+        verify(roomRepository, times(2)).countBrokenRooms();
         verify(userRepository, times(2)).count();
     }
 }

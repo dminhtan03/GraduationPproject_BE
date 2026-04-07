@@ -1,5 +1,23 @@
 package com.finalProject.BookingMeetingRoom.service.reservation;
 
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.mapper.ReservationMapper;
+import com.finalProject.BookingMeetingRoom.mapper.ReservationMapperFacade;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.model.entity.UserInfo;
+import com.finalProject.BookingMeetingRoom.model.request.RoomStatusUpdateRequest;
+import com.finalProject.BookingMeetingRoom.repository.ReservationHistoryRepository;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.RealTimeService;
+import com.finalProject.BookingMeetingRoom.service.ReservationHistoryService;
+import com.finalProject.BookingMeetingRoom.service.impl.ReservationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,8 +30,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -30,7 +47,7 @@ class ReservationServicelTest_checkIn {
     private ReservationMapper reservationMapper;
 
     @Mock
-    private SeatRepository seatRepository;
+    private RoomRepository roomRepository;
 
     @Mock
     private ReservationMapperFacade reservationMapperFacade;
@@ -39,7 +56,7 @@ class ReservationServicelTest_checkIn {
     private ReservationHistoryRepository reservationHistoryRepository;
 
     @Mock
-    private SeatStatusUpdateService seatStatusUpdateService;
+    private RoomStatusUpdateService roomStatusUpdateService;
 
     @Mock
     private ReservationHistoryService reservationHistoryService;
@@ -55,7 +72,7 @@ class ReservationServicelTest_checkIn {
 
     private String reservationId;
     private Reservation reservation;
-    private Seat seat;
+    private Room room;
     private User user;
     private UserInfo userInfo;
     private LocalDateTime currentTime;
@@ -82,15 +99,15 @@ class ReservationServicelTest_checkIn {
         user.setEnabled(true);
         user.setLocked(false);
 
-        seat = new Seat();
-        seat.setId("a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d");
-        seat.setStatus(SeatStatus.AVAILABLE);
+        room = new Room();
+        room.setId("a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d");
+        room.setStatus(RoomStatus.AVAILABLE);
 
         reservation = new Reservation();
         reservation.setId(reservationId);
         reservation.setStatus(ReservationStatus.RESERVED);
         reservation.setStartTime(startTime);
-        reservation.setSeat(seat);
+        reservation.setRoom(room);
         reservation.setUser(user);
     }
 
@@ -103,7 +120,7 @@ class ReservationServicelTest_checkIn {
         when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
         when(userRepository.findByEmail(userInfo.getEmail())).thenReturn(Optional.of(user));
 
-        when(seatRepository.findById(seat.getId())).thenReturn(Optional.of(seat));
+        when(roomRepository.findById(room.getId())).thenReturn(Optional.of(room));
 
         // Also try alternative repository method names that might be used
         when(userRepository.findByEmail(userInfo.getEmail())).thenReturn(Optional.of(user));
@@ -124,13 +141,13 @@ class ReservationServicelTest_checkIn {
         assertEquals(ReservationStatus.IN_USE, reservation.getStatus());
         assertNotNull(reservation.getCheckinTime());
         assertNotNull(reservation.getUpdatedAt());
-        assertEquals(SeatStatus.UNAVAILABLE, seat.getStatus());
+        assertEquals(RoomStatus.UNAVAILABLE, room.getStatus());
 
         verify(reservationHistoryService).saveHistory(eq(reservation), eq(user.getId()),
                 eq(ReservationStatus.RESERVED), isNull(), reservation.getUpdatedAt());
         verify(reservationRepository).save(reservation);
-        verify(seatRepository).save(seat);
-        verify(seatStatusUpdateService).sendRealTimeSeatStatusUpdate(any(SeatStatusUpdateRequest.class));
+        verify(roomRepository).save(room);
+        verify(roomStatusUpdateService).sendRealTimeRoomStatusUpdate(any(RoomStatusUpdateRequest.class));
         verify(authentication).getName(); // Verify authentication was used
     }
 
@@ -162,22 +179,22 @@ class ReservationServicelTest_checkIn {
 
         assertEquals(ResponseCode.RESERVATION_NOT_RESERVED, exception.getResponseCode());
         verify(reservationRepository, never()).save(any());
-        verify(seatRepository, never()).save(any());
+        verify(roomRepository, never()).save(any());
     }
 
     @Test
-    void checkIn_SeatNotAvailable_ShouldThrowException() {
+    void checkIn_RoomNotAvailable_ShouldThrowException() {
         // Given
-        seat.setStatus(SeatStatus.UNAVAILABLE);
+        room.setStatus(RoomStatus.UNAVAILABLE);
         mockValidateReservationContext();
 
         // When & Then
         CustomException exception = assertThrows(CustomException.class,
                 () -> reservationService.checkIn(reservationId, authentication));
 
-        assertEquals(ResponseCode.SEAT_NOT_AVAILABLE, exception.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_AVAILABLE, exception.getResponseCode());
         verify(reservationRepository, never()).save(any());
-        verify(seatRepository, never()).save(any());
+        verify(roomRepository, never()).save(any());
     }
 
     @Test
@@ -192,7 +209,7 @@ class ReservationServicelTest_checkIn {
 
         assertEquals(ResponseCode.RESERVATION_NOT_TIME_CHECK_IN, exception.getResponseCode());
         verify(reservationRepository, never()).save(any());
-        verify(seatRepository, never()).save(any());
+        verify(roomRepository, never()).save(any());
     }
 
     @Test
@@ -207,7 +224,7 @@ class ReservationServicelTest_checkIn {
         // Then
         assertEquals(ReservationStatus.IN_USE, reservation.getStatus());
         verify(reservationRepository).save(reservation);
-        verify(seatRepository).save(seat);
+        verify(roomRepository).save(room);
     }
 
     @Test
@@ -221,7 +238,7 @@ class ReservationServicelTest_checkIn {
 
         // Reservation vẫn gán với `user` ở @BeforeEach
         when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
-        when(seatRepository.findById(seat.getId())).thenReturn(Optional.of(seat));
+        when(roomRepository.findById(room.getId())).thenReturn(Optional.of(room));
 
         // When & Then
         CustomException exception = assertThrows(CustomException.class,
@@ -231,8 +248,8 @@ class ReservationServicelTest_checkIn {
 
         // Ensure không gọi save hay update gì cả
         verify(reservationRepository, never()).save(any());
-        verify(seatRepository, never()).save(any());
-        verify(seatStatusUpdateService, never()).sendRealTimeSeatStatusUpdate(any());
+        verify(roomRepository, never()).save(any());
+        verify(roomStatusUpdateService, never()).sendRealTimeRoomStatusUpdate(any());
     }
 
 
@@ -255,7 +272,7 @@ class ReservationServicelTest_checkIn {
 
 
     @Test
-    void checkIn_ShouldSendCorrectSeatStatusUpdate() {
+    void checkIn_ShouldSendCorrectRoomStatusUpdate() {
         // Given
         reservation.setStartTime(currentTime.minusMinutes(1));
         mockValidateReservationContext();
@@ -264,112 +281,112 @@ class ReservationServicelTest_checkIn {
         reservationService.checkIn(reservationId, authentication);
 
         // Then
-        verify(seatStatusUpdateService).sendRealTimeSeatStatusUpdate(
+        verify(roomStatusUpdateService).sendRealTimeRoomStatusUpdate(
                 argThat(request ->
-                        request.getSeatId().equals(seat.getId()) &&
-                                request.getNewStatus().equals(SeatStatus.UNAVAILABLE)
+                        request.getRoomId().equals(room.getId()) &&
+                                request.getNewStatus().equals(RoomStatus.UNAVAILABLE)
                 )
         );
     }
 
-    // RETURN SEAT TESTS
+    // RETURN ROOM TESTS
     @Test
-    void returnSeat_ValidReservation_ShouldSucceed() {
+    void returnRoom_ValidReservation_ShouldSucceed() {
         // Given
         reservation.setStatus(ReservationStatus.IN_USE);
-        seat.setStatus(SeatStatus.UNAVAILABLE);
+        room.setStatus(RoomStatus.UNAVAILABLE);
         mockValidateReservationContext();
 
         // When
-        reservationService.returnSeat(reservationId, authentication);
+        reservationService.returnRoom(reservationId, authentication);
 
         // Then
         assertEquals(ReservationStatus.COMPLETED, reservation.getStatus());
         assertNotNull(reservation.getReturnTime());
         assertNotNull(reservation.getUpdatedAt());
-        assertEquals(SeatStatus.AVAILABLE, seat.getStatus());
+        assertEquals(RoomStatus.AVAILABLE, room.getStatus());
 
         verify(reservationRepository).save(reservation);
-        verify(seatRepository).save(seat);
-        verify(seatStatusUpdateService).sendRealTimeSeatStatusUpdate(any(SeatStatusUpdateRequest.class));
+        verify(roomRepository).save(room);
+        verify(roomStatusUpdateService).sendRealTimeRoomStatusUpdate(any(RoomStatusUpdateRequest.class));
     }
 
     @Test
-    void returnSeat_ReservationNotInUse_ShouldThrowException() {
+    void returnRoom_ReservationNotInUse_ShouldThrowException() {
         // Given
         reservation.setStatus(ReservationStatus.RESERVED);
-        seat.setStatus(SeatStatus.UNAVAILABLE);
+        room.setStatus(RoomStatus.UNAVAILABLE);
         mockValidateReservationContext();
 
         // When & Then
         CustomException exception = assertThrows(CustomException.class,
-                () -> reservationService.returnSeat(reservationId, authentication));
+                () -> reservationService.returnRoom(reservationId, authentication));
 
         assertEquals(ResponseCode.RESERVATION_NOT_IN_USE, exception.getResponseCode());
         verify(reservationRepository, never()).save(any());
-        verify(seatRepository, never()).save(any());
+        verify(roomRepository, never()).save(any());
     }
 
     @Test
-    void returnSeat_SeatNotUnavailable_ShouldThrowException() {
+    void returnRoom_RoomNotUnavailable_ShouldThrowException() {
         // Given
         reservation.setStatus(ReservationStatus.IN_USE);
-        seat.setStatus(SeatStatus.AVAILABLE);
+        room.setStatus(RoomStatus.AVAILABLE);
         mockValidateReservationContext();
 
         // When & Then
         CustomException exception = assertThrows(CustomException.class,
-                () -> reservationService.returnSeat(reservationId, authentication));
+                () -> reservationService.returnRoom(reservationId, authentication));
 
-        assertEquals(ResponseCode.SEAT_NOT_UNAVAILABLE, exception.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_UNAVAILABLE, exception.getResponseCode());
         verify(reservationRepository, never()).save(any());
-        verify(seatRepository, never()).save(any());
+        verify(roomRepository, never()).save(any());
     }
 
     @Test
-    void returnSeat_UnexpectedException_ShouldThrowInternalServerError() {
+    void returnRoom_UnexpectedException_ShouldThrowInternalServerError() {
         // Given
         reservation.setStatus(ReservationStatus.IN_USE);
-        seat.setStatus(SeatStatus.UNAVAILABLE);
+        room.setStatus(RoomStatus.UNAVAILABLE);
         mockValidateReservationContext();
         doThrow(new RuntimeException("Database error")).when(reservationRepository).save(any());
 
         // When & Then
         CustomException exception = assertThrows(CustomException.class,
-                () -> reservationService.returnSeat(reservationId, authentication));
+                () -> reservationService.returnRoom(reservationId, authentication));
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
     }
 
     @Test
-    void returnSeat_ShouldSendCorrectSeatStatusUpdate() {
+    void returnRoom_ShouldSendCorrectRoomStatusUpdate() {
         // Given
         reservation.setStatus(ReservationStatus.IN_USE);
-        seat.setStatus(SeatStatus.UNAVAILABLE);
+        room.setStatus(RoomStatus.UNAVAILABLE);
         mockValidateReservationContext();
 
         // When
-        reservationService.returnSeat(reservationId, authentication);
+        reservationService.returnRoom(reservationId, authentication);
 
         // Then
-        verify(seatStatusUpdateService).sendRealTimeSeatStatusUpdate(
+        verify(roomStatusUpdateService).sendRealTimeRoomStatusUpdate(
                 argThat(request ->
-                        request.getSeatId().equals(seat.getId()) &&
-                                request.getNewStatus().equals(SeatStatus.AVAILABLE)
+                        request.getRoomId().equals(room.getId()) &&
+                                request.getNewStatus().equals(RoomStatus.AVAILABLE)
                 )
         );
     }
 
     @Test
-    void returnSeat_ShouldUpdateTimestamps() {
+    void returnRoom_ShouldUpdateTimestamps() {
         // Given
         reservation.setStatus(ReservationStatus.IN_USE);
-        seat.setStatus(SeatStatus.UNAVAILABLE);
+        room.setStatus(RoomStatus.UNAVAILABLE);
         mockValidateReservationContext();
         LocalDateTime beforeReturn = LocalDateTime.now().minusSeconds(1);
 
         // When
-        reservationService.returnSeat(reservationId, authentication);
+        reservationService.returnRoom(reservationId, authentication);
 
         // Then
         assertTrue(reservation.getReturnTime().isAfter(beforeReturn));
@@ -413,7 +430,7 @@ class ReservationServicelTest_checkIn {
 
 
     @Test
-    void returnSeat_CustomExceptionFromValidation_ShouldRethrow() {
+    void returnRoom_CustomExceptionFromValidation_ShouldRethrow() {
         // Given
         CustomException validationException = new CustomException(ResponseCode.RESERVATION_NOT_FOUND);
 
@@ -427,7 +444,7 @@ class ReservationServicelTest_checkIn {
 
         // When & Then
         CustomException exception = assertThrows(CustomException.class,
-                () -> reservationService.returnSeat(reservationId, authentication));
+                () -> reservationService.returnRoom(reservationId, authentication));
 
         assertEquals(ResponseCode.RESERVATION_NOT_FOUND, exception.getResponseCode());
     }

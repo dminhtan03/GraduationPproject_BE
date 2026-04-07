@@ -17,7 +17,7 @@ class RoomStatusUpdateServiceTest {
     private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
-    private SeatStatusUpdateServiceImpl seatStatusUpdateService;
+    private RoomStatusUpdateServiceImpl roomStatusUpdateService;
 
     @BeforeEach
     void setUp() {
@@ -25,27 +25,27 @@ class RoomStatusUpdateServiceTest {
     }
 
     @Test
-    void sendRealTimeSeatStatusUpdate_shouldSendMessageToTopic() {
+    void sendRealTimeRoomStatusUpdate_shouldSendMessageToTopic() {
         // Arrange
-        SeatStatusUpdateRequest request = SeatStatusUpdateRequest.builder()
-                .seatId("seat001")
-                .newStatus(SeatStatus.AVAILABLE)
+        RoomStatusUpdateRequest request = RoomStatusUpdateRequest.builder()
+                .roomId("room001")
+                .newStatus(RoomStatus.AVAILABLE)
                 .build();
 
         // Act
-        assertDoesNotThrow(() -> seatStatusUpdateService.sendRealTimeSeatStatusUpdate(request));
+        assertDoesNotThrow(() -> roomStatusUpdateService.sendRealTimeRoomStatusUpdate(request));
 
         // Assert
         verify(messagingTemplate, times(1))
-                .convertAndSend("/topic/seats", request);
+                .convertAndSend("/topic/rooms", request);
     }
 
     @Test
-    void sendRealTimeSeatStatusUpdate_shouldThrowCustomExceptionOnError() {
+    void sendRealTimeRoomStatusUpdate_shouldThrowCustomExceptionOnError() {
         // Arrange
-        SeatStatusUpdateRequest request = SeatStatusUpdateRequest.builder()
-                .seatId("seat001")
-                .newStatus(SeatStatus.AVAILABLE)
+        RoomStatusUpdateRequest request = RoomStatusUpdateRequest.builder()
+                .roomId("room001")
+                .newStatus(RoomStatus.AVAILABLE)
                 .build();
 
         doThrow(new RuntimeException("Messaging error"))
@@ -53,7 +53,7 @@ class RoomStatusUpdateServiceTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () ->
-                seatStatusUpdateService.sendRealTimeSeatStatusUpdate(request));
+                roomStatusUpdateService.sendRealTimeRoomStatusUpdate(request));
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
     }

@@ -45,11 +45,11 @@ class DashboardServiceTest_getDashboardOverview {
             @Override
             public int getOccupied() { return 25; }
             @Override
-            public int getTotalSeats() { return 100; }
+            public int getTotalRooms() { return 100; }
             @Override
-            public int getBrokenSeats() { return 5; }
+            public int getBrokenRooms() { return 5; }
             @Override
-            public int getAvailableSeats() { return 70; }
+            public int getAvailableRooms() { return 70; }
             @Override
             public int getOccupancyRate() { return 25; }
         };
@@ -70,19 +70,19 @@ class DashboardServiceTest_getDashboardOverview {
 
     // Helper method để tạo BuildingOccupancyProjection
     private BuildingOccupancyProjection createBuildingOccupancyProjection(String buildingName, int occupied,
-                                                                          int totalSeats, int brokenSeats,
-                                                                          int availableSeats, int occupancyRate) {
+                                                                          int totalRooms, int brokenRooms,
+                                                                          int availableRooms, int occupancyRate) {
         return new BuildingOccupancyProjection() {
             @Override
             public String getBuildingName() { return buildingName; }
             @Override
             public int getOccupied() { return occupied; }
             @Override
-            public int getTotalSeats() { return totalSeats; }
+            public int getTotalRooms() { return totalRooms; }
             @Override
-            public int getBrokenSeats() { return brokenSeats; }
+            public int getBrokenRooms() { return brokenRooms; }
             @Override
-            public int getAvailableSeats() { return availableSeats; }
+            public int getAvailableRooms() { return availableRooms; }
             @Override
             public int getOccupancyRate() { return occupancyRate; }
         };
@@ -131,9 +131,9 @@ class DashboardServiceTest_getDashboardOverview {
         BuildingOccupancyDto occupancyDto = result.getBuildingOccupancyDto().get(0);
         assertEquals("Building A", occupancyDto.getBuildingName());
         assertEquals(25, occupancyDto.getOccupied());
-        assertEquals(100, occupancyDto.getTotalSeats());
-        assertEquals(5, occupancyDto.getBrokenSeats());
-        assertEquals(70, occupancyDto.getAvailableSeats());
+        assertEquals(100, occupancyDto.getTotalRooms());
+        assertEquals(5, occupancyDto.getBrokenRooms());
+        assertEquals(70, occupancyDto.getAvailableRooms());
         assertEquals(25, occupancyDto.getOccupancyRate());
 
         // Verify recent activity
@@ -255,9 +255,9 @@ class DashboardServiceTest_getDashboardOverview {
 
         BuildingOccupancyDto occupancyDto = result.getBuildingOccupancyDto().get(0);
         assertEquals(0, occupancyDto.getOccupied());
-        assertEquals(0, occupancyDto.getTotalSeats());
-        assertEquals(0, occupancyDto.getBrokenSeats());
-        assertEquals(0, occupancyDto.getAvailableSeats());
+        assertEquals(0, occupancyDto.getTotalRooms());
+        assertEquals(0, occupancyDto.getBrokenRooms());
+        assertEquals(0, occupancyDto.getAvailableRooms());
         assertEquals(0, occupancyDto.getOccupancyRate());
     }
 
@@ -375,11 +375,11 @@ class DashboardServiceTest_getDashboardOverview {
                     @Override
                     public int getOccupied() { return 0; }
                     @Override
-                    public int getTotalSeats() { return 0; }
+                    public int getTotalRooms() { return 0; }
                     @Override
-                    public int getBrokenSeats() { return 0; }
+                    public int getBrokenRooms() { return 0; }
                     @Override
-                    public int getAvailableSeats() { return 0; }
+                    public int getAvailableRooms() { return 0; }
                     @Override
                     public int getOccupancyRate() { return 0; }
                 }
@@ -403,9 +403,9 @@ class DashboardServiceTest_getDashboardOverview {
         BuildingOccupancyDto occupancyDto = result.getBuildingOccupancyDto().get(0);
         assertNull(occupancyDto.getBuildingName());
         assertEquals(0, occupancyDto.getOccupied());
-        assertEquals(0, occupancyDto.getTotalSeats());
-        assertEquals(0, occupancyDto.getBrokenSeats());
-        assertEquals(0, occupancyDto.getAvailableSeats());
+        assertEquals(0, occupancyDto.getTotalRooms());
+        assertEquals(0, occupancyDto.getBrokenRooms());
+        assertEquals(0, occupancyDto.getAvailableRooms());
         assertEquals(0, occupancyDto.getOccupancyRate());
 
         RecentActivityDto activityDto = result.getRecentActivityDto().get(0);
@@ -487,9 +487,9 @@ class DashboardServiceTest_getDashboardOverview {
 
         BuildingOccupancyDto occupancyDto = result.getBuildingOccupancyDto().get(0);
         assertEquals(Integer.MAX_VALUE, occupancyDto.getOccupied());
-        assertEquals(Integer.MAX_VALUE, occupancyDto.getTotalSeats());
-        assertEquals(Integer.MAX_VALUE, occupancyDto.getBrokenSeats());
-        assertEquals(Integer.MAX_VALUE, occupancyDto.getAvailableSeats());
+        assertEquals(Integer.MAX_VALUE, occupancyDto.getTotalRooms());
+        assertEquals(Integer.MAX_VALUE, occupancyDto.getBrokenRooms());
+        assertEquals(Integer.MAX_VALUE, occupancyDto.getAvailableRooms());
         assertEquals(Integer.MAX_VALUE, occupancyDto.getOccupancyRate());
     }
 
