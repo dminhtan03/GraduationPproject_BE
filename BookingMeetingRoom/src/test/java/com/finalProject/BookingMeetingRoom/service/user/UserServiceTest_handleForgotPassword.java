@@ -1,5 +1,17 @@
 package com.finalProject.BookingMeetingRoom.service.user;
 
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.model.entity.UserInfo;
+import com.finalProject.BookingMeetingRoom.model.entity.UserOtp;
+import com.finalProject.BookingMeetingRoom.model.request.ForgotPasswordRequest;
+import com.finalProject.BookingMeetingRoom.model.request.ResendOtpRequest;
+import com.finalProject.BookingMeetingRoom.repository.UserOtpRepository;
+import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.EmailService;
+import com.finalProject.BookingMeetingRoom.service.RedisService;
+import com.finalProject.BookingMeetingRoom.service.impl.UserServiceImpl;
 import jakarta.mail.MessagingException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;

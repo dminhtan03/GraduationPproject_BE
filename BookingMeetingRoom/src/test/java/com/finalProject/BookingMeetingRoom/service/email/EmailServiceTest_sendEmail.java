@@ -1,5 +1,7 @@
 package com.finalProject.BookingMeetingRoom.service.email;
 
+import com.finalProject.BookingMeetingRoom.common.enums.EmailTemplateName;
+import com.finalProject.BookingMeetingRoom.service.EmailService;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
@@ -21,7 +23,7 @@ import static org.mockito.Mockito.*;
 public class EmailServiceTest_sendEmail {
 
     @InjectMocks
-    private EmailServiceImpl emailService;
+    private EmailService emailService;
 
     @Mock
     private JavaMailSender javaMailSender;
