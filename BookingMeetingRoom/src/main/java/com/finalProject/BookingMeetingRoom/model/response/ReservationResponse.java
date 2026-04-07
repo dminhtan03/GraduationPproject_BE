@@ -34,6 +34,10 @@ public class ReservationResponse {
 
     private LocalDateTime updatedAt;
 
+    private String reason;
+
+    private  String cancelBy;
+
     private RoomDto room;
 
     private FloorDto floor;
