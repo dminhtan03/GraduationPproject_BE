@@ -62,6 +62,13 @@ application:
   file:
     uploads:
       photos-output-path: ./uploads
+  ai:
+    llm:
+      enabled: true/false
+      base-url: https://api.openai.com/v1
+      model: gpt-4o-mini
+      api-key: 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
+      timeout-ms: 10000
 springdoc:
   api-docs:
     path: /v3/api-docs

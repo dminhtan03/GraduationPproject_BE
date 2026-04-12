@@ -21,6 +21,7 @@ import com.finalProject.BookingMeetingRoom.repository.RoomImageRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.ChatHistoryService;
+import com.finalProject.BookingMeetingRoom.service.ChatbotLlmService;
 import com.finalProject.BookingMeetingRoom.service.ChatbotService;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,7 @@ public class ChatbotServiceImpl implements ChatbotService {
     private final ChatbotRoomSuggestionEngine suggestionEngine;
     private final UserRepository userRepository;
     private final ChatHistoryService chatHistoryService;
+    private final ChatbotLlmService chatbotLlmService;
 
     private final ChatbotMessageParser parser = new ChatbotMessageParser();
 
@@ -80,7 +82,9 @@ public class ChatbotServiceImpl implements ChatbotService {
             }
 
             ChatbotMessageParser.ParseResult parsed = parser.parse(message);
-            ChatbotMessageParser.ParseResult effectiveParsed = mergeWithContext(parsed, recentUserMessages);
+            ChatbotMessageParser.ParseResult llmParsed = chatbotLlmService.parse(message, recentUserMessages).orElse(null);
+            ChatbotMessageParser.ParseResult mergedCurrent = mergeRuleWithLlm(parsed, llmParsed);
+            ChatbotMessageParser.ParseResult effectiveParsed = mergeWithContext(mergedCurrent, recentUserMessages);
 
             ChatbotMessageResponse response = switch (effectiveParsed.intent()) {
                 case CHECK_AVAILABLE_ROOMS_TODAY -> handleAvailableRoomsToday(message, effectiveParsed);
@@ -100,6 +104,36 @@ public class ChatbotServiceImpl implements ChatbotService {
             log.error("Unexpected chatbot error", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private ChatbotMessageParser.ParseResult mergeRuleWithLlm(
+            ChatbotMessageParser.ParseResult ruleParsed,
+            ChatbotMessageParser.ParseResult llmParsed
+    ) {
+        if (ruleParsed == null) return llmParsed;
+        if (llmParsed == null) return ruleParsed;
+
+        ChatbotIntent intent = ruleParsed.intent();
+        if (intent == ChatbotIntent.FALLBACK && llmParsed.intent() != null && llmParsed.intent() != ChatbotIntent.FALLBACK) {
+            intent = llmParsed.intent();
+        }
+
+        String roomCode = ruleParsed.roomCode() != null ? ruleParsed.roomCode() : llmParsed.roomCode();
+        LocalDate date = ruleParsed.date() != null ? ruleParsed.date() : llmParsed.date();
+        LocalTime startTime = ruleParsed.startTime() != null ? ruleParsed.startTime() : llmParsed.startTime();
+        LocalTime endTime = ruleParsed.endTime() != null ? ruleParsed.endTime() : llmParsed.endTime();
+        Integer minCapacity = ruleParsed.minCapacity() != null ? ruleParsed.minCapacity() : llmParsed.minCapacity();
+
+        return new ChatbotMessageParser.ParseResult(
+                intent,
+                ruleParsed.normalizedMessage(),
+                roomCode,
+                date,
+                startTime,
+                endTime,
+                ruleParsed.endTimeDefaulted(),
+                minCapacity
+        );
     }
 
     private ChatbotMessageParser.ParseResult mergeWithContext(ChatbotMessageParser.ParseResult current, List<String> recentUserMessages) {

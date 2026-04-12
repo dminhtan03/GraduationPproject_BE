@@ -1,33 +1,61 @@
-# BookingMeetingRoom — AI/Chatbot
+# BookingMeetingRoom - AI/Chatbot
 
-Tài liệu này mô tả **toàn bộ API liên quan AI/Chatbot**, kèm **request mẫu + response mẫu**, và **luồng đi chi tiết** theo đúng code hiện tại.
+Tai lieu nay tong hop day du:
 
-## 1) Tổng quan
+- Tat ca nhung thay doi da duoc thuc hien cho luong AI/Chatbot.
+- Luong xu ly AI theo tung man (stage) va endpoint.
+- Danh sach API kem curl chi tiet de test nhanh.
 
-Hệ thống có 2 nhóm endpoint liên quan “AI”:
+## 1) Tong ket nhung gi da duoc lam
 
-1. **Chatbot (rule-based / parsing + business services)**
-   - Endpoint: `/api/v1/chatbot/*`
-   - Mục tiêu: xử lý hội thoại theo pattern, có khả năng **hỏi lại khi thiếu thông tin**, **gợi ý theo sức chứa**, **tự chọn phòng để đặt theo sức chứa**, và **nhớ ngữ cảnh theo session**.
+### 1.1 Muc tieu da trien khai
 
-2. **AI Chat (heuristic + gọi service có sẵn)**
-   - Endpoint: `/api/v1/ai/*`
-   - Mục tiêu: chat/tư vấn/gợi ý/đặt phòng dựa trên request structure của FE.
+- Giu nguyen API va business rule-base hien co.
+- Them lop NLP dung GPT de hieu ngon ngu tu nhien tot hon.
+- Neu GPT khong cau hinh/loi/timeout, he thong tu fallback ve rule-base, khong vo luong dat phong.
 
-Cả 2 nhóm đều hỗ trợ:
+### 1.2 Cac thay doi ky thuat da lam
 
-- **`sessionId`**: FE gửi lên để group tin nhắn theo 1 phiên chat.
-- **Lưu DB**: mỗi request sẽ log **2 bản ghi** vào `tbl_chat_history` (`USER` và `BOT`).
+- Them interface ChatbotLlmService de truu tuong hoa viec parse intent + slot bang LLM.
+- Them OpenAiChatbotLlmService:
+  - Goi OpenAI Chat Completions endpoint /chat/completions.
+  - Yeu cau LLM tra JSON co cau truc: intent, roomCode, date, startTime, endTime, minCapacity.
+  - Parse JSON tra ve, map sang ParseResult.
+  - Bat loi de fail-safe (khong lam sap service).
+- Noi vao ChatbotServiceImpl:
+  - Parse rule-base nhu cu.
+  - Parse bang GPT (neu enabled va co api-key).
+  - Merge rule + GPT theo uu tien an toan:
+    - Rule co du lieu thi giu rule.
+    - Chi bo sung du lieu thieu tu GPT.
+    - Intent chi nhan GPT khi rule dang FALLBACK.
+  - Sau do tiep tuc merge context va chay business flow dat phong cu.
+- Da compile xac nhan build thanh cong.
 
-## 2) Chuẩn response chung
+### 1.3 Ket qua dat duoc
 
-Tất cả endpoint trả về wrapper `Response<T>`:
+- Tang kha nang hieu cau noi tu nhien va da ngon ngu.
+- Giam su phu thuoc vao regex/rule o lop hieu ngon ngu.
+- Khong thay doi hop dong API FE dang dung.
+
+## 2) Tong quan kien truc AI hien tai
+
+He thong co 2 nhom endpoint:
+
+1. Chatbot API: /api/v1/chatbot/\*
+2. AI API cu: /api/v1/ai/\*
+
+Trong do:
+
+- /api/v1/chatbot/message la luong hybrid moi: Rule-based + GPT NLP (optional).
+- /api/v1/chatbot/voice la luong voice theo transcript hoac audio.
+- /api/v1/ai/chat va /api/v1/ai/reserve la luong heuristic cu (van giu nguyen).
+
+Tat ca response deu duoc wrap theo dang:
 
 ```json
 {
-  "data": {
-    "...": "..."
-  },
+  "data": {},
   "meta": {
     "code": "200",
     "message": null
@@ -35,587 +63,258 @@ Tất cả endpoint trả về wrapper `Response<T>`:
 }
 ```
 
-Khi lỗi nghiệp vụ (throw `CustomException(ResponseCode.XYZ)`), GlobalExceptionHandler trả:
+## 3) Luong AI di qua nhung man nao
 
-```json
-{
-  "data": null,
-  "meta": {
-    "code": "ROOM_410",
-    "message": "Someone has already booked a room during your chosen time slot."
-  }
-}
+## 3.1 Luong chinh: POST /api/v1/chatbot/message
+
+Man 1 - Nhan request
+
+- Controller nhan message + sessionId.
+- Neu sessionId rong -> tao moi.
+
+Man 2 - Nho ngu canh
+
+- Lay toi da 5 message USER gan nhat theo sessionId.
+- Chua xu ly ngay, chi dung lam context.
+
+Man 3 - Log USER
+
+- Luu 1 dong chat history voi sender = USER.
+
+Man 4 - NLP layer
+
+- Rule parser parse message hien tai (intent/room/date/time/capacity).
+- GPT parser (optional) parse cung message + context:
+  - Chi chay khi AI_LLM_ENABLED=true va co AI_LLM_API_KEY.
+  - Neu loi/timeout -> bo qua GPT, he thong van chay.
+
+Man 5 - Merge ket qua NLP
+
+- Merge rule + GPT theo uu tien an toan.
+- Merge tiep voi context de fill slot con thieu.
+
+Man 6 - Router theo intent
+
+- CHECK_AVAILABLE_ROOMS_TODAY -> tim phong trong.
+- SUGGEST_ROOMS_BY_CAPACITY -> goi y phong theo suc chua.
+- BOOK_ROOM -> dat theo roomCode hoac auto-pick theo capacity.
+- FALLBACK -> tra loi huong dan.
+
+Man 7 - Log BOT + Tra response
+
+- Gan sessionId vao response.
+- Log BOT reply vao chat history.
+- Tra ve cho FE.
+
+## 3.2 Luong voice: POST /api/v1/chatbot/voice
+
+Man 1 - Nhan multipart form-data: audio/transcript/sessionId/language.
+
+Man 2 - Xac dinh text dau vao:
+
+- Neu co transcript -> dung transcript.
+- Neu khong co transcript ma co audio -> goi SpeechToTextService.transcribe(...).
+
+Man 3 - Chuyen thanh ChatbotMessageRequest va tai su dung toan bo luong /chatbot/message.
+
+Luu y:
+
+- Neu backend STT chua cau hinh (NoOpSpeechToTextService), can gui transcript truc tiep.
+
+## 3.3 Luong cu: POST /api/v1/ai/chat
+
+Man 1 - Nhap message + optional start/end/capacity.
+
+Man 2 - Heuristic detect keyword booking/suggest/default.
+
+Man 3 - Neu booking:
+
+- Validate du start/end/capacity.
+- Tim candidate room theo capacity.
+- Kiem tra available theo khung gio.
+- Neu co phong hop le -> tao reservation.
+
+Man 4 - Neu suggest:
+
+- Validate start/end.
+- Tim danh sach phong available theo khung gio va capacity.
+
+Man 5 - Log USER/BOT, tra AiChatResponse.
+
+## 3.4 Luong cu: POST /api/v1/ai/reserve
+
+Man 1 - FE gui ReservationRequest day du.
+
+Man 2 - Goi truc tiep ReservationService.reserveRoom(...).
+
+Man 3 - Tra AiChatResponse (co reservationCreated=true neu thanh cong).
+
+## 4) Chi tiet endpoint + curl
+
+Gia su BE chay local tai http://localhost:8080.
+
+### 4.1 Chatbot text
+
+Endpoint:
+
+- POST /api/v1/chatbot/message
+
+Muc dich:
+
+- Chat hoi dap phong hop.
+- Kiem tra phong trong.
+- Dat phong theo roomCode hoac auto-book theo capacity.
+
+Curl (chua login):
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Today available rooms?",
+    "sessionId": null
+  }'
 ```
 
-## 3) Session + lưu lịch sử + nhớ ngữ cảnh
+Curl (can login khi booking):
 
-### 3.1 Bảng `tbl_chat_history`
-
-Entity: `Chat_history` (table `tbl_chat_history`). Các trường chính:
-
-- `user_id` (nullable)
-- `chatbot_id` (NOT NULL)
-- `session_id` (NOT NULL)
-- `sender` (`USER`/`BOT`)
-- `message` (TEXT)
-- `created_at`
-
-### 3.2 `sessionId` dùng thế nào
-
-- Lần chat đầu: FE không cần gửi `sessionId` → BE auto-generate và trả trong `data.sessionId`.
-- Các lần tiếp theo: FE gửi lại `sessionId` để cuộc hội thoại được group đúng.
-
-### 3.3 Nhớ ngữ cảnh (context recall)
-
-Trong `/api/v1/chatbot/message`, BE có cơ chế **nhớ ngữ cảnh nhẹ**:
-
-- Trước khi xử lý message hiện tại, BE đọc tối đa **5 message USER gần nhất** theo `sessionId`.
-- BE parse các message cũ và **fill các slot còn thiếu** cho message hiện tại (ví dụ: capacity, date, start/end time, roomCode, intent).
-
-Ví dụ multi-turn:
-
-1. USER: `Book a room with a capacity of 20 people`
-
-2. USER (cùng `sessionId`): `Tomorrow at 10AM`
-
-→ BE sẽ ghép capacity=20 (tin 1) + time/date (tin 2) để đặt phòng.
-
-## 4) Tóm tắt API (kèm request/response mẫu)
-
-### 4.1 Chatbot — Text
-
-**POST** `/api/v1/chatbot/message`
-
-Body:
-
-```json
-{
-  "message": "<user message>",
-  "sessionId": null
-}
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "message": "Book AL-102 from 14:00 to 15:00 tomorrow",
+    "sessionId": "<SESSION_ID_TU_LAN_TRUOC>"
+  }'
 ```
 
-Response `data` là `ChatbotMessageResponse` (các field thường dùng):
+### 4.2 Chatbot voice
 
-```json
-{
-  "sessionId": "<uuid>",
-  "reply": "...",
-  "intent": "CHECK_AVAILABLE_ROOMS_TODAY | SUGGEST_ROOMS_BY_CAPACITY | BOOK_ROOM | FALLBACK",
-  "availableRooms": [],
-  "alternativeRooms": [],
-  "reservation": null
-}
+Endpoint:
+
+- POST /api/v1/chatbot/voice (multipart/form-data)
+
+Muc dich:
+
+- Voice booking/chat, sau do di chung luong chatbot text.
+
+Curl dung transcript truc tiep (khuyen nghi neu STT backend chua cau hinh):
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/voice" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -F "transcript=Book room V21-024 tomorrow at 6PM to 8PM" \
+  -F "sessionId=<SESSION_ID>" \
+  -F "language=en"
 ```
 
-Các kiểu message đang hỗ trợ (đã cấu hình trong parser/service):
+Curl gui audio:
 
-- Date:
-  - `today`, `hôm nay`, `hom nay`
-  - `tomorrow`, `tomorow` (typo), `tmr`, `ngày mai`, `ngay mai`
-  - ISO date: `yyyy-mm-dd`
-  - Slash/Dash date: `d/M/yyyy` (vd `4/4/2026`, cũng hỗ trợ `-`)
-- Time:
-  - Single: `at 10AM`, `lúc 10h` → mặc định endTime = +1h
-  - Range:
-    - `from 14:00 to 15:00` / `từ 14h đến 15h`
-    - `at 6PM to 8PM` / `lúc 18h đến 20h`
-    - Nếu end time thiếu AM/PM (vd `6PM to 8`) thì end sẽ kế thừa AM/PM từ start
-- Room code:
-  - Format có dấu phân tách `-` hoặc `_`: `AL-102`, `V21-024`, `V5-020`
-- Capacity:
-  - `capacity of 20 people`, `accommodate 20`, `20 or more people`, `20+ people`, `sức chứa 20 người`
-- Intents:
-  - `CHECK_AVAILABLE_ROOMS_TODAY`: hỏi phòng trống hôm nay / từ mốc giờ
-  - `SUGGEST_ROOMS_BY_CAPACITY`: gợi ý phòng theo sức chứa (không tính khung giờ)
-  - `BOOK_ROOM`: đặt theo mã phòng + thời gian; hoặc auto-book theo sức chứa + thời gian
-  - `FALLBACK`: không match pattern
-
-Các request phổ biến + response mẫu:
-
-1. Check phòng trống hôm nay
-
-Request:
-
-```json
-{ "message": "Today available rooms?", "sessionId": null }
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/voice" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -F "audio=@/path/to/voice.wav" \
+  -F "sessionId=<SESSION_ID>" \
+  -F "language=vi"
 ```
 
-Response mẫu:
+### 4.3 AI chat (heuristic cu)
 
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Here are rooms that still have free time today:",
-    "intent": "CHECK_AVAILABLE_ROOMS_TODAY",
-    "availableRooms": [
-      {
-        "roomId": "R1",
-        "roomCode": "AL-102",
-        "building": "Alpha",
-        "floor": "1",
-        "capacity": 8,
-        "amenities": ["TV"],
-        "imageUrl": "...",
-        "availableTimeSlots": ["14:00–15:00", "16:00–17:00"]
-      }
-    ],
-    "alternativeRooms": null,
-    "reservation": null
-  },
-  "meta": { "code": "200" }
-}
+Endpoint:
+
+- POST /api/v1/ai/chat
+
+Muc dich:
+
+- Luong heuristic chat/suggest/booking theo request structure.
+
+Curl suggest:
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/ai/chat" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "message": "Goi y phong trong giup minh",
+    "sessionId": null,
+    "startTime": "2026-04-14T09:00:00",
+    "endTime": "2026-04-14T10:00:00",
+    "capacity": 8
+  }'
 ```
 
-2. Book theo mã phòng + khoảng giờ (đặt đúng giờ user nhập)
+Curl booking:
 
-Request:
-
-```json
-{
-  "message": "Book me room V21-024 for tomorrow at 6PM to 8PM",
-  "sessionId": null
-}
+```bash
+curl -X POST "http://localhost:8080/api/v1/ai/chat" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "message": "Dat phong giup minh",
+    "sessionId": null,
+    "startTime": "2026-04-14T14:00:00",
+    "endTime": "2026-04-14T15:00:00",
+    "capacity": 10
+  }'
 ```
 
-Response thành công (mẫu):
+### 4.4 AI reserve (heuristic cu)
 
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Booked successfully. You have V21-024 from 18:00 to 20:00 tomorrow.",
-    "intent": "BOOK_ROOM",
-    "availableRooms": null,
-    "alternativeRooms": null,
-    "reservation": { "...": "..." }
-  },
-  "meta": { "code": "200" }
-}
+Endpoint:
+
+- POST /api/v1/ai/reserve
+
+Muc dich:
+
+- Dat phong truc tiep khi FE da co du roomId + khung gio.
+
+Curl:
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/ai/reserve" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "roomId": "<ROOM_ID>",
+    "startTime": "2026-04-14T14:00:00",
+    "endTime": "2026-04-14T15:00:00",
+    "purpose": "Team sync",
+    "note": "Booked via AI"
+  }'
 ```
 
-Nếu overlap, chatbot sẽ trả message theo `ResponseCode` + danh sách phòng gợi ý (mẫu):
+## 5) Cau hinh GPT cho luong chatbot (optional)
 
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Someone has already booked a room during your chosen time slot. (V21-024, 18:00–20:00)",
-    "intent": "BOOK_ROOM",
-    "alternativeRooms": [
-      {
-        "roomId": "R2",
-        "roomCode": "V21-025",
-        "capacity": 20,
-        "availableTimeSlots": ["18:00–20:00"]
-      }
-    ]
-  },
-  "meta": { "code": "200" }
-}
-```
+Dat bien moi truong:
 
-Các response lỗi nghiệp vụ thường gặp (mẫu):
+- AI_LLM_ENABLED=true
+- AI_LLM_API_KEY=<OPENAI_API_KEY>
+- AI_LLM_MODEL=gpt-4o-mini
+- AI_LLM_BASE_URL=https://api.openai.com/v1
+- AI_LLM_TIMEOUT_MS=10000
 
-- Thiếu đăng nhập khi booking
+Luu y quan trong:
 
-Nếu user gọi intent booking nhưng `Authentication=null` → BE throw `ACCESS_DENIED`:
+- Neu khong bat hoac thieu api-key, he thong tu dong quay lai rule-base.
+- Dat phong van thong qua business service hien co, khong giao cho LLM quyet dinh nghiep vu cuoi cung.
 
-```json
-{
-  "data": null,
-  "meta": {
-    "code": "ACCESS_DENIED",
-    "message": "..."
-  }
-}
-```
+## 6) Session va chat history
 
-- Thời gian không hợp lệ / quá khứ
+- Lan dau FE gui sessionId = null.
+- Backend sinh sessionId va tra lai trong data.sessionId.
+- FE phai gui lai sessionId o cac lan tiep theo de giu ngu canh.
+- Moi request chatbot/ai chat se log 2 ban ghi history: USER va BOT.
 
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "That start time is in the past. Please choose a future time.",
-    "intent": "BOOK_ROOM"
-  },
-  "meta": { "code": "200" }
-}
-```
+## 7) Loi thuong gap khi test
 
-- Range time không hợp lệ (end <= start)
+- Booking khong kem token -> ACCESS_DENIED.
+- Start time trong qua khu -> chatbot tra loi yeu cau chon thoi gian tuong lai.
+- End <= start -> chatbot tra loi invalid range.
+- Voice gui audio khi STT chua cau hinh -> can gui transcript thay the.
 
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "The time range looks invalid. Please make sure the end time is after the start time.",
-    "intent": "BOOK_ROOM"
-  },
-  "meta": { "code": "200" }
-}
-```
+## 8) Khuyên nghi van hanh
 
-3. Suggest rooms theo sức chứa
-
-Request:
-
-```json
-{
-  "message": "Suggest rooms that can accommodate 20 or more people.",
-  "sessionId": null
-}
-```
-
-Response mẫu:
-
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Here are rooms that can accommodate 20+ people:",
-    "intent": "SUGGEST_ROOMS_BY_CAPACITY",
-    "availableRooms": [
-      {
-        "roomId": "R10",
-        "roomCode": "AL-020",
-        "capacity": 20,
-        "availableTimeSlots": []
-      },
-      {
-        "roomId": "R11",
-        "roomCode": "AL-025",
-        "capacity": 25,
-        "availableTimeSlots": []
-      }
-    ],
-    "alternativeRooms": null,
-    "reservation": null
-  },
-  "meta": { "code": "200" }
-}
-```
-
-4. Auto-book theo sức chứa (không cần roomCode)
-
-Request:
-
-```json
-{
-  "message": "Book a room with a capacity of 20 people for tomorrow at 10AM.",
-  "sessionId": null
-}
-```
-
-Response mẫu:
-
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Done — I booked AL-020 at 10:00 tomorrow for 1 hour (capacity 20+).",
-    "intent": "BOOK_ROOM",
-    "reservation": { "...": "..." }
-  },
-  "meta": { "code": "200" }
-}
-```
-
-Gợi ý: để multi-turn (nhớ ngữ cảnh), các message tiếp theo phải gửi đúng `sessionId`.
-
-### 4.2 Chatbot — Voice
-
-**POST** `/api/v1/chatbot/voice` (multipart/form-data)
-
-Form-data:
-
-- `audio`: file (optional)
-- `transcript`: string (optional) — nếu có thì dùng trực tiếp
-- `sessionId`: string (optional)
-- `language`: `en` / `vi` (optional)
-
-Response: giống `/api/v1/chatbot/message`.
-
-### 4.3 AI — Chat
-
-**POST** `/api/v1/ai/chat`
-
-Request mẫu:
-
-```json
-{
-  "message": "Gợi ý phòng trống giúp mình",
-  "sessionId": null,
-  "startTime": "2026-03-29T18:00:00",
-  "endTime": "2026-03-29T19:00:00",
-  "capacity": 8
-}
-```
-
-Response `data` là `AiChatResponse` (các field thường gặp):
-
-```json
-{
-  "sessionId": "<uuid>",
-  "reply": "...",
-  "reservationCreated": false,
-  "reservation": null,
-  "suggestions": []
-}
-```
-
-Các case thường gặp + response mẫu:
-
-1. Booking intent nhưng thiếu field (AI cần start/end/capacity)
-
-Request:
-
-```json
-{
-  "message": "Đặt phòng giúp mình",
-  "sessionId": null,
-  "startTime": null,
-  "endTime": null,
-  "capacity": null
-}
-```
-
-Response mẫu:
-
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Bạn muốn đặt phòng, vui lòng cung cấp thời gian bắt đầu, thời gian kết thúc và số người tham dự.",
-    "reservationCreated": false
-  },
-  "meta": { "code": "200" }
-}
-```
-
-2. Suggestion intent thiếu thời gian
-
-Request:
-
-```json
-{ "message": "Gợi ý phòng trống", "sessionId": null }
-```
-
-Response mẫu:
-
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Để gợi ý phòng trống, vui lòng cho tôi biết thời gian bắt đầu và kết thúc.",
-    "reservationCreated": false
-  },
-  "meta": { "code": "200" }
-}
-```
-
-3. Suggestion intent đủ thời gian (có thể kèm capacity)
-
-Response mẫu (rút gọn):
-
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Tôi đã tìm thấy một số phòng trống phù hợp. Bạn có thể chọn một trong các phòng sau để đặt:",
-    "reservationCreated": false,
-    "suggestions": [{ "roomId": "R1", "status": "AVAILABLE" }]
-  },
-  "meta": { "code": "200" }
-}
-```
-
-4. Booking intent đủ field (AI tự tìm phòng và đặt)
-
-Request:
-
-```json
-{
-  "message": "Đặt phòng giúp mình",
-  "sessionId": null,
-  "startTime": "2026-03-29T18:00:00",
-  "endTime": "2026-03-29T19:00:00",
-  "capacity": 8
-}
-```
-
-Response mẫu (rút gọn):
-
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Tôi đã đặt giúp bạn phòng AL-102 từ 2026-03-29T18:00 đến 2026-03-29T19:00.",
-    "reservationCreated": true,
-    "reservation": { "id": "<RESERVATION_ID>", "...": "..." }
-  },
-  "meta": { "code": "200" }
-}
-```
-
-5. Booking intent nhưng không có phòng đủ sức chứa
-
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Hiện tại không tìm thấy phòng nào đủ sức chứa cho 20 người.",
-    "reservationCreated": false
-  },
-  "meta": { "code": "200" }
-}
-```
-
-6. Booking intent nhưng không còn phòng trống phù hợp trong khung giờ
-
-```json
-{
-  "data": {
-    "sessionId": "<uuid>",
-    "reply": "Xin lỗi, không còn phòng trống phù hợp trong khung giờ bạn yêu cầu.",
-    "reservationCreated": false
-  },
-  "meta": { "code": "200" }
-}
-```
-
-### 4.4 AI — Reserve
-
-**POST** `/api/v1/ai/reserve`
-
-Request mẫu:
-
-```json
-{
-  "roomId": "<ROOM_ID>",
-  "startTime": "2026-03-29T18:00:00",
-  "endTime": "2026-03-29T19:00:00",
-  "purpose": "Meeting",
-  "note": "Booked via AI"
-}
-```
-
-Response mẫu:
-
-```json
-{
-  "data": {
-    "reply": "Tôi đã giúp bạn đặt phòng thành công. Mã đặt chỗ: <RESERVATION_ID>",
-    "reservationCreated": true,
-    "reservation": { "id": "<RESERVATION_ID>", "...": "..." }
-  },
-  "meta": { "code": "200" }
-}
-```
-
-Lưu ý: `/api/v1/ai/reserve` hiện trả `AiChatResponse` nhưng không set `sessionId` và không log `tbl_chat_history` (khác với `/api/v1/ai/chat`).
-
-## 5) Flow chi tiết nhất — Chatbot
-
-### 5.1 Các intent hiện có
-
-- `CHECK_AVAILABLE_ROOMS_TODAY`
-- `SUGGEST_ROOMS_BY_CAPACITY`
-- `BOOK_ROOM`
-- `FALLBACK`
-
-### 5.2 Luồng xử lý `/api/v1/chatbot/message`
-
-1. `ChatbotController.message()` nhận request.
-
-2. `ChatbotServiceImpl.handleMessage()`:
-
-- `ensureSessionId()`
-- (Context recall) `getRecentMessages(sessionId, sender=USER, limit=5)`
-- Load `User` theo `Authentication` (nếu có)
-- Log `Chat_history(sender=USER)`
-- Parse message hiện tại bằng `ChatbotMessageParser.parse()`
-- Merge với ngữ cảnh (fill slot còn thiếu): capacity/date/time/roomCode/intent
-- Switch theo intent:
-  - `CHECK_AVAILABLE_ROOMS_TODAY` → `handleAvailableRoomsToday()`
-  - `SUGGEST_ROOMS_BY_CAPACITY` → `handleSuggestRoomsByCapacity()`
-  - `BOOK_ROOM` → `handleBookRoom()`
-  - default → `handleFallback()`
-- Set `sessionId` vào response
-- Log `Chat_history(sender=BOT)` với `reply`
-
-3. Controller wrap `Response.ofSucceeded(data)`.
-
-### 5.3 Luồng check available
-
-`handleAvailableRoomsToday(message, parsed)`:
-
-- Xác định window:
-  - Mặc định: từ `now` đến cuối ngày
-  - Nếu có mốc giờ trong message (vd “as of 6 PM today”) → start từ giờ đó
-- Query phòng hợp lệ: `roomRepository.findAllWithDetails()` + filter:
-  - `status != BROKEN`
-  - floor/building không deleted
-- Load image theo roomIds
-- Query overlaps trong window bằng `reservationRepository.findOverlappingReservationsForRooms(...)`
-- Compute free ranges → map sang `ChatbotRoomItemResponse(availableTimeSlots)`
-
-### 5.4 Luồng suggest theo sức chứa
-
-`handleSuggestRoomsByCapacity(message, parsed)`:
-
-- Parse `minCapacity`
-- Query phòng hợp lệ rồi filter `room.capacity >= minCapacity`
-- Trả danh sách qua `availableRooms` (không tính slot thời gian)
-
-### 5.5 Luồng book room
-
-`handleBookRoom(message, parsed, authentication)`:
-
-- Nếu thiếu `time`: hỏi lại time
-- Nếu thiếu `roomCode`:
-  - Nếu có `minCapacity` + có time/date → **auto-pick room** theo capacity và check overlap rồi reserve
-  - Nếu không có `minCapacity` → hỏi lại roomCode
-- Nếu có `roomCode`:
-  - `roomRepository.findByLocationCodeIgnoreCase(roomCode)`
-  - Gọi `reservationService.reserveRoom(request, authentication)`
-  - Nếu overlap (CustomException) → trả message theo `ResponseCode` + gợi ý phòng thay thế (`suggestionEngine.suggest(...)`)
-
-## 6) Flow chi tiết — AI (`/api/v1/ai`)
-
-### 6.1 `/api/v1/ai/chat`
-
-1. `AiController.chat()`
-
-2. `AiServiceImpl.chat()` (theo code hiện tại):
-
-- `sessionId = ensureSessionId(request.sessionId)`
-- `messageLower = request.message.toLowerCase()`
-- Load `User` theo authentication (nếu có)
-- Log `Chat_history(sender=USER)`
-- Detect theo keyword:
-  - Booking intent nếu message chứa: `đặt phòng/dat phong/book/reserve/đặt lịch/dat lich`
-    - Nếu thiếu `startTime/endTime/capacity` → trả reply yêu cầu cung cấp đủ
-    - Nếu đủ field → tìm phòng có `capacity >= request.capacity`
-      - Với mỗi phòng candidate: gọi `roomService.searchRooms(floorId, start, end)` để check AVAILABLE
-      - Khi tìm thấy phòng AVAILABLE đầu tiên → tạo `ReservationRequest(roomId,start,end)` và gọi `reservationService.reserveRoom()`
-      - Trả `reservationCreated=true` + `reservation`
-  - Suggestion intent nếu message chứa: `gợi ý/goi y/phòng trống/phong trong/suggest`
-    - Nếu thiếu `startTime/endTime` → trả reply yêu cầu cung cấp thời gian
-    - Nếu đủ time → quét danh sách phòng, filter theo `capacity` (nếu request có)
-      - Với mỗi phòng: gọi `roomService.searchRooms(...)` để lấy room AVAILABLE
-      - Trả `suggestions` là list `RoomSearchResponse`
-  - Default: trả message hướng dẫn cung cấp time/capacity/amenities
-- Log `Chat_history(sender=BOT)`
-
-### 6.2 `/api/v1/ai/reserve`
-
-- `AiController.reserveViaAi()` gọi `AiServiceImpl.reserveViaAi()`
-- `ReservationService.reserveRoom(request, authentication)`
-
-## 7) Ghi chú & giới hạn
-
-- Context recall là dạng “nhớ ngữ cảnh nhẹ” dựa trên các message USER gần nhất; không phải LLM.
-- Chưa có API public để query chat history theo `sessionId` (hiện chỉ dùng nội bộ để merge ngữ cảnh). Nếu cần có thể bổ sung `GET /api/v1/chatbot/history?sessionId=...`.
+- Nen tach ro 2 luong cho FE:
+  - Luong thong minh/chinh: /api/v1/chatbot/message.
+  - Luong cu tuong thich nguoc: /api/v1/ai/chat.
+- Neu san xuat, nen bo api-key vao bien moi truong/secret manager, khong hard-code.
