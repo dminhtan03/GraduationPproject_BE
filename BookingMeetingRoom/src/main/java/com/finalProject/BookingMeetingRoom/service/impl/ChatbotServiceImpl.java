@@ -113,10 +113,7 @@ public class ChatbotServiceImpl implements ChatbotService {
         if (ruleParsed == null) return llmParsed;
         if (llmParsed == null) return ruleParsed;
 
-        ChatbotIntent intent = ruleParsed.intent();
-        if (intent == ChatbotIntent.FALLBACK && llmParsed.intent() != null && llmParsed.intent() != ChatbotIntent.FALLBACK) {
-            intent = llmParsed.intent();
-        }
+        ChatbotIntent intent = chooseBalancedIntent(ruleParsed, llmParsed);
 
         String roomCode = ruleParsed.roomCode() != null ? ruleParsed.roomCode() : llmParsed.roomCode();
         LocalDate date = ruleParsed.date() != null ? ruleParsed.date() : llmParsed.date();
@@ -134,6 +131,68 @@ public class ChatbotServiceImpl implements ChatbotService {
                 ruleParsed.endTimeDefaulted(),
                 minCapacity
         );
+    }
+
+    private ChatbotIntent chooseBalancedIntent(
+            ChatbotMessageParser.ParseResult ruleParsed,
+            ChatbotMessageParser.ParseResult llmParsed
+    ) {
+        ChatbotIntent ruleIntent = ruleParsed.intent();
+        ChatbotIntent llmIntent = llmParsed.intent();
+
+        if (llmIntent == null || llmIntent == ChatbotIntent.FALLBACK) {
+            return ruleIntent;
+        }
+
+        if (ruleIntent == null || ruleIntent == ChatbotIntent.FALLBACK) {
+            return llmIntent;
+        }
+
+        if (ruleIntent == llmIntent) {
+            return ruleIntent;
+        }
+
+        int ruleSignals = countSignals(ruleParsed);
+        int llmSignals = countSignals(llmParsed);
+        boolean hasBookingHints = hasBookingHints(ruleParsed.normalizedMessage());
+
+        // Balanced policy:
+        // - keep rule when it has enough structure
+        // - allow LLM override when rule is weak and LLM has richer extracted slots
+        if (ruleSignals <= 1 && llmSignals >= 2) {
+            return llmIntent;
+        }
+
+        // Allow safer upgrade to booking when user wording suggests booking but rule picked non-booking intent.
+        if (llmIntent == ChatbotIntent.BOOK_ROOM
+                && hasBookingHints
+                && llmSignals >= Math.max(2, ruleSignals)) {
+            return llmIntent;
+        }
+
+        return ruleIntent;
+    }
+
+    private int countSignals(ChatbotMessageParser.ParseResult parsed) {
+        int count = 0;
+        if (parsed.roomCode() != null && !parsed.roomCode().isBlank()) count++;
+        if (parsed.date() != null) count++;
+        if (parsed.startTime() != null) count++;
+        if (parsed.endTime() != null) count++;
+        if (parsed.minCapacity() != null) count++;
+        return count;
+    }
+
+    private boolean hasBookingHints(String normalizedMessage) {
+        if (normalizedMessage == null || normalizedMessage.isBlank()) return false;
+        return normalizedMessage.contains("book")
+                || normalizedMessage.contains("reserve")
+                || normalizedMessage.contains("đặt")
+                || normalizedMessage.contains("dat")
+                || normalizedMessage.contains("mượn")
+                || normalizedMessage.contains("muon")
+                || normalizedMessage.contains("giữ")
+                || normalizedMessage.contains("giu");
     }
 
     private ChatbotMessageParser.ParseResult mergeWithContext(ChatbotMessageParser.ParseResult current, List<String> recentUserMessages) {
@@ -354,9 +413,12 @@ public class ChatbotServiceImpl implements ChatbotService {
         LocalTime end = parsed.endTime();
 
         if (start == null) {
+            String roomHint = (parsed.roomCode() != null && !parsed.roomCode().isBlank())
+                ? parsed.roomCode()
+                : "a room";
             return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.BOOK_ROOM)
-                    .reply("What time should I book it for? For example: 'Book " + parsed.roomCode() + " at 10AM today' or 'from 14:00 to 15:00 today'.")
+                .reply("What time should I book it for? For example: 'Book " + roomHint + " at 10AM today' or 'from 14:00 to 15:00 today'.")
                     .build();
         }
 

@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
@@ -24,6 +25,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @Slf4j
@@ -47,11 +50,18 @@ public class OpenAiChatbotLlmService implements ChatbotLlmService {
     @Value("${application.ai.llm.timeout-ms:10000}")
     private int timeoutMs;
 
+    @Value("${application.ai.llm.quota-cooldown-ms:600000}")
+    private long quotaCooldownMs;
+
+    private final AtomicLong skipUntilEpochMs = new AtomicLong(0);
+    private final AtomicBoolean quotaWarnLogged = new AtomicBoolean(false);
+
     @Override
     public Optional<ChatbotMessageParser.ParseResult> parse(String message, List<String> recentUserMessages) {
         if (!llmEnabled) return Optional.empty();
         if (apiKey == null || apiKey.isBlank()) return Optional.empty();
         if (message == null || message.isBlank()) return Optional.empty();
+        if (isInCooldown()) return Optional.empty();
 
         try {
             String endpoint = normalizeBaseUrl(baseUrl) + "/chat/completions";
@@ -84,11 +94,36 @@ public class OpenAiChatbotLlmService implements ChatbotLlmService {
 
             JsonNode parsed = objectMapper.readTree(stripCodeFence(content));
             ChatbotMessageParser.ParseResult result = toParseResult(message, parsed);
+            quotaWarnLogged.set(false);
             return Optional.of(result);
+        } catch (HttpStatusCodeException e) {
+            String body = e.getResponseBodyAsString();
+            if (e.getStatusCode().value() == 429 && body != null && body.contains("insufficient_quota")) {
+                long until = System.currentTimeMillis() + Math.max(60000L, quotaCooldownMs);
+                skipUntilEpochMs.set(until);
+                if (quotaWarnLogged.compareAndSet(false, true)) {
+                    log.warn("LLM disabled temporarily due to insufficient quota. Falling back to rule-based parser for {} ms.", Math.max(60000L, quotaCooldownMs));
+                }
+                return Optional.empty();
+            }
+            log.warn("LLM parse skipped due to HTTP error {}: {}", e.getStatusCode().value(), e.getStatusText());
+            return Optional.empty();
         } catch (Exception e) {
             log.warn("LLM parse skipped due to error: {}", e.getMessage());
             return Optional.empty();
         }
+    }
+
+    private boolean isInCooldown() {
+        long until = skipUntilEpochMs.get();
+        if (until <= 0) return false;
+        if (System.currentTimeMillis() >= until) {
+            if (skipUntilEpochMs.compareAndSet(until, 0)) {
+                quotaWarnLogged.set(false);
+            }
+            return false;
+        }
+        return true;
     }
 
     private org.springframework.http.client.SimpleClientHttpRequestFactory clientHttpRequestFactory(int timeoutMillis) {
