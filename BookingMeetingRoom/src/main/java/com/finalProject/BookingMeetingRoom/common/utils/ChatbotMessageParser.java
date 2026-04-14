@@ -25,7 +25,7 @@ public class ChatbotMessageParser {
     );
 
         private static final Pattern CAPACITY_KEYWORD_NUMBER_PATTERN = Pattern.compile(
-            "(?i)(?:capacity|accommodate|accomodate|people|persons|person|seats|seat|người|nguoi|sức chứa|suc chua)\\D{0,15}(\\d{1,3})\\b"
+            "(?i)(?:capacity|accommodate|accomodate|seats|seat|sức chứa|suc chua)\\D{0,15}(\\d{1,3})\\b"
         );
 
         private static final Pattern CAPACITY_NUMBER_SUFFIX_PATTERN = Pattern.compile(
@@ -136,7 +136,7 @@ public class ChatbotMessageParser {
                 "ranh",
                 "trống") ;
 
-        if (hasAvailabilityHint && !hasRoom && !hasTime && !hasDate && minCapacity == null) {
+        if (hasAvailabilityHint && minCapacity == null) {
             return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
         }
 
@@ -200,11 +200,6 @@ public class ChatbotMessageParser {
     private Integer extractMinCapacity(String normalized) {
         if (normalized == null || normalized.isBlank()) return null;
 
-        Matcher m1 = CAPACITY_KEYWORD_NUMBER_PATTERN.matcher(normalized);
-        if (m1.find()) {
-            return safeParseInt(m1.group(1));
-        }
-
         Matcher m2 = CAPACITY_NUMBER_SUFFIX_PATTERN.matcher(normalized);
         if (m2.find()) {
             return safeParseInt(m2.group(1));
@@ -222,6 +217,11 @@ public class ChatbotMessageParser {
         Matcher m3 = CAPACITY_APPROX_PATTERN.matcher(normalized);
         if (m3.find()) {
             return safeParseInt(m3.group(1));
+        }
+
+        Matcher m1 = CAPACITY_KEYWORD_NUMBER_PATTERN.matcher(normalized);
+        if (m1.find()) {
+            return safeParseInt(m1.group(1));
         }
 
         return null;
@@ -247,6 +247,12 @@ public class ChatbotMessageParser {
                 "tmr",
                 "ngày mai",
                 "ngay mai")) {
+            return LocalDate.now().plusDays(1);
+        }
+
+        // Colloquial Vietnamese shorthand: "mai", "sang mai", "chieu mai", "toi mai".
+        if (normalized.matches(".*\\bmai\\b.*")
+                || normalized.matches(".*\\b(?:sáng|sang|chiều|chieu|tối|toi)\\s+mai\\b.*")) {
             return LocalDate.now().plusDays(1);
         }
 

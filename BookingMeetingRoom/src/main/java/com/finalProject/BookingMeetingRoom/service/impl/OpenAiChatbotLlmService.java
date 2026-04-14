@@ -99,10 +99,17 @@ public class OpenAiChatbotLlmService implements ChatbotLlmService {
         } catch (HttpStatusCodeException e) {
             String body = e.getResponseBodyAsString();
             if (e.getStatusCode().value() == 429 && body != null && body.contains("insufficient_quota")) {
-                long until = System.currentTimeMillis() + Math.max(60000L, quotaCooldownMs);
-                skipUntilEpochMs.set(until);
+                long cooldown = Math.max(0L, quotaCooldownMs);
+                if (cooldown > 0) {
+                    long until = System.currentTimeMillis() + cooldown;
+                    skipUntilEpochMs.set(until);
+                }
                 if (quotaWarnLogged.compareAndSet(false, true)) {
-                    log.warn("LLM disabled temporarily due to insufficient quota. Falling back to rule-based parser for {} ms.", Math.max(60000L, quotaCooldownMs));
+                    if (cooldown > 0) {
+                        log.warn("LLM disabled temporarily due to insufficient quota. Falling back to rule-based parser for {} ms.", cooldown);
+                    } else {
+                        log.warn("LLM quota is insufficient. Falling back to rule-based parser and retrying on next request.");
+                    }
                 }
                 return Optional.empty();
             }
