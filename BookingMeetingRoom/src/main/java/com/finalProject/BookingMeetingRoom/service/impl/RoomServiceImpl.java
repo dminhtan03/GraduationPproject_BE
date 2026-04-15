@@ -263,7 +263,6 @@ public class RoomServiceImpl implements RoomService {
             return RoomDetailResponse.builder()
                     .id(room.getId())
                     .locationCode(room.getLocationCode())
-                    .status(status)
                     .capacity(room.getCapacity())
                     .amenities(room.getAmenities())
                     .images(images)

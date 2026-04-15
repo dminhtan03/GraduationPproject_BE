@@ -2,6 +2,7 @@ package com.finalProject.BookingMeetingRoom.controller.ai;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.ChatbotMessageRequest;
+import com.finalProject.BookingMeetingRoom.service.ChatHistoryService;
 import com.finalProject.BookingMeetingRoom.service.ChatbotService;
 import com.finalProject.BookingMeetingRoom.service.SpeechToTextService;
 import jakarta.validation.Valid;
@@ -11,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
  
 @RestController
 @RequestMapping("/api/v1/chatbot")
@@ -19,6 +22,13 @@ public class ChatbotController {
 
     private final ChatbotService chatbotService;
     private final SpeechToTextService speechToTextService;
+    private final ChatHistoryService chatHistoryService;
+
+    @PostMapping("/session")
+    public ResponseEntity<?> createSession() {
+        String sessionId = chatHistoryService.createSession();
+        return ResponseEntity.ok(Response.ofSucceeded(Map.of("sessionId", sessionId)));
+    }
 
     @PostMapping("/message")
     public ResponseEntity<?> message(@RequestBody @Valid ChatbotMessageRequest request, Authentication authentication) {
@@ -48,5 +58,24 @@ public class ChatbotController {
                 .build();
 
         return ResponseEntity.ok(Response.ofSucceeded(chatbotService.handleMessage(req, authentication)));
+    }
+
+    @DeleteMapping("/session/{sessionId}")
+    public ResponseEntity<?> deleteSession(@PathVariable String sessionId) {
+        long deleted = chatHistoryService.deleteSession(sessionId);
+        return ResponseEntity.ok(Response.ofSucceeded(Map.of(
+                "sessionId", sessionId,
+                "deletedMessages", deleted
+        )));
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<?> getMyChatHistories(Authentication authentication) {
+        return ResponseEntity.ok(Response.ofSucceeded(chatHistoryService.getAllSessionsOfCurrentUser(authentication)));
+    }
+
+    @GetMapping("/history/{sessionId}")
+    public ResponseEntity<?> getChatHistoryDetail(@PathVariable String sessionId, Authentication authentication) {
+        return ResponseEntity.ok(Response.ofSucceeded(chatHistoryService.getSessionDetailOfCurrentUser(sessionId, authentication)));
     }
 }
