@@ -1,18 +1,29 @@
 package com.finalProject.BookingMeetingRoom.controller.room;
 
+import java.time.LocalDate;
+import java.util.List;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleUpdateRequest;
 import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v1/academic-schedules")
@@ -79,5 +90,25 @@ public class AcademicScheduleController {
     public ResponseEntity<?> deleteSchedule(@PathVariable String scheduleId) {
         scheduleService.deleteSchedule(scheduleId);
         return ResponseEntity.ok(Response.ofSucceeded("Đã xóa lịch học thành công"));
+    }
+
+    /**
+     * API Xóa hàng loạt lịch học.
+     */
+    @DeleteMapping("/bulk")
+    public ResponseEntity<?> deleteSchedules(@RequestBody List<String> scheduleIds) {
+        scheduleService.deleteSchedules(scheduleIds);
+        return ResponseEntity.ok(Response.ofSucceeded("Đã xóa các lịch học được chọn thành công"));
+    }
+
+    /**
+     * API Cập nhật hàng loạt lịch học.
+     */
+    @PutMapping("/bulk")
+    public ResponseEntity<?> bulkUpdateSchedules(
+            @RequestParam List<String> scheduleIds,
+            @Valid @RequestBody AcademicScheduleUpdateRequest request) {
+        scheduleService.bulkUpdateSchedules(scheduleIds, request);
+        return ResponseEntity.ok(Response.ofSucceeded("Đã cập nhật các lịch học được chọn thành công"));
     }
 }

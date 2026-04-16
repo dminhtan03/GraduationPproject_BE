@@ -35,6 +35,16 @@ public interface AcademicScheduleService {
     void deleteSchedule(String scheduleId);
 
     /**
+     * Xóa hàng loạt lịch học.
+     */
+    void deleteSchedules(List<String> scheduleIds);
+
+    /**
+     * Cập nhật hàng loạt lịch học.
+     */
+    void bulkUpdateSchedules(List<String> scheduleIds, AcademicScheduleUpdateRequest request);
+
+    /**
      * Tìm kiếm lịch học cố định với các tham số filter.
      */
     Page<AcademicScheduleResponse> searchSchedules(
