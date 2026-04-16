@@ -1,6 +1,7 @@
-package com.finalProject.BookingMeetingRoom.controller.amenity;
+package com.finalProject.BookingMeetingRoom.service.amenity;
 
 import com.finalProject.BookingMeetingRoom.common.filter.JwtAuthFilter;
+import com.finalProject.BookingMeetingRoom.controller.amenity.AmenityController;
 import com.finalProject.BookingMeetingRoom.model.entity.Amenity;
 import com.finalProject.BookingMeetingRoom.repository.AmenityRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;

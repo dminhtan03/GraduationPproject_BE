@@ -17,6 +17,7 @@ import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.RealTimeService;
 import com.finalProject.BookingMeetingRoom.service.ReservationHistoryService;
+import com.finalProject.BookingMeetingRoom.service.RoomStatusUpdateService;
 import com.finalProject.BookingMeetingRoom.service.impl.ReservationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

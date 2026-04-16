@@ -1,5 +1,16 @@
 package com.finalProject.BookingMeetingRoom.service.building;
 
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.model.dto.AdminBuildingDto;
+import com.finalProject.BookingMeetingRoom.model.dto.AdminFloorDto;
+import com.finalProject.BookingMeetingRoom.model.entity.Building;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.BuildingUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.response.BuildingResponse;
+import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
+import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
+import com.finalProject.BookingMeetingRoom.service.impl.DashboardServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,18 +48,20 @@ class BuildingServiceImplTest {
     private Logger logger;
 
     @InjectMocks
-    private BuildingServiceImpl buildingService;
+    private DashboardServiceImpl dashboardService;
 
-    private BuildingRequest buildingRequest;
+    private BuildingCreateRequest buildingRequest;
+    private BuildingUpdateRequest buildingUpdateRequest;
     private Building testBuilding;
     private AdminBuildingDto adminBuildingDto;
     private AdminFloorDto adminFloorDto;
 
     @BeforeEach
     void setUp() {
-        buildingRequest = new BuildingRequest();
+        buildingRequest = new BuildingCreateRequest();
         buildingRequest.setName("Test Building");
         buildingRequest.setAddress("123 Test Street");
+        buildingRequest.setTotalFloors(4);
 
         testBuilding = new Building();
         testBuilding.setId("building-123");
@@ -62,7 +75,7 @@ class BuildingServiceImplTest {
                 testBuilding.getId(),
                 testBuilding.getName(),
                 testBuilding.getAddress(),
-                2
+                4
         );
 
         adminFloorDto = new AdminFloorDto(
@@ -83,7 +96,7 @@ class BuildingServiceImplTest {
         when(buildingRepository.save(any(Building.class))).thenReturn(testBuilding);
 
         // Act
-        buildingService.addBuilding(buildingRequest);
+        dashboardService.createBuilding(buildingRequest);
 
         // Assert
         ArgumentCaptor<Building> buildingCaptor = ArgumentCaptor.forClass(Building.class);
@@ -108,7 +121,7 @@ class BuildingServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            buildingService.addBuilding(buildingRequest);
+            dashboardService.createBuilding(buildingRequest);
         });
 
         assertEquals(ResponseCode.BUILDING_NOT_FOUND, exception.getResponseCode());
@@ -124,14 +137,14 @@ class BuildingServiceImplTest {
     @Test
     void testAddBuilding_Success_WithNullValues() {
         // Arrange
-        BuildingRequest nullRequest = new BuildingRequest();
+        BuildingCreateRequest nullRequest = new BuildingCreateRequest();
         nullRequest.setName(null);
         nullRequest.setAddress(null);
 
         when(buildingRepository.save(any(Building.class))).thenReturn(testBuilding);
 
         // Act
-        buildingService.addBuilding(nullRequest);
+        dashboardService.createBuilding(nullRequest);
 
         // Assert
         ArgumentCaptor<Building> buildingCaptor = ArgumentCaptor.forClass(Building.class);
@@ -160,7 +173,7 @@ class BuildingServiceImplTest {
         when(buildingRepository.findAllBuilding(any(Pageable.class))).thenReturn(buildingPage);
 
         // Act
-        Page<AdminBuildingDto> result = buildingService.getAllBuilding(pageNum, pageSize);
+        Page<AdminBuildingDto> result = dashboardService.getAllBuilding(pageNum, pageSize);
 
         // Assert
         assertNotNull(result);
@@ -185,7 +198,7 @@ class BuildingServiceImplTest {
         when(buildingRepository.findAllBuilding(any(Pageable.class))).thenReturn(emptyPage);
 
         // Act
-        Page<AdminBuildingDto> result = buildingService.getAllBuilding(pageNum, pageSize);
+        Page<AdminBuildingDto> result = dashboardService.getAllBuilding(pageNum, pageSize);
 
         // Assert
         assertNotNull(result);
@@ -208,7 +221,7 @@ class BuildingServiceImplTest {
         when(buildingRepository.findAllBuilding(any(Pageable.class))).thenReturn(buildingPage);
 
         // Act
-        Page<AdminBuildingDto> result = buildingService.getAllBuilding(pageNum, pageSize);
+        Page<AdminBuildingDto> result = dashboardService.getAllBuilding(pageNum, pageSize);
 
         // Assert
         assertNotNull(result);
@@ -236,7 +249,7 @@ class BuildingServiceImplTest {
         when(floorRepository.findFloorByBuildingIdAndDeleted(buildingId)).thenReturn(floors);
 
         // Act
-        BuildingResponse result = buildingService.getBuildingById(buildingId);
+        BuildingResponse result = dashboardService.getBuildingById(buildingId);
 
         // Assert
         assertNotNull(result);
@@ -261,7 +274,7 @@ class BuildingServiceImplTest {
         when(floorRepository.findFloorByBuildingIdAndDeleted(buildingId)).thenReturn(Collections.emptyList());
 
         // Act
-        BuildingResponse result = buildingService.getBuildingById(buildingId);
+        BuildingResponse result = dashboardService.getBuildingById(buildingId);
 
         // Assert
         assertNotNull(result);
@@ -285,7 +298,7 @@ class BuildingServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            buildingService.getBuildingById(buildingId);
+            dashboardService.getBuildingById(buildingId);
         });
 
         assertEquals(ResponseCode.BUILDING_NOT_FOUND, exception.getResponseCode());
@@ -303,15 +316,14 @@ class BuildingServiceImplTest {
     void testUpdateBuilding_Success() {
         // Arrange
         String buildingId = "building-123";
-        BuildingRequest updateRequest = new BuildingRequest();
+        BuildingUpdateRequest updateRequest = new BuildingUpdateRequest();
         updateRequest.setName("Updated Building");
-        updateRequest.setAddress("456 Updated Street");
 
         when(buildingRepository.findByIdAndIsDeleted(buildingId, false)).thenReturn(testBuilding);
         when(buildingRepository.save(any(Building.class))).thenReturn(testBuilding);
 
         // Act
-        buildingService.updateBuilding(buildingId, updateRequest);
+        dashboardService.updateBuilding(buildingId, updateRequest);
 
         // Assert
         ArgumentCaptor<Building> buildingCaptor = ArgumentCaptor.forClass(Building.class);
@@ -337,7 +349,7 @@ class BuildingServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            buildingService.updateBuilding(buildingId, buildingRequest);
+            dashboardService.updateBuilding(buildingId, buildingUpdateRequest);
         });
 
         assertEquals(ResponseCode.BUILDING_NOT_FOUND, exception.getResponseCode());
@@ -360,7 +372,7 @@ class BuildingServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            buildingService.updateBuilding(buildingId, buildingRequest);
+            dashboardService.updateBuilding(buildingId, buildingUpdateRequest);
         });
 
         assertEquals(ResponseCode.BUILDING_NOT_FOUND, exception.getResponseCode());
@@ -383,7 +395,7 @@ class BuildingServiceImplTest {
         when(buildingRepository.save(any(Building.class))).thenReturn(testBuilding);
 
         // Act
-        buildingService.deleteBuilding(buildingId);
+        dashboardService.deleteBuilding(buildingId);
 
         // Assert
         ArgumentCaptor<Building> buildingCaptor = ArgumentCaptor.forClass(Building.class);
@@ -407,7 +419,7 @@ class BuildingServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            buildingService.deleteBuilding(buildingId);
+            dashboardService.deleteBuilding(buildingId);
         });
 
         assertEquals(ResponseCode.BUILDING_NOT_FOUND, exception.getResponseCode());
@@ -430,7 +442,7 @@ class BuildingServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            buildingService.deleteBuilding(buildingId);
+            dashboardService.deleteBuilding(buildingId);
         });
 
         assertEquals(ResponseCode.BUILDING_NOT_FOUND, exception.getResponseCode());
@@ -451,19 +463,19 @@ class BuildingServiceImplTest {
 
         // Test getBuildingById with null ID
         CustomException exception1 = assertThrows(CustomException.class, () -> {
-            buildingService.getBuildingById(nullBuildingId);
+            dashboardService.getBuildingById(nullBuildingId);
         });
         assertEquals(ResponseCode.BUILDING_NOT_FOUND, exception1.getResponseCode());
 
         // Test updateBuilding with null ID
         CustomException exception2 = assertThrows(CustomException.class, () -> {
-            buildingService.updateBuilding(nullBuildingId, buildingRequest);
+            dashboardService.updateBuilding(nullBuildingId, buildingUpdateRequest);
         });
         assertEquals(ResponseCode.BUILDING_NOT_FOUND, exception2.getResponseCode());
 
         // Test deleteBuilding with null ID
         CustomException exception3 = assertThrows(CustomException.class, () -> {
-            buildingService.deleteBuilding(nullBuildingId);
+            dashboardService.deleteBuilding(nullBuildingId);
         });
         assertEquals(ResponseCode.BUILDING_NOT_FOUND, exception3.getResponseCode());
 
@@ -479,7 +491,7 @@ class BuildingServiceImplTest {
         when(buildingRepository.save(any(Building.class))).thenReturn(testBuilding);
 
         // Act
-        buildingService.addBuilding(buildingRequest);
+        dashboardService.createBuilding(buildingRequest);
 
         // Assert
         ArgumentCaptor<Building> buildingCaptor = ArgumentCaptor.forClass(Building.class);

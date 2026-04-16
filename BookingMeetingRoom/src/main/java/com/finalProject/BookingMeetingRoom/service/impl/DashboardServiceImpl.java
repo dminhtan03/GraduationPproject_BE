@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.finalProject.BookingMeetingRoom.model.dto.AdminBuildingDto;
+import com.finalProject.BookingMeetingRoom.model.dto.AdminFloorDto;
+import com.finalProject.BookingMeetingRoom.model.response.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -25,13 +28,6 @@ import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.FloorCreateRequest;
-import com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse;
-import com.finalProject.BookingMeetingRoom.model.response.AmbiguousFloorResponse;
-import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
-import com.finalProject.BookingMeetingRoom.model.response.DetailFloorResponse;
-import com.finalProject.BookingMeetingRoom.model.response.RoomMapBuildingResponse;
-import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
-import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
 import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
@@ -62,13 +58,13 @@ public class DashboardServiceImpl implements DashboardService {
      */
 
     /**
-     * Retrieves the seat map dashboard data, organizing seat information by building and floor.
+     * Retrieves the room map dashboard data, organizing room information by building and floor.
      * Logic:
-     * 1. Fetches a flat list of seat data from the repository.
-     * 2. Iterates through each seat, grouping them by buildingId using a LinkedHashMap.
+     * 1. Fetches a flat list of room data from the repository.
+     * 2. Iterates through each room, grouping them by buildingId using a LinkedHashMap.
      * 3. For each building, checks if the floor exists; if not, creates a new floor entry.
-     * 4. For each seat, creates a SeatDto and adds it to the corresponding floor's seat list.
-     * 5. After grouping, builds and returns a SeatMapDashboardResponse containing the structured building, floor, and seat data.
+     * 4. For each room, creates a RoomDto and adds it to the corresponding floor's room list.
+     * 5. After grouping, builds and returns a RoomMapDashboardResponse containing the structured building, floor, and room data.
      * 6. Handles exceptions by throwing a CustomException with appropriate response codes.
      */
     @Override
@@ -157,7 +153,7 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     /**
-     * Retrieves a summary of the dashboard, including total seats, occupied seats, broken seats, and total users.
+     * Retrieves a summary of the dashboard, including total rooms, occupied rooms, broken rooms, and total users.
      *
      * @return DashboardSummaryResponse containing the summary data
      */
@@ -241,10 +237,10 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     /**
-     * Retrieves all seats for a given floor ID.
+     * Retrieves all rooms for a given floor ID.
      *
-     * @param floorId the ID of the floor to retrieve seats for
-     * @return List of SeatDto containing seat details
+     * @param floorId the ID of the floor to retrieve rooms for
+     * @return List of RoomDto containing room details
      */
     @Override
     public List<RoomDto> getAllRoomsByFloorId(String floorId) {
@@ -442,4 +438,60 @@ public class DashboardServiceImpl implements DashboardService {
         }
     }
     // end implement createBuilding
+
+    @Override
+    public BuildingResponse getBuildingById(String buildingId) {
+        try {
+            var building = buildingRepository.findByIdAndIsDeleted(buildingId, false);
+            if (building == null) {
+                throw new CustomException(ResponseCode.BUILDING_NOT_FOUND);
+            }
+
+            List<AdminFloorDto> floorDtos = floorRepository.findFloorByBuildingIdAndDeleted(building.getId());
+            BuildingResponse response = new BuildingResponse();
+            response.setName(building.getName());
+            response.setAddress(building.getAddress());
+            response.setFloors(floorDtos);
+
+            return response;
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public Page<AdminBuildingDto> getAllBuilding(int pageNum, int pageSize) {
+        try {
+            Pageable pageable = PageRequest.of(pageNum, pageSize);
+
+            return buildingRepository.findAllBuilding(pageable);
+
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public void deleteBuilding(String buildingId) {
+        try {
+            var building = buildingRepository.findByIdAndIsDeleted(buildingId, false);
+            if (building == null) {
+                throw new CustomException(ResponseCode.BUILDING_NOT_FOUND);
+            }
+            building.setDeleted(true);
+            building.setUpdatedAt(LocalDateTime.now());
+
+            buildingRepository.save(building);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
 }

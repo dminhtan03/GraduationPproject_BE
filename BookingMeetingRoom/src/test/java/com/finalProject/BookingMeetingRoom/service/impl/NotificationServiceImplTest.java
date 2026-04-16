@@ -1,5 +1,16 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.mapper.NotificationMapper;
+import com.finalProject.BookingMeetingRoom.messaging.producer.NotificationProducer;
+import com.finalProject.BookingMeetingRoom.model.dto.NotificationDTO;
+import com.finalProject.BookingMeetingRoom.model.entity.*;
+import com.finalProject.BookingMeetingRoom.model.request.NotificationRequest;
+import com.finalProject.BookingMeetingRoom.model.response.SendNoticeRequest;
+import com.finalProject.BookingMeetingRoom.repository.NotificationRepository;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,8 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -190,6 +200,7 @@ class NotificationServiceImplTest {
 
     @Test
     void remindCheckIn_ShouldCallNotifyUsers_WhenReservationsExist() {
+        LocalDateTime current = LocalDateTime.now();
         Reservation reservation = mock(Reservation.class);
         Room room = mock(Room.class);
         Floor floor = mock(Floor.class);
@@ -205,7 +216,7 @@ class NotificationServiceImplTest {
         when(reservation.getUser()).thenReturn(user);
         when(user.getId()).thenReturn("user-id");
 
-        when(reservationRepository.findReservationsToRemindCheckIn())
+        when(reservationRepository.findReservationsToRemindCheckIn(current))
                 .thenReturn(List.of(reservation));
 
         notificationService.remindCheckIn();

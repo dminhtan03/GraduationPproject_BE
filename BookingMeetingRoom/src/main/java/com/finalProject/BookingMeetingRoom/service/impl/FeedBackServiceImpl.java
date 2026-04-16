@@ -42,7 +42,7 @@ public class FeedBackServiceImpl implements FeedBackService {
     private final FeedbackMapper feedbackMapper;
 
     /**
-     * Retrieves feedback for a specific seat with pagination.
+     * Retrieves feedback for a specific room with pagination.
      *
      * @param roomId   the ID of the room
      * @param pageNum  the page number to retrieve

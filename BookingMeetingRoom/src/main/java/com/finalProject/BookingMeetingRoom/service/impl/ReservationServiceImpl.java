@@ -72,7 +72,7 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     /**
-     * Return a seat after use.
+     * Return a room after use.
      *
      * @param reservationId  the ID of the reservation to return
      * @param authentication the authentication object containing user details
@@ -610,11 +610,11 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     /**
-     * Validate the reservation context (Reservation and Seat).
+     * Validate the reservation context (Reservation and Room).
      *
      * @param reservationId  the ID of the reservation to validate
      * @param authentication the authentication object containing user details
-     * @return a ReservationContext containing the reservation and seat information
+     * @return a ReservationContext containing the reservation and room information
      */
     private ReservationContext validateReservationContext(String reservationId, Authentication authentication) {
         var currentUser = userRepository.findByEmail(authentication.getName())

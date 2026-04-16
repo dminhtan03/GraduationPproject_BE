@@ -2,17 +2,14 @@ package com.finalProject.BookingMeetingRoom.service;
 
 import java.util.List;
 
+import com.finalProject.BookingMeetingRoom.model.dto.AdminBuildingDto;
+import com.finalProject.BookingMeetingRoom.model.response.*;
 import org.springframework.data.domain.Page;
 
 import com.finalProject.BookingMeetingRoom.model.dto.RoomDto;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.BuildingUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.FloorCreateRequest;
-import com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse;
-import com.finalProject.BookingMeetingRoom.model.response.AmbiguousFloorResponse;
-import com.finalProject.BookingMeetingRoom.model.response.DashboardOverviewStatsResponse;
-import com.finalProject.BookingMeetingRoom.model.response.RoomMapDashboardResponse;
-import com.finalProject.BookingMeetingRoom.model.response.UserDashboardResponse;
 
 public interface DashboardService {
     DashboardOverviewStatsResponse getOverviewStats();
@@ -30,4 +27,8 @@ public interface DashboardService {
     void updateBuilding(String buildingId, BuildingUpdateRequest request);
     void createFloor(FloorCreateRequest request);
     // end add createBuilding method
+
+    Page<AdminBuildingDto> getAllBuilding(int pageNum, int pageSize);
+    BuildingResponse getBuildingById(String buildingId);
+    void deleteBuilding(String buildingId);
 }

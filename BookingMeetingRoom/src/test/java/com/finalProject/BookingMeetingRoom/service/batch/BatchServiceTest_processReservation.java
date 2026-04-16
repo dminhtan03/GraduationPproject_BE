@@ -10,6 +10,7 @@ import com.finalProject.BookingMeetingRoom.model.request.RoomStatusUpdateRequest
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.service.NotificationService;
+import com.finalProject.BookingMeetingRoom.service.RoomStatusUpdateService;
 import com.finalProject.BookingMeetingRoom.service.impl.BatchServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,23 +64,25 @@ class BatchServiceTest_processReservation {
 
     @Test
     void updateUserStatuses_ShouldExecuteAllStepsSuccessfully() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
-        when(reservationRepository.findReservationsOverStartTime()).thenReturn(Collections.emptyList());
-        when(reservationRepository.findReservationsOverEndTime()).thenReturn(Collections.emptyList());
+        when(reservationRepository.findReservationsOverStartTime(current)).thenReturn(Collections.emptyList());
+        when(reservationRepository.findReservationsOverEndTime(current)).thenReturn(Collections.emptyList());
 
         // When
         batchService.updateUserStatuses();
 
         // Then
-        verify(reservationRepository).findReservationsOverStartTime();
-        verify(reservationRepository).findReservationsOverEndTime();
+        verify(reservationRepository).findReservationsOverStartTime(current);
+        verify(reservationRepository).findReservationsOverEndTime(current);
         verify(notificationService).remindCheckIn();
     }
 
     @Test
     void updateUserStatuses_ShouldThrowCustomExceptionWhenError() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
-        when(reservationRepository.findReservationsOverStartTime())
+        when(reservationRepository.findReservationsOverStartTime(current))
                 .thenThrow(new RuntimeException("Database error"));
 
         // When & Then
@@ -91,9 +94,10 @@ class BatchServiceTest_processReservation {
 
     @Test
     void processReservation_NoShowStatus_ShouldUpdateReservationAndRoom() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
         List<Reservation> reservations = Arrays.asList(reservation);
-        when(reservationRepository.findReservationsOverStartTime()).thenReturn(reservations);
+        when(reservationRepository.findReservationsOverStartTime(current)).thenReturn(reservations);
 
         // When
         batchService.processReservation(ReservationStatus.NO_SHOW);
@@ -111,9 +115,10 @@ class BatchServiceTest_processReservation {
 
     @Test
     void processReservation_CompletedStatus_ShouldUpdateReservationAndRoom() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
         List<Reservation> reservations = Arrays.asList(reservation);
-        when(reservationRepository.findReservationsOverEndTime()).thenReturn(reservations);
+        when(reservationRepository.findReservationsOverEndTime(current)).thenReturn(reservations);
 
         // When
         batchService.processReservation(ReservationStatus.COMPLETED);
@@ -131,8 +136,9 @@ class BatchServiceTest_processReservation {
 
     @Test
     void processReservation_NoShowStatus_WithEmptyReservations_ShouldNotSendNotification() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
-        when(reservationRepository.findReservationsOverStartTime()).thenReturn(Collections.emptyList());
+        when(reservationRepository.findReservationsOverStartTime(current)).thenReturn(Collections.emptyList());
 
         // When
         batchService.processReservation(ReservationStatus.NO_SHOW);
@@ -145,8 +151,9 @@ class BatchServiceTest_processReservation {
 
     @Test
     void processReservation_CompletedStatus_WithEmptyReservations_ShouldNotSendNotification() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
-        when(reservationRepository.findReservationsOverEndTime()).thenReturn(Collections.emptyList());
+        when(reservationRepository.findReservationsOverEndTime(current)).thenReturn(Collections.emptyList());
 
         // When
         batchService.processReservation(ReservationStatus.COMPLETED);
@@ -159,10 +166,11 @@ class BatchServiceTest_processReservation {
 
     @Test
     void processReservation_WithNullRoom_ShouldSkipRoomUpdate() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
         reservation.setRoom(null);
         List<Reservation> reservations = Arrays.asList(reservation);
-        when(reservationRepository.findReservationsOverStartTime()).thenReturn(reservations);
+        when(reservationRepository.findReservationsOverStartTime(current)).thenReturn(reservations);
 
         // When
         batchService.processReservation(ReservationStatus.NO_SHOW);
@@ -176,6 +184,7 @@ class BatchServiceTest_processReservation {
 
     @Test
     void processReservation_WithMultipleReservations_ShouldProcessAll() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
         Room room2 = new Room();
         room2.setId("b2c3d4e5-f6g7-8h9i-j0k1-l2m3n4o5p6q7");
@@ -187,7 +196,7 @@ class BatchServiceTest_processReservation {
         reservation2.setRoom(room2);
 
         List<Reservation> reservations = Arrays.asList(reservation, reservation2);
-        when(reservationRepository.findReservationsOverStartTime()).thenReturn(reservations);
+        when(reservationRepository.findReservationsOverStartTime(current)).thenReturn(reservations);
 
         // When
         batchService.processReservation(ReservationStatus.NO_SHOW);
@@ -205,9 +214,10 @@ class BatchServiceTest_processReservation {
 
     @Test
     void processReservation_ShouldSetCorrectRoomStatusUpdateRequest() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
         List<Reservation> reservations = Arrays.asList(reservation);
-        when(reservationRepository.findReservationsOverStartTime()).thenReturn(reservations);
+        when(reservationRepository.findReservationsOverStartTime(current)).thenReturn(reservations);
 
         // When
         batchService.processReservation(ReservationStatus.NO_SHOW);
@@ -223,10 +233,11 @@ class BatchServiceTest_processReservation {
 
     @Test
     void processReservation_ShouldUpdateReservationTimestamp() {
+        LocalDateTime current = LocalDateTime.now();
         // Given
         LocalDateTime beforeUpdate = LocalDateTime.now().minusSeconds(1);
         List<Reservation> reservations = Arrays.asList(reservation);
-        when(reservationRepository.findReservationsOverStartTime()).thenReturn(reservations);
+        when(reservationRepository.findReservationsOverStartTime(current)).thenReturn(reservations);
 
         // When
         batchService.processReservation(ReservationStatus.NO_SHOW);

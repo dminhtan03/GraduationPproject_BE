@@ -21,6 +21,7 @@ import com.finalProject.BookingMeetingRoom.service.EmailService;
 import com.finalProject.BookingMeetingRoom.service.NotificationService;
 import com.finalProject.BookingMeetingRoom.service.RealTimeService;
 import com.finalProject.BookingMeetingRoom.service.ReservationHistoryService;
+import com.finalProject.BookingMeetingRoom.service.impl.ReservationServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 
