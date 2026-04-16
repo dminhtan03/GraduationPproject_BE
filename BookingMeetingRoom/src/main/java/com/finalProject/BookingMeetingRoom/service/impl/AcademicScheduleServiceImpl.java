@@ -138,10 +138,11 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
 
     private LocalTime parseLocalTime(Cell cell) {
         if (cell == null) return LocalTime.MIDNIGHT;
-        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+        if (cell.getCellType() == CellType.NUMERIC) {
             return cell.getLocalDateTimeCellValue().toLocalTime();
         }
         String val = getCellValueAsString(cell);
+        if (val.isEmpty()) return LocalTime.MIDNIGHT;
         try {
             return LocalTime.parse(val);
         } catch (Exception e) {
@@ -155,10 +156,12 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
 
     private LocalDate parseLocalDate(Cell cell) {
         if (cell == null) return LocalDate.now();
-        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+        if (cell.getCellType() == CellType.NUMERIC) {
             return cell.getLocalDateTimeCellValue().toLocalDate();
         }
-        return LocalDate.parse(getCellValueAsString(cell));
+        String val = getCellValueAsString(cell);
+        if (val.isEmpty()) return LocalDate.now();
+        return LocalDate.parse(val);
     }
 
     @Override

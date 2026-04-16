@@ -491,7 +491,15 @@ public class RoomServiceImpl implements RoomService {
         if (cell == null) return "";
         switch (cell.getCellType()) {
             case STRING: return cell.getStringCellValue();
-            case NUMERIC: return String.valueOf(cell.getNumericCellValue());
+            case NUMERIC:
+                if (org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getLocalDateTimeCellValue().toString();
+                }
+                double numericValue = cell.getNumericCellValue();
+                if (numericValue == (long) numericValue) {
+                    return String.valueOf((long) numericValue);
+                }
+                return String.valueOf(numericValue);
             case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
             default: return "";
         }
