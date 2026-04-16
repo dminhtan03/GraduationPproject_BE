@@ -24,4 +24,5 @@ public class AcademicScheduleResponse {
     private LocalDate fromDate;
     private LocalDate toDate;
     private String description;
+    private java.time.LocalDateTime createdAt;
 }

@@ -21,6 +21,9 @@ public interface AcademicScheduleRepository extends JpaRepository<AcademicSchedu
 
     List<AcademicSchedule> findByRoomId(String roomId);
 
+    @Query("SELECT s FROM AcademicSchedule s WHERE s.fromDate <= :date AND s.toDate >= :date")
+    List<AcademicSchedule> findAllActiveSchedulesToday(@Param("date") LocalDate date);
+
     @Query("SELECT s FROM AcademicSchedule s " +
             "LEFT JOIN s.room r " +
             "LEFT JOIN r.floor f " +
@@ -29,7 +32,8 @@ public interface AcademicScheduleRepository extends JpaRepository<AcademicSchedu
             "AND (:floorId IS NULL OR :floorId = '' OR f.id = :floorId) " +
             "AND (:buildingId IS NULL OR :buildingId = '' OR b.id = :buildingId) " +
             "AND (:fromDate IS NULL OR s.fromDate >= :fromDate) " +
-            "AND (:toDate IS NULL OR s.toDate <= :toDate)")
+            "AND (:toDate IS NULL OR s.toDate <= :toDate) " +
+            "ORDER BY s.createdAt DESC")
     Page<AcademicSchedule> searchSchedules(
             @Param("roomName") String roomName,
             @Param("floorId") String floorId,

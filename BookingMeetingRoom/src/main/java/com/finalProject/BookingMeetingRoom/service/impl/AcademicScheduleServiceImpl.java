@@ -1,5 +1,6 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.model.entity.AcademicSchedule;
@@ -17,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -124,6 +126,7 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
 
             scheduleRepository.saveAll(schedulesToSave);
             logger.info("Imported {} academic schedules from excel", schedulesToSave.size());
+            updateRoomStatusesBySchedule();
 
         } catch (CustomException e) {
             throw e;
@@ -167,6 +170,7 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     @Transactional
     public void deleteSchedule(String scheduleId) {
         scheduleRepository.deleteById(scheduleId);
+        updateRoomStatusesBySchedule();
     }
 
     @Override
@@ -186,6 +190,7 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
                         .fromDate(s.getFromDate())
                         .toDate(s.getToDate())
                         .description(s.getDescription())
+                        .createdAt(s.getCreatedAt())
                         .build());
     }
 
@@ -207,6 +212,7 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
                 .build();
 
         scheduleRepository.save(schedule);
+        updateRoomStatusesBySchedule();
     }
 
     @Override
@@ -223,6 +229,65 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
         schedule.setDescription(request.getDescription());
 
         scheduleRepository.save(schedule);
+        updateRoomStatusesBySchedule();
+    }
+
+    /**
+     * Tự động cập nhật trạng thái phòng dựa trên lịch học cố định.
+     * Chạy mỗi phút để đảm bảo trạng thái phòng luôn chính xác.
+     */
+    @Scheduled(fixedRate = 60000) // 1 phút
+    @Transactional
+    public void updateRoomStatusesBySchedule() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = now.toLocalDate();
+        LocalTime currentTime = now.toLocalTime();
+        String currentDayOfWeek = today.getDayOfWeek().name();
+
+        List<Room> allRooms = roomRepository.findAll();
+        List<AcademicSchedule> activeSchedulesToday = scheduleRepository.findAllActiveSchedulesToday(today);
+
+        for (Room room : allRooms) {
+            // Chỉ cập nhật trạng thái cho những phòng đang AVAILABLE hoặc LEARNING
+            // Để tránh ghi đè các trạng thái BROKEN hoặc UNAVAILABLE do Admin cài đặt thủ công
+            if (room.getStatus() != RoomStatus.AVAILABLE && room.getStatus() != RoomStatus.LEARNING) {
+                continue;
+            }
+
+            boolean isCurrentlyLearning = false;
+            for (AcademicSchedule schedule : activeSchedulesToday) {
+                if (schedule.getRoom().getId().equals(room.getId())) {
+                    // Kiểm tra thứ trong tuần
+                    String[] days = schedule.getDaysOfWeek().split(",");
+                    boolean isTodayInSchedule = false;
+                    for (String day : days) {
+                        if (day.trim().equalsIgnoreCase(currentDayOfWeek)) {
+                            isTodayInSchedule = true;
+                            break;
+                        }
+                    }
+
+                    if (isTodayInSchedule) {
+                        // Kiểm tra xem thời gian hiện tại có nằm trong khoảng [startTime, endTime] không
+                        if (!currentTime.isBefore(schedule.getStartTime()) && currentTime.isBefore(schedule.getEndTime())) {
+                            isCurrentlyLearning = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Cập nhật trạng thái phòng
+            if (isCurrentlyLearning && room.getStatus() != RoomStatus.LEARNING) {
+                room.setStatus(RoomStatus.LEARNING);
+                roomRepository.save(room);
+                logger.info("Room {} status changed to LEARNING due to academic schedule", room.getLocationCode());
+            } else if (!isCurrentlyLearning && room.getStatus() == RoomStatus.LEARNING) {
+                room.setStatus(RoomStatus.AVAILABLE);
+                roomRepository.save(room);
+                logger.info("Room {} status changed back to AVAILABLE (academic schedule ended)", room.getLocationCode());
+            }
+        }
     }
 
     private String getCellValueAsString(Cell cell) {

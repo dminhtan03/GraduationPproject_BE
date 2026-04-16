@@ -39,7 +39,7 @@ class FloorServiceImplTest {
     private RoomRepository roomRepository;
 
     @InjectMocks
-    private FloorServiceImpl floorService;
+    private FloorSericeImpl floorService;
 
     private Building testBuilding;
     private Floor testFloor;
