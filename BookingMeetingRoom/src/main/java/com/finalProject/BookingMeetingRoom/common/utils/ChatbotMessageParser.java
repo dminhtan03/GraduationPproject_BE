@@ -112,10 +112,55 @@ public class ChatbotMessageParser {
         boolean hasTime = timeExtraction != null && (timeExtraction.start != null || timeExtraction.end != null);
         boolean hasDate = date != null;
 
+        boolean hasDetailHint = containsAnyEither(normalized, folded,
+            "chi tiết",
+            "chi tiet",
+            "thông tin",
+            "thong tin",
+            "detail",
+            "details",
+            "info",
+            "xem",
+            "show",
+            "describe");
+
+        boolean hasFacilityNoun = containsAnyEither(normalized, folded,
+            "tòa",
+            "toà",
+            "toa",
+            "building",
+            "tầng",
+            "tang",
+            "floor",
+            "phòng",
+            "phong",
+            "room");
+
+        boolean hasBookingHint = containsAnyEither(normalized, folded,
+            "book",
+            "reserve",
+            "đặt",
+            "dat ",
+            "mượn",
+            "muon",
+            "đặt giúp",
+            "dat giup",
+            "giữ",
+            "giu ",
+            "schedule",
+            "arrange",
+            "chốt",
+            "chot");
+
+        if (hasDetailHint && hasFacilityNoun && !hasTime && minCapacity == null) {
+            return ChatbotIntent.VIEW_FACILITY_DETAILS;
+        }
+
         boolean hasAvailabilityHint = containsAnyEither(normalized, folded,
                 "today available rooms",
                 "available rooms today",
                 "rooms available today",
+            "available room",
                 "rooms are available",
                 "available as of",
                 "hôm nay còn phòng",
@@ -136,9 +181,19 @@ public class ChatbotMessageParser {
                 "ranh",
                 "trống") ;
 
-        if (hasAvailabilityHint && minCapacity == null) {
-            return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
-        }
+            boolean hasAvailabilityKeyword = containsAnyEither(normalized, folded,
+                "available",
+                "free",
+                "trống",
+                "trong",
+                "rảnh",
+                "ranh",
+                "còn",
+                "con");
+
+            if (!hasBookingHint && minCapacity == null && (hasAvailabilityHint || (hasAvailabilityKeyword && hasFacilityNoun))) {
+                return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
+            }
 
         boolean hasSuggestHint = containsAnyEither(normalized, folded,
                 "suggest",
@@ -151,22 +206,6 @@ public class ChatbotMessageParser {
         if (minCapacity != null && hasSuggestHint) {
             return ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY;
         }
-
-        boolean hasBookingHint = containsAnyEither(normalized, folded,
-                "book",
-                "reserve",
-                "đặt",
-                "dat ",
-                "mượn",
-                "muon",
-                "đặt giúp",
-                "dat giup",
-                "giữ",
-                "giu ",
-                "schedule",
-                "arrange",
-                "chốt",
-                "chot");
 
         if (hasBookingHint) {
             return ChatbotIntent.BOOK_ROOM;
@@ -187,6 +226,35 @@ public class ChatbotMessageParser {
 
         if (hasRoom && hasTime) {
             return ChatbotIntent.BOOK_ROOM;
+        }
+
+        if (hasFacilityNoun && containsAnyEither(normalized, folded,
+                "bao nhiêu",
+                "bao nhieu",
+                "capacity",
+                "sức chứa",
+                "suc chua",
+                "trạng thái",
+                "trang thai",
+                "status",
+                "ở đâu",
+                "o dau",
+                "where",
+                "located",
+                "location",
+                "address")) {
+            return ChatbotIntent.VIEW_FACILITY_DETAILS;
+        }
+
+        if (hasFacilityNoun && containsAnyEither(normalized, folded,
+                "what is",
+                "what's",
+                "which",
+                "cho mình biết",
+                "cho toi biet",
+                "xem giúp",
+                "xem giup")) {
+            return ChatbotIntent.VIEW_FACILITY_DETAILS;
         }
 
         // Heuristic: if a room code is present and a time is present, it is likely a booking request.

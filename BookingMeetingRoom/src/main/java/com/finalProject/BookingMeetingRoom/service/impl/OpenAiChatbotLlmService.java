@@ -206,6 +206,7 @@ public class OpenAiChatbotLlmService implements ChatbotLlmService {
 
     private String buildUserPrompt(String message, List<String> recentUserMessages) {
         StringBuilder sb = new StringBuilder();
+        sb.append("User language can be Vietnamese or English.\\n");
         sb.append("Current user message:\n").append(message).append("\n\n");
         sb.append("Recent user context (newest first):\n");
         if (recentUserMessages == null || recentUserMessages.isEmpty()) {
@@ -219,13 +220,15 @@ public class OpenAiChatbotLlmService implements ChatbotLlmService {
 
         sb.append("\nReturn only JSON with these fields: intent, roomCode, date, startTime, endTime, minCapacity. ");
         sb.append("Use null if unknown. Date format yyyy-MM-dd. Time format HH:mm:ss. ");
-        sb.append("Intent must be one of CHECK_AVAILABLE_ROOMS_TODAY, SUGGEST_ROOMS_BY_CAPACITY, BOOK_ROOM, FALLBACK.");
+        sb.append("Set intent=VIEW_FACILITY_DETAILS for requests asking building/floor/room information, details, status, capacity, or address (Vietnamese/English). ");
+        sb.append("Intent must be one of CHECK_AVAILABLE_ROOMS_TODAY, SUGGEST_ROOMS_BY_CAPACITY, BOOK_ROOM, VIEW_FACILITY_DETAILS, FALLBACK.");
         return sb.toString();
     }
 
     private String systemPrompt() {
         return "You are an intent and slot extractor for a meeting-room booking chatbot. " +
-                "Classify intent and extract roomCode/date/startTime/endTime/minCapacity from multilingual user text. " +
+            "Classify intent and extract roomCode/date/startTime/endTime/minCapacity from multilingual (Vietnamese and English) user text. " +
+            "For abstract requests, infer the most likely intent without inventing slot values. " +
                 "Do not invent values. Use null when not provided.";
     }
 }

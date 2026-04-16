@@ -8,6 +8,8 @@ import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.common.utils.ChatbotMessageParser;
 import com.finalProject.BookingMeetingRoom.model.entity.Amenity;
+import com.finalProject.BookingMeetingRoom.model.entity.Building;
+import com.finalProject.BookingMeetingRoom.model.entity.Floor;
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.entity.RoomImage;
@@ -16,6 +18,8 @@ import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.model.response.ChatbotMessageResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ChatbotRoomItemResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
+import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomImageRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
@@ -34,6 +38,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.text.Normalizer;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -45,6 +50,8 @@ public class ChatbotServiceImpl implements ChatbotService {
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     private final RoomRepository roomRepository;
+    private final BuildingRepository buildingRepository;
+    private final FloorRepository floorRepository;
     private final RoomImageRepository roomImageRepository;
     private final ReservationRepository reservationRepository;
     private final ReservationService reservationService;
@@ -90,6 +97,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                 case CHECK_AVAILABLE_ROOMS_TODAY -> handleAvailableRoomsToday(message, effectiveParsed);
                 case SUGGEST_ROOMS_BY_CAPACITY -> handleSuggestRoomsByCapacity(message, effectiveParsed);
                 case BOOK_ROOM -> handleBookRoom(message, effectiveParsed, authentication);
+                case VIEW_FACILITY_DETAILS -> handleFacilityDetails(message, effectiveParsed);
                 default -> handleFallback(message);
             };
 
@@ -170,6 +178,14 @@ public class ChatbotServiceImpl implements ChatbotService {
             return llmIntent;
         }
 
+        // If LLM confidently detects facility details and the user message contains facility cues,
+        // prefer LLM for abstract queries where rule intent may drift.
+        if (llmIntent == ChatbotIntent.VIEW_FACILITY_DETAILS
+                && hasFacilityHints(ruleParsed.normalizedMessage())
+                && ruleSignals == 0) {
+            return llmIntent;
+        }
+
         return ruleIntent;
     }
 
@@ -193,6 +209,15 @@ public class ChatbotServiceImpl implements ChatbotService {
                 || normalizedMessage.contains("muon")
                 || normalizedMessage.contains("giữ")
                 || normalizedMessage.contains("giu");
+    }
+
+    private boolean hasFacilityHints(String normalizedMessage) {
+        if (normalizedMessage == null || normalizedMessage.isBlank()) return false;
+        String folded = foldText(normalizedMessage);
+        return containsAnyEither(normalizedMessage, folded,
+                "chi tiết", "chi tiet", "thông tin", "thong tin", "detail", "details", "info",
+                "tòa", "toà", "toa", "building", "tầng", "tang", "floor", "phòng", "phong", "room",
+                "status", "trạng thái", "trang thai", "capacity", "sức chứa", "suc chua");
     }
 
     private ChatbotMessageParser.ParseResult mergeWithContext(ChatbotMessageParser.ParseResult current, List<String> recentUserMessages) {
@@ -239,10 +264,17 @@ public class ChatbotServiceImpl implements ChatbotService {
     }
 
     private ChatbotMessageResponse handleFallback(String message) {
+        boolean vi = isVietnameseMessage(message);
         String reply = pickByHash(message,
-                "I can help you check available rooms today or book a room. Try: 'Today available rooms?' or 'Book AL-102 at 10AM today'.",
-                "Tell me what you need: (1) available rooms today, or (2) book a specific room (e.g. 'Book AL-102 from 14:00 to 15:00 today').",
-                "I can search available rooms today and create bookings for you. What would you like to do?"
+            vi
+                ? "Mình có thể giúp bạn kiểm tra phòng trống, đặt phòng, hoặc xem chi tiết tòa/tầng/phòng. Ví dụ: 'Xem chi tiết phòng AL-102'."
+                : "I can help you check available rooms, book a room, or view building/floor/room details. Try: 'Show details of room AL-102'.",
+            vi
+                ? "Bạn muốn: (1) kiểm tra phòng trống hôm nay, (2) đặt phòng, hay (3) xem chi tiết tòa, tầng hoặc phòng?"
+                : "Tell me what you need: (1) available rooms today, (2) book a room, or (3) view details for a building, floor, or room.",
+            vi
+                ? "Mình có thể tìm phòng trống, tạo đặt phòng và cung cấp thông tin chi tiết cơ sở vật chất. Bạn muốn hỗ trợ phần nào?"
+                : "I can search available rooms, create bookings, and show facility details. What would you like to do?"
         );
 
         return ChatbotMessageResponse.builder()
@@ -250,6 +282,215 @@ public class ChatbotServiceImpl implements ChatbotService {
                 .reply(reply)
                 .build();
     }
+
+            @Transactional(readOnly = true)
+            private ChatbotMessageResponse handleFacilityDetails(String message, ChatbotMessageParser.ParseResult parsed) {
+                boolean vi = isVietnameseMessage(message);
+            String normalized = parsed != null && parsed.normalizedMessage() != null
+                ? parsed.normalizedMessage()
+                : (message == null ? "" : message.trim().toLowerCase(Locale.ROOT));
+                String folded = foldText(normalized);
+
+                List<Building> buildings = buildingRepository.findAll().stream()
+                    .filter(b -> b != null && !b.isDeleted())
+                    .toList();
+                List<Floor> floors = floorRepository.findAll().stream()
+                    .filter(f -> f != null && !f.isDeleted())
+                    .toList();
+                List<Room> rooms = roomRepository.findAllWithDetails().stream()
+                    .filter(Objects::nonNull)
+                    .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
+                    .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
+                    .toList();
+
+                Room room = resolveRoom(parsed, normalized, folded, rooms);
+                Floor floor = resolveFloor(normalized, folded, floors);
+                Building building = resolveBuilding(normalized, folded, buildings);
+
+                if (room != null) {
+                    String amenities = room.getAmenities() == null || room.getAmenities().isEmpty()
+                        ? (vi ? "không có" : "none")
+                        : room.getAmenities().stream()
+                        .map(Amenity::getName)
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(s -> !s.isBlank())
+                        .limit(8)
+                        .collect(Collectors.joining(", "));
+
+                    String buildingName = room.getFloor() != null && room.getFloor().getBuilding() != null
+                        ? room.getFloor().getBuilding().getName()
+                        : (vi ? "không xác định" : "unknown");
+                    String floorName = room.getFloor() != null
+                        ? room.getFloor().getName()
+                        : (vi ? "không xác định" : "unknown");
+                    String status = room.getStatus() != null ? room.getStatus().name() : "UNKNOWN";
+                    String capacity = room.getCapacity() != null
+                        ? String.valueOf(room.getCapacity())
+                        : (vi ? "không xác định" : "unknown");
+
+                    String reply = vi
+                        ? "Chi tiết phòng " + room.getLocationCode() + ": tòa " + buildingName + ", tầng " + floorName
+                        + ", trạng thái " + status + ", sức chứa " + capacity + ", tiện ích: " + amenities + "."
+                        : "Room " + room.getLocationCode() + " details: building " + buildingName + ", floor " + floorName
+                        + ", status " + status + ", capacity " + capacity + ", amenities: " + amenities + ".";
+
+                    return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                        .reply(reply)
+                        .build();
+                }
+
+                boolean floorRequested = containsAnyEither(normalized, folded, "tầng", "tang", "floor") || floor != null;
+                if (floorRequested) {
+                    if (floor != null) {
+                    List<Room> floorRooms = rooms.stream()
+                        .filter(r -> r.getFloor() != null && Objects.equals(r.getFloor().getId(), floor.getId()))
+                        .toList();
+                    long totalRooms = floorRooms.size();
+                    long availableRooms = floorRooms.stream().filter(r -> r.getStatus() == RoomStatus.AVAILABLE).count();
+                    long unavailableRooms = floorRooms.stream().filter(r -> r.getStatus() == RoomStatus.UNAVAILABLE).count();
+                    long brokenRooms = floorRooms.stream().filter(r -> r.getStatus() == RoomStatus.BROKEN).count();
+                    String buildingName = floor.getBuilding() != null
+                        ? floor.getBuilding().getName()
+                        : (vi ? "không xác định" : "unknown");
+
+                    String reply = vi
+                        ? "Chi tiết tầng " + floor.getName() + ": thuộc tòa " + buildingName
+                        + ", tổng số phòng " + totalRooms
+                        + ", đang trống " + availableRooms
+                        + ", đang sử dụng " + unavailableRooms
+                        + ", hỏng " + brokenRooms + "."
+                        : "Floor " + floor.getName() + " details: building " + buildingName
+                        + ", total rooms " + totalRooms
+                        + ", available " + availableRooms
+                        + ", unavailable " + unavailableRooms
+                        + ", broken " + brokenRooms + ".";
+
+                    return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                        .reply(reply)
+                        .build();
+                    }
+
+                    String availableFloors = floors.stream()
+                        .map(Floor::getName)
+                        .filter(Objects::nonNull)
+                        .filter(s -> !s.isBlank())
+                        .limit(8)
+                        .collect(Collectors.joining(", "));
+
+                    return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                        .reply(vi
+                            ? (availableFloors.isBlank()
+                            ? "Mình không tìm thấy thông tin tầng trong hệ thống."
+                            : "Mình chưa xác định được bạn muốn xem tầng nào. Một số tầng hiện có: " + availableFloors + ".")
+                            : (availableFloors.isBlank()
+                            ? "I couldn't find floor information in the database."
+                            : "I couldn't determine which floor you mean. Available floors include: " + availableFloors + "."))
+                        .build();
+                }
+
+                boolean buildingRequested = containsAnyEither(normalized, folded, "tòa", "toà", "toa", "building") || building != null;
+                if (buildingRequested) {
+                    if (building != null) {
+                    List<Floor> buildingFloors = floors.stream()
+                        .filter(f -> f.getBuilding() != null && Objects.equals(f.getBuilding().getId(), building.getId()))
+                        .toList();
+                    Set<String> floorIds = buildingFloors.stream().map(Floor::getId).filter(Objects::nonNull).collect(Collectors.toSet());
+                    long totalRooms = rooms.stream()
+                        .filter(r -> r.getFloor() != null && floorIds.contains(r.getFloor().getId()))
+                        .count();
+
+                    String reply = vi
+                        ? "Chi tiết tòa " + building.getName() + ": địa chỉ " + Objects.toString(building.getAddress(), "không xác định")
+                        + ", tổng số tầng " + buildingFloors.size() + ", tổng số phòng " + totalRooms + "."
+                        : "Building " + building.getName() + " details: address " + Objects.toString(building.getAddress(), "unknown")
+                        + ", total floors " + buildingFloors.size() + ", total rooms " + totalRooms + ".";
+
+                    return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                        .reply(reply)
+                        .build();
+                    }
+
+                    String topBuildings = buildings.stream()
+                        .map(Building::getName)
+                        .filter(Objects::nonNull)
+                        .filter(s -> !s.isBlank())
+                        .limit(8)
+                        .collect(Collectors.joining(", "));
+
+                    return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                        .reply(vi
+                            ? (topBuildings.isBlank()
+                            ? "Mình không tìm thấy thông tin tòa nhà trong hệ thống."
+                            : "Mình chưa xác định được bạn muốn xem tòa nào. Các tòa hiện có: " + topBuildings + ".")
+                            : (topBuildings.isBlank()
+                            ? "I couldn't find building details in the database."
+                            : "I couldn't determine which building you mean. Available buildings include: " + topBuildings + "."))
+                        .build();
+                }
+
+                String sample = vi
+                    ? "Ví dụ: 'Xem chi tiết phòng AL-102' hoặc 'Chi tiết tòa A'."
+                    : "For example: 'Show details of room AL-102' or 'Details of building A'.";
+                return ChatbotMessageResponse.builder()
+                    .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                    .reply(vi
+                        ? "Vui lòng cho biết bạn muốn xem chi tiết tòa, tầng hay phòng. " + sample
+                        : "Please specify whether you want building, floor, or room details. " + sample)
+                    .build();
+                }
+
+                private Room resolveRoom(ChatbotMessageParser.ParseResult parsed, String normalized, String folded, List<Room> rooms) {
+                if (parsed != null && parsed.roomCode() != null && !parsed.roomCode().isBlank()) {
+                    return rooms.stream()
+                        .filter(r -> r.getLocationCode() != null && r.getLocationCode().equalsIgnoreCase(parsed.roomCode()))
+                        .findFirst()
+                        .orElse(null);
+                }
+
+                return rooms.stream()
+                    .filter(r -> r.getLocationCode() != null)
+                    .filter(r -> {
+                        String code = r.getLocationCode().toLowerCase(Locale.ROOT);
+                        String codeFolded = foldText(code);
+                        return normalized.contains(code) || folded.contains(codeFolded) || normalized.contains(code.replace("-", " "));
+                    })
+                    .findFirst()
+                    .orElse(null);
+                }
+
+                private Floor resolveFloor(String normalized, String folded, List<Floor> floors) {
+                return floors.stream()
+                    .filter(f -> f.getName() != null && !f.getName().isBlank())
+                    .filter(f -> {
+                        String name = f.getName().toLowerCase(Locale.ROOT);
+                        String foldedName = foldText(name);
+                        return normalized.contains(name) || folded.contains(foldedName);
+                    })
+                    .findFirst()
+                    .orElse(null);
+                }
+
+                private Building resolveBuilding(String normalized, String folded, List<Building> buildings) {
+                return buildings.stream()
+                    .filter(b -> b.getName() != null && !b.getName().isBlank())
+                    .filter(b -> {
+                        String name = b.getName().toLowerCase(Locale.ROOT);
+                        String foldedName = foldText(name);
+                        String address = Objects.toString(b.getAddress(), "").toLowerCase(Locale.ROOT);
+                        String foldedAddress = foldText(address);
+                        return normalized.contains(name)
+                            || folded.contains(foldedName)
+                            || (!address.isBlank() && (normalized.contains(address) || folded.contains(foldedAddress)));
+                    })
+                    .findFirst()
+                    .orElse(null);
+                }
 
             @Transactional(readOnly = true)
             private ChatbotMessageResponse handleSuggestRoomsByCapacity(String message, ChatbotMessageParser.ParseResult parsed) {
@@ -305,11 +546,20 @@ public class ChatbotServiceImpl implements ChatbotService {
 
     @Transactional(readOnly = true)
     private ChatbotMessageResponse handleAvailableRoomsToday(String message, ChatbotMessageParser.ParseResult parsed) {
+        boolean vi = isVietnameseMessage(message);
+        String normalized = parsed != null && parsed.normalizedMessage() != null
+            ? parsed.normalizedMessage()
+            : Objects.toString(message, "").trim().toLowerCase(Locale.ROOT);
+        String folded = foldText(normalized);
+
         LocalDate day = parsed != null && parsed.date() != null ? parsed.date() : LocalDate.now();
+        String dayPhraseVi = humanizeDateVi(day);
+        String dayPhraseEn = humanizeDate(day);
         LocalDateTime startOfDay = day.atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
 
         LocalDateTime now = LocalDateTime.now();
+        boolean instantMode = parsed == null || parsed.startTime() == null;
         LocalDateTime requestedStart = (parsed != null && parsed.startTime() != null)
                 ? LocalDateTime.of(day, parsed.startTime())
                 : now;
@@ -319,15 +569,48 @@ public class ChatbotServiceImpl implements ChatbotService {
         if (!windowStart.isBefore(endOfDay)) {
             return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY)
-                    .reply("Today is almost over — please try a different date/time.")
+                .reply(vi
+                    ? ("Khoảng thời gian của " + dayPhraseVi + " đã qua, vui lòng thử ngày/giờ khác.")
+                    : ("The remaining time window for " + dayPhraseEn + " is over, please try a different date/time."))
                     .availableRooms(List.of())
                     .build();
+        }
+
+        List<Building> buildings = buildingRepository.findAll().stream()
+            .filter(Objects::nonNull)
+            .filter(b -> !b.isDeleted())
+            .toList();
+        Building matchedBuilding = resolveBuilding(normalized, folded, buildings);
+        boolean buildingMentioned = containsAnyEither(normalized, folded, "tòa", "toà", "toa", "building");
+
+        if (buildingMentioned && matchedBuilding == null) {
+            String topBuildings = buildings.stream()
+                .map(Building::getName)
+                .filter(Objects::nonNull)
+                .filter(s -> !s.isBlank())
+                .limit(8)
+                .collect(Collectors.joining(", "));
+            return ChatbotMessageResponse.builder()
+                .intent(ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY)
+                .reply(vi
+                    ? (topBuildings.isBlank()
+                    ? "Mình không tìm thấy dữ liệu tòa nhà trong hệ thống."
+                    : "Mình chưa xác định được tòa bạn muốn xem. Các tòa hiện có: " + topBuildings + ".")
+                    : (topBuildings.isBlank()
+                    ? "I couldn't find building data in the database."
+                    : "I couldn't determine which building you mean. Available buildings include: " + topBuildings + "."))
+                .availableRooms(List.of())
+                .build();
         }
 
         List<Room> rooms = roomRepository.findAllWithDetails().stream()
                 .filter(r -> r.getStatus() != RoomStatus.BROKEN)
                 .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
                 .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
+            .filter(r -> matchedBuilding == null
+                || (r.getFloor() != null
+                && r.getFloor().getBuilding() != null
+                && Objects.equals(r.getFloor().getBuilding().getId(), matchedBuilding.getId())))
                 .collect(Collectors.toList());
 
         List<String> roomIds = rooms.stream().map(Room::getId).filter(Objects::nonNull).toList();
@@ -349,12 +632,26 @@ public class ChatbotServiceImpl implements ChatbotService {
                 ? List.of()
                 : reservationRepository.findOverlappingReservationsForRooms(roomIds, blocking, windowStart, endOfDay);
 
+        LocalDateTime pointEnd = requestedStart.plusMinutes(1);
+        List<Reservation> overlapsAtPoint = roomIds.isEmpty()
+            ? List.of()
+            : reservationRepository.findOverlappingReservationsForRooms(roomIds, blocking, requestedStart, pointEnd);
+        Set<String> busyAtPoint = overlapsAtPoint.stream()
+            .map(Reservation::getRoom)
+            .filter(Objects::nonNull)
+            .map(Room::getId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
         Map<String, List<Reservation>> reservationsByRoom = overlaps.stream()
                 .collect(Collectors.groupingBy(r -> r.getRoom().getId()));
 
         List<ChatbotRoomItemResponse> available = new ArrayList<>();
 
         for (Room room : rooms) {
+            if (instantMode && busyAtPoint.contains(room.getId())) {
+                continue;
+            }
             List<Reservation> busy = reservationsByRoom.getOrDefault(room.getId(), List.of());
             List<TimeRange> freeRanges = computeFreeRanges(windowStart, endOfDay, busy);
             if (freeRanges.isEmpty()) continue;
@@ -367,11 +664,25 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
 
         if (available.isEmpty()) {
-            String reply = pickByHash(message,
-                    "I couldn’t find any rooms available for the rest of today. Want to try a different time or date?",
-                    "All rooms look booked for the remaining hours today. You can ask for another date/time window.",
-                    "No available rooms for the rest of today. Try another time slot or tomorrow."
-            );
+            String scope = matchedBuilding != null ? matchedBuilding.getName() : null;
+            String reply;
+            if (instantMode) {
+                reply = vi
+                        ? (scope == null
+                            ? "Hiện tại không có phòng trống. Bạn muốn thử mốc thời gian khác không?"
+                            : "Hiện tại tòa " + scope + " không có phòng trống.")
+                        : (scope == null
+                            ? "There are no rooms available right now. Would you like to try another time?"
+                            : "There are no rooms available right now in building " + scope + ".");
+            } else {
+                reply = vi
+                        ? (scope == null
+                            ? "Mình không tìm thấy phòng trống cho phần thời gian còn lại của " + dayPhraseVi + "."
+                            : "Mình không tìm thấy phòng trống cho phần thời gian còn lại của " + dayPhraseVi + " ở tòa " + scope + ".")
+                        : (scope == null
+                            ? "I couldn't find any rooms available for the rest of " + dayPhraseEn + "."
+                            : "I couldn't find any rooms available for the rest of " + dayPhraseEn + " in building " + scope + ".");
+            }
 
             return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY)
@@ -381,19 +692,39 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
 
         String reply;
-        if (parsed != null && parsed.startTime() != null) {
+        String scope = matchedBuilding != null ? matchedBuilding.getName() : null;
+        if (!instantMode && parsed != null && parsed.startTime() != null) {
             String t = parsed.startTime().format(TIME_FMT);
-            reply = pickByHash(message,
-                "Rooms available as of " + t + " today:",
-                "Here are rooms that have free time from " + t + " today:",
-                "These rooms are available starting " + t + " today:"
-            );
+            if (vi) {
+                reply = scope == null
+                        ? "Các phòng có thể trống từ " + t + " " + dayPhraseVi + ":"
+                        : "Các phòng có thể trống từ " + t + " " + dayPhraseVi + " tại tòa " + scope + ":";
+            } else {
+                reply = scope == null
+                        ? "Rooms available as of " + t + " " + dayPhraseEn + ":"
+                        : "Rooms available as of " + t + " " + dayPhraseEn + " in building " + scope + ":";
+            }
+        } else if (instantMode) {
+            String nowText = requestedStart.format(TIME_FMT);
+            if (vi) {
+                reply = scope == null
+                        ? "Các phòng đang trống tại thời điểm hiện tại (" + nowText + ") :"
+                        : "Các phòng đang trống tại thời điểm hiện tại (" + nowText + ") ở tòa " + scope + ":";
+            } else {
+                reply = scope == null
+                        ? "Rooms available right now (" + nowText + "):"
+                        : "Rooms available right now (" + nowText + ") in building " + scope + ":";
+            }
         } else {
-            reply = pickByHash(message,
-                "Here are rooms that still have free time today:",
-                "I found some rooms with open slots today:",
-                "These rooms are available later today:"
-            );
+            if (vi) {
+                reply = scope == null
+                        ? "Các phòng còn khung giờ trống trong " + dayPhraseVi + ":"
+                        : "Các phòng còn khung giờ trống trong " + dayPhraseVi + " tại tòa " + scope + ":";
+            } else {
+                reply = scope == null
+                        ? "Here are rooms that still have free time in " + dayPhraseEn + ":"
+                        : "Here are rooms that still have free time in " + dayPhraseEn + " in building " + scope + ":";
+            }
         }
 
         return ChatbotMessageResponse.builder()
@@ -618,6 +949,14 @@ public class ChatbotServiceImpl implements ChatbotService {
         return "on " + date;
     }
 
+    private String humanizeDateVi(LocalDate date) {
+        if (date == null) return "";
+        LocalDate today = LocalDate.now();
+        if (date.equals(today)) return "hôm nay";
+        if (date.equals(today.plusDays(1))) return "ngày mai";
+        return "ngày " + date;
+    }
+
     private ChatbotRoomItemResponse toRoomItem(Room room, List<String> timeSlots) {
         return toRoomItem(room, timeSlots, null);
     }
@@ -717,5 +1056,45 @@ public class ChatbotServiceImpl implements ChatbotService {
         if (variants == null || variants.length == 0) return "";
         int idx = Math.abs(Objects.toString(message, "").hashCode()) % variants.length;
         return variants[idx];
+    }
+
+    private boolean containsAny(String source, String... needles) {
+        if (source == null || source.isBlank() || needles == null || needles.length == 0) return false;
+        for (String n : needles) {
+            if (n != null && !n.isBlank() && source.contains(n.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsAnyEither(String normalized, String folded, String... needles) {
+        if (needles == null || needles.length == 0) return false;
+        for (String n : needles) {
+            if (n == null || n.isBlank()) continue;
+            String lower = n.toLowerCase(Locale.ROOT);
+            String foldedNeedle = foldText(lower);
+            if ((normalized != null && normalized.contains(lower))
+                    || (folded != null && folded.contains(foldedNeedle))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String foldText(String input) {
+        if (input == null) return "";
+        String lower = input.toLowerCase(Locale.ROOT);
+        String normalized = Normalizer.normalize(lower, Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{M}+", "");
+    }
+
+    private boolean isVietnameseMessage(String message) {
+        if (message == null || message.isBlank()) return false;
+        String lower = message.toLowerCase(Locale.ROOT);
+        String folded = foldText(lower);
+        boolean hasVnChar = lower.matches(".*[ăâđêôơưáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ].*");
+        return hasVnChar || containsAnyEither(lower, folded,
+                "hôm", "hom", "ngày", "ngay", "đặt", "dat", "phòng", "phong", "tòa", "toa", "tầng", "tang", "chi tiết", "chi tiet");
     }
 }
