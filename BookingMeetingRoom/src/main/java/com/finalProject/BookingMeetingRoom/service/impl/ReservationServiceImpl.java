@@ -2,9 +2,11 @@ package com.finalProject.BookingMeetingRoom.service.impl;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -12,6 +14,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +35,7 @@ import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationHistoryResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationTimelineResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.repository.ReservationHistoryRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
@@ -551,6 +555,106 @@ public class ReservationServiceImpl implements ReservationService {
             throw e;
         } catch (Exception e) {
             log.error("Unexpected error during force cancelling", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+     /**
+     * Get the reservation timeline for a specific reservation ID.
+     *
+     * @param reservationId the ID of the reservation to get the timeline for
+     * @return a list of reservation timeline responses
+     */
+    public List<ReservationTimelineResponse> getReservationTimeline(String reservationId) {
+        try {
+            final var reservation = reservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+            final String id = reservation.getId();
+            final List<ReservationTimelineResponse> timeline = new ArrayList<>();
+
+            timeline.add(new ReservationTimelineResponse(
+                    id,
+                    reservation.getStatus(),
+                    null,
+                    reservation.getUpdatedAt()
+            ));
+
+            if (reservation.getCheckinTime() != null) {
+                timeline.add(new ReservationTimelineResponse(
+                        id,
+                        null,
+                        HistoryAction.CHECK_IN,
+                        reservation.getCheckinTime()
+                ));
+            }
+
+            reservationHistoryRepository.findByReservationId(id).forEach(history -> {
+                timeline.add(new ReservationTimelineResponse(
+                        id,
+                        history.getOldStatus(),
+                        history.getAction(),
+                        history.getPerformAt()
+                ));
+            });
+
+            timeline.sort(Comparator.comparing(ReservationTimelineResponse::getPerformAt).reversed());
+
+            return timeline;
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during get reservation timeline", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Get the reservation history for the connected user within a specified date range.
+     *
+     * @param startDate     the start date of the history (inclusive)
+     * @param endDate       the end date of the history (inclusive)
+     * @param page          the page number
+     * @param size          the size of each page
+     * @param connectedUser the authentication object containing user details
+     * @return a paginated list of reservation responses for the user's history
+     */
+    public Page<ReservationResponse> getReservationHistory(LocalDate startDate, LocalDate endDate, int page, int size,
+                                                           Authentication connectedUser) {
+        try {
+            var user = userRepository.findByEmail(connectedUser.getName())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            LocalDate now = LocalDate.now();
+            if (startDate == null && endDate == null) {
+                endDate = now;
+                startDate = now.minusMonths(1);
+            } else if (startDate == null) {
+                startDate = endDate.minusMonths(1);
+            } else if (endDate == null) {
+                endDate = startDate.plusMonths(1);
+            }
+
+            Pageable pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
+
+            LocalDateTime startDateTime = startDate.atStartOfDay();
+            LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+            return reservationRepository
+                    .findByUserAndStatusInAndStartTimeBetween(
+                            user,
+                            List.of(ReservationStatus.NO_SHOW, ReservationStatus.FAILED,
+                                    ReservationStatus.CANCELLED, ReservationStatus.COMPLETED,
+                                    ReservationStatus.FORCE_CANCELLED),
+                            startDateTime,
+                            endDateTime,
+                            pageable
+                    )
+                    .map(reservationMapperFacade::toResponse);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during get reservation history", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }

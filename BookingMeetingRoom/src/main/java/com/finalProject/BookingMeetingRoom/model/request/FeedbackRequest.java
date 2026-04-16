@@ -18,6 +18,8 @@ import jakarta.validation.constraints.NotBlank;
 @AllArgsConstructor
 public class FeedbackRequest {
 
+    public FeedbackRequest() {
+    }
     @NotBlank(message = "Reservation's id is mandatory")
     private String reservationId;
 
