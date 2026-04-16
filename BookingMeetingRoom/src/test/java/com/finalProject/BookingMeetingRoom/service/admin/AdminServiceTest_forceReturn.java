@@ -11,6 +11,8 @@ import com.finalProject.BookingMeetingRoom.model.entity.User;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.RoomStatusUpdateService;
+import com.finalProject.BookingMeetingRoom.service.impl.AdminServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -71,7 +73,7 @@ public class AdminServiceTest_forceReturn {
 
         when(RoomRepository.findRoomsByRoomIds(RoomIds)).thenReturn(List.of(Room));
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
-        when(reservationRepository.findByRoomIdAndStatus(RoomId, String.valueOf(ReservationStatus.IN_USE)))
+        when(reservationRepository.findByIdAndStatus(RoomId, ReservationStatus.IN_USE))
                 .thenReturn(Optional.of(reservation));
         when(authentication.getName()).thenReturn(email);
 
@@ -104,7 +106,7 @@ public class AdminServiceTest_forceReturn {
         // When & Then
         CustomException ex = assertThrows(CustomException.class, () ->
                 adminService.forceReturn(RoomIds, authentication));
-        assertEquals(ResponseCode.Room_NOT_FOUND, ex.getResponseCode());
+        assertEquals(ResponseCode.ROOM_NOT_FOUND, ex.getResponseCode());
     }
 
     @Test
@@ -139,7 +141,7 @@ public class AdminServiceTest_forceReturn {
         when(RoomRepository.findRoomsByRoomIds(any())).thenReturn(List.of(Room));
         when(authentication.getName()).thenReturn(email);
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
-        when(reservationRepository.findByRoomIdAndStatus(eq(RoomId), any())).thenReturn(Optional.empty());
+        when(reservationRepository.findByIdAndStatus(eq(RoomId), any())).thenReturn(Optional.empty());
 
         // When & Then
         CustomException ex = assertThrows(CustomException.class, () ->

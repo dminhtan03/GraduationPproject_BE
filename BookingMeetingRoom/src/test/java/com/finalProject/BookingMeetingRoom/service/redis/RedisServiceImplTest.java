@@ -1,5 +1,9 @@
 package com.finalProject.BookingMeetingRoom.service.redis;
 
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.model.entity.RefreshToken;
+import com.finalProject.BookingMeetingRoom.service.RedisService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +32,7 @@ class RedisServiceImplTest {
     private ValueOperations<String, Object> valueOperations;
 
     @InjectMocks
-    private RedisServiceImpl redisService;
+    private RedisService redisService;
 
     private RefreshToken testRefreshToken;
     private final String TEST_KEY = "test-key";

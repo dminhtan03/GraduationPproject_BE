@@ -36,7 +36,7 @@ public class Room {
     @Column(name = "LOCATION_CODE", unique = true)
     private String locationCode;
 
-    @Column(name = "STATUS")
+    @Column(name = "STATUS", length = 20, columnDefinition = "VARCHAR(20)")
     @Enumerated(EnumType.STRING)
     private RoomStatus status;
 

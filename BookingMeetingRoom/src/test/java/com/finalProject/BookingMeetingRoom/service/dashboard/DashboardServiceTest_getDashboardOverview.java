@@ -1,5 +1,9 @@
 package com.finalProject.BookingMeetingRoom.service.dashboard;
 
+import com.finalProject.BookingMeetingRoom.model.projection.BuildingOccupancyProjection;
+import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.service.impl.DashboardServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

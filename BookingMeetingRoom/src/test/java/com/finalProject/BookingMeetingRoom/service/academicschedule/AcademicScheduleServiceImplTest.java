@@ -8,6 +8,7 @@ import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleCreateR
 import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleUpdateRequest;
 import com.finalProject.BookingMeetingRoom.repository.AcademicScheduleRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.service.impl.AcademicScheduleServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

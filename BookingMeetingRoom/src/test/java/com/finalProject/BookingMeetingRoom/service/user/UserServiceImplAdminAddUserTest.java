@@ -14,6 +14,7 @@ import com.finalProject.BookingMeetingRoom.repository.UserOtpRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.EmailService;
 import com.finalProject.BookingMeetingRoom.service.RedisService;
+import com.finalProject.BookingMeetingRoom.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;

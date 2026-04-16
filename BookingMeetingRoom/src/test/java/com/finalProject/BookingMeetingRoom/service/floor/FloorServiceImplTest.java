@@ -1,5 +1,15 @@
 package com.finalProject.BookingMeetingRoom.service.floor;
 
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.model.dto.AdminFloorDto;
+import com.finalProject.BookingMeetingRoom.model.entity.Building;
+import com.finalProject.BookingMeetingRoom.model.entity.Floor;
+import com.finalProject.BookingMeetingRoom.model.projection.RoomDtoProjection;
+import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
+import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +39,7 @@ class FloorServiceImplTest {
     private RoomRepository roomRepository;
 
     @InjectMocks
-    private FloorServiceImpl floorService;
+    private FloorSericeImpl floorService;
 
     private Building testBuilding;
     private Floor testFloor;

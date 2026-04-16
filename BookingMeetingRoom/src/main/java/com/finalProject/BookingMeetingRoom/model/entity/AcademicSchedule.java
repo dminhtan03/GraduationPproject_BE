@@ -9,6 +9,7 @@ import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Getter
@@ -45,10 +46,16 @@ public class AcademicSchedule {
     @Column(name = "DESCRIPTION")
     private String description;
 
+    @Column(name = "CREATED_AT")
+    private LocalDateTime createdAt;
+
     @PrePersist
-    public void ensureId() {
+    public void ensureIdAndCreatedAt() {
         if (id == null) {
             id = UUID.randomUUID().toString();
+        }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
         }
     }
 }
