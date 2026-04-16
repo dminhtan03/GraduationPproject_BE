@@ -1,32 +1,54 @@
 package com.finalProject.BookingMeetingRoom.service.feedback;
 
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.Logger;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
+
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.mapper.FeedbackMapper;
-import com.finalProject.BookingMeetingRoom.model.entity.*;
+import com.finalProject.BookingMeetingRoom.model.entity.Feedback;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.model.entity.UserInfo;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackRequest;
 import com.finalProject.BookingMeetingRoom.model.response.FeedbackResponse;
 import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.slf4j.Logger;
-import org.springframework.data.domain.*;
-import org.springframework.security.core.Authentication;
-
-import java.time.LocalDateTime;
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import com.finalProject.BookingMeetingRoom.service.impl.FeedBackServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
 class FeedbackServiceImplTest {
@@ -53,7 +75,7 @@ class FeedbackServiceImplTest {
     private Logger logger;
 
     @InjectMocks
-    private FeedbackServiceImpl feedbackService;
+    private FeedBackServiceImpl feedbackService;
 
     private User testUser;
     private UserInfo testUserInfo;
@@ -360,7 +382,7 @@ class FeedbackServiceImplTest {
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
 
         // Act
-        feedbackService.addFeedback(feedbackRequest, connectedUser);
+        feedbackService.createFeedback(feedbackRequest, connectedUser);
 
         // Assert
         ArgumentCaptor<Feedback> feedbackCaptor = ArgumentCaptor.forClass(Feedback.class);
@@ -393,7 +415,7 @@ class FeedbackServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            feedbackService.addFeedback(feedbackRequest, connectedUser);
+            feedbackService.createFeedback(feedbackRequest, connectedUser);
         });
 
         assertEquals(ResponseCode.USER_NOT_FOUND, exception.getResponseCode());
@@ -420,7 +442,7 @@ class FeedbackServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            feedbackService.addFeedback(invalidRequest, connectedUser);
+            feedbackService.createFeedback(invalidRequest, connectedUser);
         });
 
         assertEquals(ResponseCode.RESERVATION_NOT_FOUND, exception.getResponseCode());
@@ -445,7 +467,7 @@ class FeedbackServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            feedbackService.addFeedback(feedbackRequest, connectedUser);
+            feedbackService.createFeedback(feedbackRequest, connectedUser);
         });
 
         assertEquals(ResponseCode.FEEDBACK_ALREADY_EXISTS, exception.getResponseCode());
@@ -470,7 +492,7 @@ class FeedbackServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            feedbackService.addFeedback(feedbackRequest, connectedUser);
+            feedbackService.createFeedback(feedbackRequest, connectedUser);
         });
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
@@ -494,7 +516,7 @@ class FeedbackServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            feedbackService.addFeedback(feedbackRequest, connectedUser);
+            feedbackService.createFeedback(feedbackRequest, connectedUser);
         });
 
         assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, exception.getResponseCode());
@@ -519,7 +541,7 @@ class FeedbackServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            feedbackService.addFeedback(feedbackRequest, connectedUser);
+            feedbackService.createFeedback(feedbackRequest, connectedUser);
         });
 
         assertEquals(ResponseCode.ROOM_NOT_FOUND, exception.getResponseCode());
@@ -540,7 +562,7 @@ class FeedbackServiceImplTest {
 
         // Act & Assert
         CustomException exception = assertThrows(CustomException.class, () -> {
-            feedbackService.addFeedback(feedbackRequest, connectedUser);
+            feedbackService.createFeedback(feedbackRequest, connectedUser);
         });
 
         assertEquals(ResponseCode.USER_NOT_FOUND, exception.getResponseCode());
@@ -561,7 +583,7 @@ class FeedbackServiceImplTest {
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
 
         // Act
-        feedbackService.addFeedback(feedbackRequest, connectedUser);
+        feedbackService.createFeedback(feedbackRequest, connectedUser);
 
         // Assert
         ArgumentCaptor<Feedback> feedbackCaptor = ArgumentCaptor.forClass(Feedback.class);

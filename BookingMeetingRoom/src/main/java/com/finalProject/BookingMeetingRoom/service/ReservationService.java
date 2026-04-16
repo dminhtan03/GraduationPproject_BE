@@ -1,17 +1,19 @@
 package com.finalProject.BookingMeetingRoom.service;
 
-import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
-import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
-import com.finalProject.BookingMeetingRoom.model.response.AdminReservationResponse;
-import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
-import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
-import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.security.core.Authentication;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
+import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
+import com.finalProject.BookingMeetingRoom.model.response.AdminReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationTimelineResponse;
 
 public interface ReservationService {
 
@@ -25,6 +27,11 @@ public interface ReservationService {
         ReservationResponse reserveRoom(ReservationRequest request, Authentication connectedUser);
 
         Page<ReservationResponse> getAllReservations(int page, int size);
+
+        List<ReservationTimelineResponse> getReservationTimeline(String reservationId);
+
+        Page<ReservationResponse> getReservationHistory(LocalDate startDate, LocalDate endDate, int page, int size,
+                                                    Authentication connectedUser);
 
         Page<MyReservationResponse> getReservationStatus(int page, int size, Authentication connectedUser,
                         String locationCode, String address, List<String> statuses,

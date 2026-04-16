@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
 import com.finalProject.BookingMeetingRoom.model.projection.MyReservationProjection;
 
 @Repository
@@ -241,6 +242,11 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
       "AND r.status IN :statuses")
   List<Reservation> findByRoomIdsAndStatusIn(@Param("roomIds") Set<String> roomIds,
       @Param("statuses") List<ReservationStatus> statuses);
+
+      Page<Reservation> findByUserAndStatusInAndStartTimeBetween(User user,
+                                                               List<ReservationStatus> statuses,
+                                                               LocalDateTime start, LocalDateTime end,
+                                                               Pageable pageable);
 
   @Query("""
       SELECT u.id,
