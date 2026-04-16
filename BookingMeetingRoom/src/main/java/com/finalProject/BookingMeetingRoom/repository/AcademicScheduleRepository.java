@@ -19,6 +19,16 @@ public interface AcademicScheduleRepository extends JpaRepository<AcademicSchedu
             "AND s.fromDate <= :date AND s.toDate >= :date")
     List<AcademicSchedule> findSchedulesByRoomAndDate(String roomId, LocalDate date);
 
+    @Query("SELECT s FROM AcademicSchedule s WHERE s.room.id = :roomId " +
+            "AND s.fromDate <= :toDate AND s.toDate >= :fromDate " +
+            "AND s.startTime < :endTime AND s.endTime > :startTime")
+    List<AcademicSchedule> findPotentialOverlappingSchedules(
+            @Param("roomId") String roomId,
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate,
+            @Param("startTime") java.time.LocalTime startTime,
+            @Param("endTime") java.time.LocalTime endTime);
+
     List<AcademicSchedule> findByRoomId(String roomId);
 
     @Query("SELECT s FROM AcademicSchedule s WHERE s.fromDate <= :date AND s.toDate >= :date")

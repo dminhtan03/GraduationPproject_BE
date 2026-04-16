@@ -1,18 +1,20 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
-import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
-import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
-import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
-import com.finalProject.BookingMeetingRoom.model.entity.AcademicSchedule;
-import com.finalProject.BookingMeetingRoom.model.entity.Room;
-import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleCreateRequest;
-import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleUpdateRequest;
-import com.finalProject.BookingMeetingRoom.model.response.AcademicScheduleResponse;
-import com.finalProject.BookingMeetingRoom.repository.AcademicScheduleRepository;
-import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
-import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
-import lombok.RequiredArgsConstructor;
-import org.apache.poi.ss.usermodel.*;
+import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,15 +25,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.InputStream;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.model.entity.AcademicSchedule;
+import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleCreateRequest;
+import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.response.AcademicScheduleResponse;
+import com.finalProject.BookingMeetingRoom.repository.AcademicScheduleRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -82,46 +88,84 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
 
             Sheet sheet = workbook.getSheetAt(0);
             List<AcademicSchedule> schedulesToSave = new ArrayList<>();
-            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+            List<String> errors = new ArrayList<>();
 
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
 
-                // Cấu trúc file Excel giả định:
-                // Cột 0: RoomCode (vd: R001)
-                // Cột 1: StartTime (vd: 07:00)
-                // Cột 2: EndTime (vd: 17:00)
-                // Cột 3: DaysOfWeek (vd: MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY)
-                // Cột 4: FromDate (vd: 2026-03-31)
-                // Cột 5: ToDate (vd: 2026-06-30)
-                // Cột 6: Description (vd: Lớp học K17)
-
                 String roomCode = getCellValueAsString(row.getCell(0));
                 if (roomCode.isEmpty()) continue;
 
-                LocalTime startTime = parseLocalTime(row.getCell(1));
-                LocalTime endTime = parseLocalTime(row.getCell(2));
-                String days = getCellValueAsString(row.getCell(3));
-                LocalDate fromDate = parseLocalDate(row.getCell(4));
-                LocalDate toDate = parseLocalDate(row.getCell(5));
-                String desc = getCellValueAsString(row.getCell(6));
+                try {
+                    LocalTime startTime = parseLocalTime(row.getCell(1));
+                    LocalTime endTime = parseLocalTime(row.getCell(2));
+                    String days = getCellValueAsString(row.getCell(3));
+                    LocalDate fromDate = parseLocalDate(row.getCell(4));
+                    LocalDate toDate = parseLocalDate(row.getCell(5));
+                    String desc = getCellValueAsString(row.getCell(6));
 
-                Room room = roomRepository.findByLocationCode(roomCode)
-                        .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
+                    if (!startTime.isBefore(endTime)) {
+                        errors.add(String.format("Dòng %d: Giờ bắt đầu (%s) phải trước giờ kết thúc (%s)", i + 1, startTime, endTime));
+                        continue;
+                    }
 
-                AcademicSchedule schedule = AcademicSchedule.builder()
-                        .id(UUID.randomUUID().toString())
-                        .room(room)
-                        .startTime(startTime)
-                        .endTime(endTime)
-                        .daysOfWeek(days.toUpperCase())
-                        .fromDate(fromDate)
-                        .toDate(toDate)
-                        .description(desc)
-                        .build();
+                    Room room = roomRepository.findByLocationCode(roomCode)
+                            .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND, "Phòng " + roomCode + " không tồn tại"));
 
-                schedulesToSave.add(schedule);
+                    // Kiểm tra trùng lặp với dữ liệu đã có trong database
+                    try {
+                        validateNoOverlap(room.getId(), fromDate, toDate, startTime, endTime, days, null);
+                    } catch (CustomException e) {
+                        errors.add(String.format("Dòng %d: %s", i + 1, e.getMessage()));
+                        continue;
+                    }
+
+                    // Kiểm tra trùng lặp với các bản ghi khác trong cùng file excel
+                    boolean internalOverlap = false;
+                    for (AcademicSchedule existingInBatch : schedulesToSave) {
+                        if (existingInBatch.getRoom().getId().equals(room.getId())) {
+                            if (!(fromDate.isAfter(existingInBatch.getToDate()) || toDate.isBefore(existingInBatch.getFromDate()))) {
+                                if (startTime.isBefore(existingInBatch.getEndTime()) && endTime.isAfter(existingInBatch.getStartTime())) {
+                                    String[] newDays = days.split(",");
+                                    String[] batchDays = existingInBatch.getDaysOfWeek().split(",");
+                                    for (String nDay : newDays) {
+                                        for (String bDay : batchDays) {
+                                            if (nDay.trim().equalsIgnoreCase(bDay.trim())) {
+                                                errors.add(String.format("Dòng %d: Trùng lịch học ngay trong file Excel cho phòng %s vào %s", i + 1, roomCode, nDay.trim()));
+                                                internalOverlap = true;
+                                                break;
+                                            }
+                                        }
+                                        if (internalOverlap) break;
+                                    }
+                                }
+                            }
+                        }
+                        if (internalOverlap) break;
+                    }
+
+                    if (internalOverlap) continue;
+
+                    AcademicSchedule schedule = AcademicSchedule.builder()
+                            .id(UUID.randomUUID().toString())
+                            .room(room)
+                            .startTime(startTime)
+                            .endTime(endTime)
+                            .daysOfWeek(days.toUpperCase())
+                            .fromDate(fromDate)
+                            .toDate(toDate)
+                            .description(desc)
+                            .build();
+
+                    schedulesToSave.add(schedule);
+                } catch (Exception e) {
+                    errors.add(String.format("Dòng %d: Lỗi định dạng hoặc dữ liệu không hợp lệ (%s)", i + 1, e.getMessage()));
+                }
+            }
+
+            if (!errors.isEmpty()) {
+                throw new CustomException(ResponseCode.ACADEMIC_SCHEDULE_OVERLAP, String.join("\n", errors));
             }
 
             scheduleRepository.saveAll(schedulesToSave);
@@ -177,6 +221,45 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     }
 
     @Override
+    @Transactional
+    public void deleteSchedules(List<String> scheduleIds) {
+        if (scheduleIds != null && !scheduleIds.isEmpty()) {
+            scheduleRepository.deleteAllById(scheduleIds);
+            updateRoomStatusesBySchedule();
+        }
+    }
+
+    @Override
+    @Transactional
+    public void bulkUpdateSchedules(List<String> scheduleIds, AcademicScheduleUpdateRequest request) {
+        if (scheduleIds == null || scheduleIds.isEmpty()) return;
+
+        if (!request.getStartTime().isBefore(request.getEndTime())) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED, "Giờ bắt đầu phải trước giờ kết thúc");
+        }
+
+        List<AcademicSchedule> schedules = scheduleRepository.findAllById(scheduleIds);
+        String daysOfWeek = String.join(",", request.getDaysOfWeek()).toUpperCase();
+
+        for (AcademicSchedule schedule : schedules) {
+            validateNoOverlap(schedule.getRoom().getId(), request.getFromDate(), request.getToDate(),
+                    request.getStartTime(), request.getEndTime(), daysOfWeek, schedule.getId());
+
+            schedule.setStartTime(request.getStartTime());
+            schedule.setEndTime(request.getEndTime());
+            schedule.setDaysOfWeek(daysOfWeek);
+            schedule.setFromDate(request.getFromDate());
+            schedule.setToDate(request.getToDate());
+            if (request.getDescription() != null && !request.getDescription().isEmpty()) {
+                schedule.setDescription(request.getDescription());
+            }
+        }
+
+        scheduleRepository.saveAll(schedules);
+        updateRoomStatusesBySchedule();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Page<AcademicScheduleResponse> searchSchedules(String roomName, String floorId, String buildingId, LocalDate fromDate, LocalDate toDate, Pageable pageable) {
         return scheduleRepository.searchSchedules(roomName, floorId, buildingId, fromDate, toDate, pageable)
@@ -200,15 +283,23 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     @Override
     @Transactional
     public void createSchedule(AcademicScheduleCreateRequest request) {
+        if (!request.getStartTime().isBefore(request.getEndTime())) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED, "Giờ bắt đầu phải trước giờ kết thúc");
+        }
+
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
+
+        String daysOfWeek = String.join(",", request.getDaysOfWeek()).toUpperCase();
+        validateNoOverlap(room.getId(), request.getFromDate(), request.getToDate(),
+                request.getStartTime(), request.getEndTime(), daysOfWeek, null);
 
         AcademicSchedule schedule = AcademicSchedule.builder()
                 .id(UUID.randomUUID().toString())
                 .room(room)
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
-                .daysOfWeek(String.join(",", request.getDaysOfWeek()).toUpperCase())
+                .daysOfWeek(daysOfWeek)
                 .fromDate(request.getFromDate())
                 .toDate(request.getToDate())
                 .description(request.getDescription())
@@ -221,18 +312,56 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     @Override
     @Transactional
     public void updateSchedule(String scheduleId, AcademicScheduleUpdateRequest request) {
+        if (!request.getStartTime().isBefore(request.getEndTime())) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED, "Giờ bắt đầu phải trước giờ kết thúc");
+        }
+
         AcademicSchedule schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new CustomException(ResponseCode.INTERNAL_SERVER_ERROR, "Schedule not found"));
 
+        String daysOfWeek = String.join(",", request.getDaysOfWeek()).toUpperCase();
+        validateNoOverlap(schedule.getRoom().getId(), request.getFromDate(), request.getToDate(),
+                request.getStartTime(), request.getEndTime(), daysOfWeek, scheduleId);
+
         schedule.setStartTime(request.getStartTime());
         schedule.setEndTime(request.getEndTime());
-        schedule.setDaysOfWeek(String.join(",", request.getDaysOfWeek()).toUpperCase());
+        schedule.setDaysOfWeek(daysOfWeek);
         schedule.setFromDate(request.getFromDate());
         schedule.setToDate(request.getToDate());
         schedule.setDescription(request.getDescription());
 
         scheduleRepository.save(schedule);
         updateRoomStatusesBySchedule();
+    }
+
+    private void validateNoOverlap(String roomId, LocalDate fromDate, LocalDate toDate, LocalTime startTime, LocalTime endTime, String daysOfWeek, String currentScheduleId) {
+        List<AcademicSchedule> potentialOverlaps = scheduleRepository.findPotentialOverlappingSchedules(
+                roomId, fromDate, toDate, startTime, endTime);
+
+        String[] newDays = daysOfWeek.split(",");
+
+        for (AcademicSchedule existing : potentialOverlaps) {
+            // Bỏ qua bản ghi hiện tại nếu đang thực hiện cập nhật
+            if (currentScheduleId != null && existing.getId().equals(currentScheduleId)) {
+                continue;
+            }
+
+            String[] existingDays = existing.getDaysOfWeek().split(",");
+            for (String newDay : newDays) {
+                String nDay = newDay.trim();
+                if (nDay.isEmpty()) continue;
+                for (String existingDay : existingDays) {
+                    if (nDay.equalsIgnoreCase(existingDay.trim())) {
+                        throw new CustomException(ResponseCode.ACADEMIC_SCHEDULE_OVERLAP,
+                                String.format("Phòng %s đã có lịch học vào %s (từ %s đến %s)",
+                                        existing.getRoom().getLocationCode(),
+                                        nDay.toUpperCase(),
+                                        existing.getStartTime(),
+                                        existing.getEndTime()));
+                    }
+                }
+            }
+        }
     }
 
     /**

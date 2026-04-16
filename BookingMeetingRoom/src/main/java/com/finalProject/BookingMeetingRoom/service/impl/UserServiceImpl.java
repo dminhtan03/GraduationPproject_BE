@@ -23,8 +23,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.util.UUID;
-import java.util.Set;
+import java.util.*;
 // end add excel and registration imports
 import jakarta.mail.MessagingException;
 import jakarta.transaction.Transactional;
@@ -40,7 +39,6 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -472,6 +470,7 @@ public class UserServiceImpl implements UserService {
              Workbook workbook = new XSSFWorkbook(is)) {
 
             Sheet sheet = workbook.getSheetAt(0);
+            List<String> errors = new ArrayList<>();
             for (Row row : sheet) {
                 // Skip header row
                 if (row.getRowNum() == 0) continue;
@@ -501,10 +500,19 @@ public class UserServiceImpl implements UserService {
                     request.setRole(role);
 
                     adminAddUser(request); // Use adminAddUser to enable immediately
+                } catch (CustomException e) {
+                    errors.add(String.format("Dòng %d: %s", row.getRowNum() + 1, e.getMessage()));
                 } catch (Exception e) {
+                    errors.add(String.format("Dòng %d: Lỗi không xác định (%s)", row.getRowNum() + 1, e.getMessage()));
                     log.error("Error processing user row " + row.getRowNum() + ": " + e.getMessage());
                 }
             }
+
+            if (!errors.isEmpty()) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED, String.join("\n", errors));
+            }
+        } catch (CustomException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error importing users from excel: " + e.getMessage(), e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);

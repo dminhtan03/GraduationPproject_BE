@@ -394,7 +394,7 @@ public class RoomServiceImpl implements RoomService {
              Workbook workbook = new XSSFWorkbook(is)) {
 
             Sheet sheet = workbook.getSheetAt(0);
-            List<String> skippedRooms = new ArrayList<>();
+            List<String> errors = new ArrayList<>();
             List<String> existingRoomNames = roomRepository.findAllLocationCodes();
 
             for (Row row : sheet) {
@@ -416,14 +416,12 @@ public class RoomServiceImpl implements RoomService {
                     String publicId = getCellValue(row.getCell(7));
 
                     if (locationCode.isEmpty() || targetFloorId.isEmpty()) {
-                        logger.warn("Skipping row " + row.getRowNum() + ": locationCode or floorId is missing.");
                         continue;
                     }
 
-                    // [ADDED] Skip if room already exists globally
+                    // [ADDED] Check if room already exists
                     if (existingRoomNames.contains(locationCode)) {
-                        logger.warn("Skipping duplicate room: " + locationCode);
-                        skippedRooms.add(locationCode);
+                        errors.add(String.format("Dòng %d: Phòng %s đã tồn tại", row.getRowNum() + 1, locationCode));
                         continue;
                     }
 
@@ -440,7 +438,6 @@ public class RoomServiceImpl implements RoomService {
                     // Handle local image upload if provided in Excel
                     if (!imageUrl.isEmpty()) {
                         try {
-                            // Check if imageUrl is actually a local file path
                             File localFile = new File(imageUrl);
                             if (localFile.exists() && localFile.isFile()) {
                                 try (FileInputStream fis = new FileInputStream(localFile)) {
@@ -455,28 +452,26 @@ public class RoomServiceImpl implements RoomService {
                                     request.setPublicId(uploadResult.get("public_id").toString());
                                 }
                             } else {
-                                // Assume it's already a URL
                                 request.setImageUrl(imageUrl);
                                 request.setPublicId(publicId);
                             }
                         } catch (Exception e) {
-                            logger.error("Error processing image from excel for room " + locationCode + ": " + e.getMessage());
+                            errors.add(String.format("Dòng %d: Lỗi xử lý ảnh cho phòng %s (%s)", row.getRowNum() + 1, locationCode, e.getMessage()));
                         }
                     }
 
                     addRoom(request, null);
-                    // Add new room name to the list to prevent duplicates within the same Excel file
                     existingRoomNames.add(locationCode);
+                } catch (CustomException e) {
+                    errors.add(String.format("Dòng %d: %s", row.getRowNum() + 1, e.getMessage()));
                 } catch (Exception e) {
+                    errors.add(String.format("Dòng %d: Lỗi không xác định (%s)", row.getRowNum() + 1, e.getMessage()));
                     logger.error("Error processing row " + row.getRowNum() + ": " + e.getMessage());
                 }
             }
 
-            // If there were any skipped rooms, notify the user
-            if (!skippedRooms.isEmpty()) {
-                String message = "Import completed, but the following rooms were skipped because they already exist: " +
-                        String.join(", ", skippedRooms);
-                throw new CustomException(ResponseCode.ROOM_ALREADY_EXISTS, message);
+            if (!errors.isEmpty()) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED, String.join("\n", errors));
             }
 
         } catch (CustomException e) {
