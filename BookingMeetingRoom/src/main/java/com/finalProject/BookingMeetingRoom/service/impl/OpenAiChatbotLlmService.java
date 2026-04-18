@@ -221,7 +221,8 @@ public class OpenAiChatbotLlmService implements ChatbotLlmService {
         sb.append("\nReturn only JSON with these fields: intent, roomCode, date, startTime, endTime, minCapacity. ");
         sb.append("Use null if unknown. Date format yyyy-MM-dd. Time format HH:mm:ss. ");
         sb.append("Set intent=VIEW_FACILITY_DETAILS for requests asking building/floor/room information, details, status, capacity, or address (Vietnamese/English). ");
-        sb.append("Intent must be one of CHECK_AVAILABLE_ROOMS_TODAY, SUGGEST_ROOMS_BY_CAPACITY, BOOK_ROOM, VIEW_FACILITY_DETAILS, FALLBACK.");
+        sb.append("Set intent=CANCEL_RESERVATION for cancel requests and intent=EXTEND_RESERVATION for extension requests (Vietnamese/English). ");
+        sb.append("Intent must be one of CHECK_AVAILABLE_ROOMS_TODAY, SUGGEST_ROOMS_BY_CAPACITY, BOOK_ROOM, CANCEL_RESERVATION, EXTEND_RESERVATION, VIEW_FACILITY_DETAILS, FALLBACK.");
         return sb.toString();
     }
 

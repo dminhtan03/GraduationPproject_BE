@@ -18,6 +18,7 @@ import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.model.response.ChatbotMessageResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ChatbotRoomItemResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
@@ -28,6 +29,7 @@ import com.finalProject.BookingMeetingRoom.service.ChatHistoryService;
 import com.finalProject.BookingMeetingRoom.service.ChatbotLlmService;
 import com.finalProject.BookingMeetingRoom.service.ChatbotService;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
+import com.finalProject.BookingMeetingRoom.service.RoomService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -40,6 +42,8 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.text.Normalizer;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,6 +52,7 @@ import java.util.stream.Collectors;
 public class ChatbotServiceImpl implements ChatbotService {
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
+    private static final List<ReservationStatus> ACTIVE_RESERVATION_STATUSES = List.of(ReservationStatus.RESERVED, ReservationStatus.IN_USE);
 
     private final RoomRepository roomRepository;
     private final BuildingRepository buildingRepository;
@@ -59,6 +64,7 @@ public class ChatbotServiceImpl implements ChatbotService {
     private final UserRepository userRepository;
     private final ChatHistoryService chatHistoryService;
     private final ChatbotLlmService chatbotLlmService;
+    private final RoomService roomService;
 
     private final ChatbotMessageParser parser = new ChatbotMessageParser();
 
@@ -93,13 +99,24 @@ public class ChatbotServiceImpl implements ChatbotService {
             ChatbotMessageParser.ParseResult mergedCurrent = mergeRuleWithLlm(parsed, llmParsed);
             ChatbotMessageParser.ParseResult effectiveParsed = mergeWithContext(mergedCurrent, recentUserMessages);
 
-            ChatbotMessageResponse response = switch (effectiveParsed.intent()) {
-                case CHECK_AVAILABLE_ROOMS_TODAY -> handleAvailableRoomsToday(message, effectiveParsed);
-                case SUGGEST_ROOMS_BY_CAPACITY -> handleSuggestRoomsByCapacity(message, effectiveParsed);
-                case BOOK_ROOM -> handleBookRoom(message, effectiveParsed, authentication);
-                case VIEW_FACILITY_DETAILS -> handleFacilityDetails(message, effectiveParsed);
-                default -> handleFallback(message);
-            };
+            ChatbotMessageResponse response;
+            try {
+                response = switch (effectiveParsed.intent()) {
+                    case CHECK_AVAILABLE_ROOMS_TODAY -> handleAvailableRoomsToday(message, effectiveParsed);
+                    case SUGGEST_ROOMS_BY_CAPACITY -> handleSuggestRoomsByCapacity(message, effectiveParsed);
+                    case BOOK_ROOM -> handleBookRoom(message, effectiveParsed, authentication);
+                    case CANCEL_RESERVATION -> handleCancelReservation(message, effectiveParsed, recentUserMessages, authentication);
+                    case EXTEND_RESERVATION -> handleExtendReservation(message, effectiveParsed, recentUserMessages, authentication);
+                    case VIEW_FACILITY_DETAILS -> handleFacilityDetails(message, effectiveParsed);
+                    default -> handleFallback(message);
+                };
+            } catch (CustomException e) {
+                if (e.getResponseCode() == ResponseCode.BOOKING_FUNCTION_LOCKED) {
+                    response = toBookingLockedResponse(message, effectiveParsed.intent(), e.getData());
+                } else {
+                    throw e;
+                }
+            }
 
             if (response != null) {
                 response.setSessionId(sessionId);
@@ -267,20 +284,215 @@ public class ChatbotServiceImpl implements ChatbotService {
         boolean vi = isVietnameseMessage(message);
         String reply = pickByHash(message,
             vi
-                ? "Mình có thể giúp bạn kiểm tra phòng trống, đặt phòng, hoặc xem chi tiết tòa/tầng/phòng. Ví dụ: 'Xem chi tiết phòng AL-102'."
-                : "I can help you check available rooms, book a room, or view building/floor/room details. Try: 'Show details of room AL-102'.",
+                ? "Mình có thể giúp bạn kiểm tra phòng trống, đặt phòng, hủy đặt phòng, gia hạn thời gian và xem chi tiết tòa/tầng/phòng."
+                : "I can help you check available rooms, book a room, cancel/extend a reservation, or view building/floor/room details.",
             vi
-                ? "Bạn muốn: (1) kiểm tra phòng trống hôm nay, (2) đặt phòng, hay (3) xem chi tiết tòa, tầng hoặc phòng?"
-                : "Tell me what you need: (1) available rooms today, (2) book a room, or (3) view details for a building, floor, or room.",
+                ? "Bạn muốn: (1) kiểm tra phòng trống, (2) đặt phòng, (3) hủy phòng, (4) thêm giờ, hay (5) xem chi tiết tòa/tầng/phòng?"
+                : "Tell me what you need: (1) check availability, (2) book, (3) cancel, (4) extend, or (5) view facility details.",
             vi
-                ? "Mình có thể tìm phòng trống, tạo đặt phòng và cung cấp thông tin chi tiết cơ sở vật chất. Bạn muốn hỗ trợ phần nào?"
-                : "I can search available rooms, create bookings, and show facility details. What would you like to do?"
+                ? "Mình có thể tìm phòng trống, đặt phòng, hủy đặt phòng, gia hạn thời gian và cung cấp thông tin cơ sở vật chất. Bạn muốn hỗ trợ phần nào?"
+                : "I can check room availability, create bookings, cancel/extend reservations, and show facility details. What would you like to do?"
         );
 
         return ChatbotMessageResponse.builder()
                 .intent(ChatbotIntent.FALLBACK)
                 .reply(reply)
                 .build();
+    }
+
+    private ChatbotMessageResponse toBookingLockedResponse(String message, ChatbotIntent intent, Object data) {
+        boolean vi = isVietnameseMessage(message);
+        String unlockAt = "";
+        if (data instanceof LocalDateTime dt) {
+            unlockAt = dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        }
+
+        String reply;
+        if (vi) {
+            reply = unlockAt.isBlank()
+                    ? "Chức năng đặt phòng hiện đang bị khóa do vượt quá số lần hủy cho phép. Vui lòng thử lại sau."
+                    : "Chức năng đặt phòng hiện đang bị khóa do vượt quá số lần hủy cho phép. Thời gian mở khóa dự kiến: " + unlockAt + ".";
+        } else {
+            reply = unlockAt.isBlank()
+                    ? "Booking function is locked due to too many cancellation attempts. Please try again later."
+                    : "Booking function is locked due to too many cancellation attempts. Expected unlock time: " + unlockAt + ".";
+        }
+
+        return ChatbotMessageResponse.builder()
+                .intent(intent != null ? intent : ChatbotIntent.FALLBACK)
+                .reply(reply)
+                .build();
+    }
+
+    private ChatbotMessageResponse handleCancelReservation(
+            String message,
+            ChatbotMessageParser.ParseResult parsed,
+            List<String> recentUserMessages,
+            Authentication authentication
+    ) {
+        if (authentication == null) {
+            throw new CustomException(ResponseCode.ACCESS_DENIED);
+        }
+
+        boolean vi = isVietnameseMessage(message);
+        var user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        String contextualRoomCode = resolveContextualRoomCode(parsed, recentUserMessages);
+        Reservation target = findTargetReservationForAction(user.getId(), contextualRoomCode);
+        if (target == null) {
+            String reply = vi
+                    ? "Mình chưa tìm thấy đặt phòng đang hoạt động để hủy. Bạn có thể cung cấp mã phòng (ví dụ: V5-020) hoặc kiểm tra lại lịch đặt phòng."
+                    : "I couldn't find an active reservation to cancel. Please provide a room code (e.g. V5-020) or check your current bookings.";
+            return ChatbotMessageResponse.builder()
+                    .intent(ChatbotIntent.CANCEL_RESERVATION)
+                    .reply(reply)
+                    .build();
+        }
+
+        String reason = extractCancelReason(message, vi);
+        reservationService.cancelReservation(target.getId(), reason, authentication);
+
+        String roomCode = target.getRoom() != null ? target.getRoom().getLocationCode() : "";
+        String reply = vi
+                ? "Đã hủy đặt phòng " + roomCode + " thành công."
+                : "Successfully cancelled reservation for room " + roomCode + ".";
+
+        return ChatbotMessageResponse.builder()
+                .intent(ChatbotIntent.CANCEL_RESERVATION)
+                .reply(reply)
+                .build();
+    }
+
+    private ChatbotMessageResponse handleExtendReservation(
+            String message,
+            ChatbotMessageParser.ParseResult parsed,
+            List<String> recentUserMessages,
+            Authentication authentication
+    ) {
+        if (authentication == null) {
+            throw new CustomException(ResponseCode.ACCESS_DENIED);
+        }
+
+        boolean vi = isVietnameseMessage(message);
+        var user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        String contextualRoomCode = resolveContextualRoomCode(parsed, recentUserMessages);
+        Reservation target = findTargetReservationForAction(user.getId(), contextualRoomCode);
+        if (target == null) {
+            String reply = vi
+                    ? "Mình chưa tìm thấy đặt phòng đang hoạt động để gia hạn. Bạn có thể cung cấp mã phòng hoặc nói 'thêm 1 giờ cho phòng V5-020'."
+                    : "I couldn't find an active reservation to extend. You can provide a room code, for example: 'extend 1 hour for room V5-020'.";
+            return ChatbotMessageResponse.builder()
+                    .intent(ChatbotIntent.EXTEND_RESERVATION)
+                    .reply(reply)
+                    .build();
+        }
+
+        double hour = extractExtendHours(message);
+        reservationService.extendReservation(target.getId(), hour, authentication);
+
+        Reservation updated = reservationRepository.findById(target.getId()).orElse(target);
+
+        String roomCode = updated.getRoom() != null ? updated.getRoom().getLocationCode() : "";
+        String hourText = (Math.floor(hour) == hour) ? String.valueOf((int) hour) : String.valueOf(hour);
+        String updatedWindow = formatReservationWindow(updated);
+        String reply = vi
+                ? "Đã gia hạn thêm " + hourText + " giờ cho phòng " + roomCode + " thành công."
+                    + (updatedWindow.isBlank() ? "" : " Khung giờ mới: " + updatedWindow + ".")
+                : "Successfully extended room " + roomCode + " by " + hourText + " hour(s)."
+                    + (updatedWindow.isBlank() ? "" : " New time window: " + updatedWindow + ".");
+
+        return ChatbotMessageResponse.builder()
+                .intent(ChatbotIntent.EXTEND_RESERVATION)
+                .reply(reply)
+                .build();
+    }
+
+    private String resolveContextualRoomCode(ChatbotMessageParser.ParseResult parsed, List<String> recentUserMessages) {
+        if (parsed != null && parsed.roomCode() != null && !parsed.roomCode().isBlank()) {
+            return parsed.roomCode();
+        }
+
+        if (recentUserMessages == null || recentUserMessages.isEmpty()) {
+            return null;
+        }
+
+        for (String msg : recentUserMessages) {
+            if (msg == null || msg.isBlank()) continue;
+            var p = parser.parse(msg);
+            if (p.roomCode() != null && !p.roomCode().isBlank()) {
+                return p.roomCode();
+            }
+        }
+        return null;
+    }
+
+    private Reservation findTargetReservationForAction(String userId, String roomCode) {
+        List<Reservation> candidates = List.of();
+        if (roomCode != null && !roomCode.isBlank()) {
+            candidates = reservationRepository.findActiveReservationsOfUserByRoomCode(userId, roomCode, ACTIVE_RESERVATION_STATUSES);
+        }
+
+        // Fallback to most recently active reservation of user when room code is missing or not found.
+        if (candidates == null || candidates.isEmpty()) {
+            candidates = reservationRepository.findActiveReservationsOfUser(userId, ACTIVE_RESERVATION_STATUSES);
+        }
+
+        return candidates == null || candidates.isEmpty() ? null : candidates.get(0);
+    }
+
+    private String formatReservationWindow(Reservation reservation) {
+        if (reservation == null || reservation.getStartTime() == null || reservation.getEndTime() == null) return "";
+        return reservation.getStartTime().toLocalDate() + " "
+                + reservation.getStartTime().toLocalTime().format(TIME_FMT)
+                + " - "
+                + reservation.getEndTime().toLocalTime().format(TIME_FMT);
+    }
+
+    private double extractExtendHours(String message) {
+        String normalized = Objects.toString(message, "").toLowerCase(Locale.ROOT);
+
+        Pattern viPattern = Pattern.compile("(?:thêm|them|gia hạn|gia han|kéo dài|keo dai)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:giờ|gio)", Pattern.CASE_INSENSITIVE);
+        Matcher viMatcher = viPattern.matcher(normalized);
+        if (viMatcher.find()) {
+            return parseHourOrDefault(viMatcher.group(1), 1.0);
+        }
+
+        Pattern enPattern = Pattern.compile("(?:extend|add|extra|more)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:hour|hours|hr|hrs)", Pattern.CASE_INSENSITIVE);
+        Matcher enMatcher = enPattern.matcher(normalized);
+        if (enMatcher.find()) {
+            return parseHourOrDefault(enMatcher.group(1), 1.0);
+        }
+
+        Pattern trailingPattern = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(?:hour|hours|hr|hrs|giờ|gio)", Pattern.CASE_INSENSITIVE);
+        Matcher trailingMatcher = trailingPattern.matcher(normalized);
+        if (trailingMatcher.find()) {
+            return parseHourOrDefault(trailingMatcher.group(1), 1.0);
+        }
+
+        return 1.0;
+    }
+
+    private double parseHourOrDefault(String raw, double defaultValue) {
+        if (raw == null || raw.isBlank()) return defaultValue;
+        try {
+            return Double.parseDouble(raw.replace(',', '.'));
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    private String extractCancelReason(String message, boolean vi) {
+        String normalized = Objects.toString(message, "");
+        Pattern p = Pattern.compile("(?:because|due to|vì|vi|do)\\s+(.+)", Pattern.CASE_INSENSITIVE);
+        Matcher m = p.matcher(normalized);
+        if (m.find()) {
+            String reason = m.group(1) != null ? m.group(1).trim() : "";
+            if (!reason.isBlank()) return reason;
+        }
+        return vi ? "Hủy qua chatbot" : "Cancelled via chatbot";
     }
 
             @Transactional(readOnly = true)
@@ -338,6 +550,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                     return ChatbotMessageResponse.builder()
                         .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
                         .reply(reply)
+                        .roomDetail(toRoomDetailSafely(room))
                         .build();
                 }
 
@@ -464,6 +677,16 @@ public class ChatbotServiceImpl implements ChatbotService {
                     .orElse(null);
                 }
 
+                private RoomDetailResponse toRoomDetailSafely(Room room) {
+                if (room == null || room.getId() == null) return null;
+                try {
+                    return roomService.getRoomDetail(room.getId());
+                } catch (Exception e) {
+                    log.warn("Failed to build room detail payload for chatbot room {}", room.getId(), e);
+                    return null;
+                }
+                }
+
                 private Floor resolveFloor(String normalized, String folded, List<Floor> floors) {
                 return floors.stream()
                     .filter(f -> f.getName() != null && !f.getName().isBlank())
@@ -563,6 +786,15 @@ public class ChatbotServiceImpl implements ChatbotService {
         LocalDateTime requestedStart = (parsed != null && parsed.startTime() != null)
                 ? LocalDateTime.of(day, parsed.startTime())
                 : now;
+        LocalDateTime requestedEnd = (!instantMode && parsed != null && parsed.endTime() != null)
+                ? LocalDateTime.of(day, parsed.endTime())
+                : requestedStart.plusHours(1);
+        if (!requestedEnd.isAfter(requestedStart)) {
+            requestedEnd = requestedStart.plusHours(1);
+        }
+        if (requestedEnd.isAfter(endOfDay)) {
+            requestedEnd = endOfDay;
+        }
 
         LocalDateTime windowStart = max(startOfDay, max(now, requestedStart));
 
@@ -643,6 +875,16 @@ public class ChatbotServiceImpl implements ChatbotService {
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
 
+            List<Reservation> overlapsRequestedWindow = roomIds.isEmpty() || instantMode
+                ? List.of()
+                : reservationRepository.findOverlappingReservationsForRooms(roomIds, blocking, requestedStart, requestedEnd);
+            Set<String> busyInRequestedWindow = overlapsRequestedWindow.stream()
+                .map(Reservation::getRoom)
+                .filter(Objects::nonNull)
+                .map(Room::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
         Map<String, List<Reservation>> reservationsByRoom = overlaps.stream()
                 .collect(Collectors.groupingBy(r -> r.getRoom().getId()));
 
@@ -652,13 +894,20 @@ public class ChatbotServiceImpl implements ChatbotService {
             if (instantMode && busyAtPoint.contains(room.getId())) {
                 continue;
             }
+            if (!instantMode && busyInRequestedWindow.contains(room.getId())) {
+                continue;
+            }
             List<Reservation> busy = reservationsByRoom.getOrDefault(room.getId(), List.of());
             List<TimeRange> freeRanges = computeFreeRanges(windowStart, endOfDay, busy);
             if (freeRanges.isEmpty()) continue;
 
+            List<String> availableSlots = instantMode
+                    ? freeRanges.stream().limit(3).map(TimeRange::format).toList()
+                    : List.of(requestedStart.toLocalTime().format(TIME_FMT) + "–" + requestedEnd.toLocalTime().format(TIME_FMT));
+
                 available.add(toRoomItem(
                     room,
-                    freeRanges.stream().limit(3).map(TimeRange::format).toList(),
+                    availableSlots,
                     roomIdToImageUrl.get(room.getId())
                 ));
         }
@@ -677,11 +926,15 @@ public class ChatbotServiceImpl implements ChatbotService {
             } else {
                 reply = vi
                         ? (scope == null
-                            ? "Mình không tìm thấy phòng trống cho phần thời gian còn lại của " + dayPhraseVi + "."
-                            : "Mình không tìm thấy phòng trống cho phần thời gian còn lại của " + dayPhraseVi + " ở tòa " + scope + ".")
+                            ? "Mình không tìm thấy phòng trống trong khung giờ bạn hỏi (" + requestedStart.toLocalTime().format(TIME_FMT)
+                                + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseVi + "."
+                            : "Mình không tìm thấy phòng trống trong khung giờ bạn hỏi (" + requestedStart.toLocalTime().format(TIME_FMT)
+                                + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseVi + " ở tòa " + scope + ".")
                         : (scope == null
-                            ? "I couldn't find any rooms available for the rest of " + dayPhraseEn + "."
-                            : "I couldn't find any rooms available for the rest of " + dayPhraseEn + " in building " + scope + ".");
+                            ? "I couldn't find rooms available in the requested time window (" + requestedStart.toLocalTime().format(TIME_FMT)
+                                + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseEn + "."
+                            : "I couldn't find rooms available in the requested time window (" + requestedStart.toLocalTime().format(TIME_FMT)
+                                + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseEn + " in building " + scope + ".");
             }
 
             return ChatbotMessageResponse.builder()
@@ -695,14 +948,15 @@ public class ChatbotServiceImpl implements ChatbotService {
         String scope = matchedBuilding != null ? matchedBuilding.getName() : null;
         if (!instantMode && parsed != null && parsed.startTime() != null) {
             String t = parsed.startTime().format(TIME_FMT);
+            String tEnd = requestedEnd.toLocalTime().format(TIME_FMT);
             if (vi) {
                 reply = scope == null
-                        ? "Các phòng có thể trống từ " + t + " " + dayPhraseVi + ":"
-                        : "Các phòng có thể trống từ " + t + " " + dayPhraseVi + " tại tòa " + scope + ":";
+                        ? "Các phòng trống trong khung giờ " + t + " - " + tEnd + " " + dayPhraseVi + ":"
+                        : "Các phòng trống trong khung giờ " + t + " - " + tEnd + " " + dayPhraseVi + " tại tòa " + scope + ":";
             } else {
                 reply = scope == null
-                        ? "Rooms available as of " + t + " " + dayPhraseEn + ":"
-                        : "Rooms available as of " + t + " " + dayPhraseEn + " in building " + scope + ":";
+                        ? "Rooms available in the time window " + t + " - " + tEnd + " " + dayPhraseEn + ":"
+                        : "Rooms available in the time window " + t + " - " + tEnd + " " + dayPhraseEn + " in building " + scope + ":";
             }
         } else if (instantMode) {
             String nowText = requestedStart.format(TIME_FMT);
@@ -762,6 +1016,14 @@ public class ChatbotServiceImpl implements ChatbotService {
 
         LocalDateTime startTime = LocalDateTime.of(date, start);
         LocalDateTime endTime = LocalDateTime.of(date, end);
+
+        // When end time is auto-defaulted (for single-time utterances like "23:00 today"),
+        // LocalTime may wrap to 00:00 and look invalid in the same date. Normalize it first.
+        if (parsed.endTimeDefaulted() && !endTime.isAfter(startTime)) {
+            LocalDateTime candidate = startTime.plusHours(1);
+            LocalDateTime endOfDay = startTime.toLocalDate().atTime(23, 59);
+            endTime = candidate.isAfter(endOfDay) ? endOfDay : candidate;
+        }
 
         if (!startTime.isBefore(endTime)) {
             return ChatbotMessageResponse.builder()

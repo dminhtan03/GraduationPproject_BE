@@ -207,6 +207,47 @@ public class ChatbotMessageParser {
             return ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY;
         }
 
+        boolean hasCancelHint = containsAnyEither(normalized, folded,
+            "cancel",
+            "abort",
+            "hủy",
+            "huy",
+            "huỷ",
+            "bỏ đặt",
+            "bo dat",
+            "hủy đặt",
+            "huy dat");
+
+        if (hasCancelHint && (hasRoom || hasFacilityNoun || containsAnyEither(normalized, folded, "reservation", "booking", "đặt phòng", "dat phong"))) {
+            return ChatbotIntent.CANCEL_RESERVATION;
+        }
+
+        boolean hasExtendHint = containsAnyEither(normalized, folded,
+            "extend",
+            "extension",
+            "gia hạn",
+            "gia han",
+            "thêm",
+            "them",
+            "kéo dài",
+            "keo dai",
+            "more hour",
+            "extra hour",
+            "add hour");
+
+        if (hasExtendHint && containsAnyEither(normalized, folded,
+            "reservation",
+            "booking",
+            "phòng",
+            "phong",
+            "room",
+            "giờ",
+            "gio",
+            "hour",
+            "hours")) {
+            return ChatbotIntent.EXTEND_RESERVATION;
+        }
+
         if (hasBookingHint) {
             return ChatbotIntent.BOOK_ROOM;
         }

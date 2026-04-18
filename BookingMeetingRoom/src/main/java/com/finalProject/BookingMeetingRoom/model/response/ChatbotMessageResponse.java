@@ -25,4 +25,7 @@ public class ChatbotMessageResponse {
 
     // If a booking is created successfully
     private ReservationResponse reservation;
+
+    // When intent is VIEW_FACILITY_DETAILS for a specific room
+    private RoomDetailResponse roomDetail;
 }

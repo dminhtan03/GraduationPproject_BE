@@ -221,6 +221,32 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
   List<Reservation> findReservationsOverEndTime(@Param("currentTime") LocalDateTime currentTime);
   // end update findReservationsOverEndTime to use parameter
 
+    @Query("""
+            SELECT r
+            FROM Reservation r
+            JOIN FETCH r.room ro
+            WHERE r.user.id = :userId
+                AND r.status IN :statuses
+            ORDER BY r.updatedAt DESC
+            """)
+    List<Reservation> findActiveReservationsOfUser(
+            @Param("userId") String userId,
+            @Param("statuses") List<ReservationStatus> statuses);
+
+    @Query("""
+            SELECT r
+            FROM Reservation r
+            JOIN FETCH r.room ro
+            WHERE r.user.id = :userId
+                AND r.status IN :statuses
+                AND LOWER(ro.locationCode) = LOWER(:locationCode)
+            ORDER BY r.updatedAt DESC
+            """)
+    List<Reservation> findActiveReservationsOfUserByRoomCode(
+            @Param("userId") String userId,
+            @Param("locationCode") String locationCode,
+            @Param("statuses") List<ReservationStatus> statuses);
+
   List<Reservation> findByStatus(ReservationStatus status);
 
   // [ADDED] Count reservations within a time range
