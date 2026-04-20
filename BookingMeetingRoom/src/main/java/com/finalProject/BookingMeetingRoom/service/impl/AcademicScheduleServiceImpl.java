@@ -1,12 +1,14 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
 import java.io.InputStream;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.poi.ss.usermodel.Cell;
@@ -18,22 +20,28 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.model.entity.AcademicSchedule;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AcademicScheduleResponse;
 import com.finalProject.BookingMeetingRoom.repository.AcademicScheduleRepository;
+import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
 
@@ -46,6 +54,8 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     private static final Logger logger = LoggerFactory.getLogger(AcademicScheduleServiceImpl.class);
     private final AcademicScheduleRepository scheduleRepository;
     private final RoomRepository roomRepository;
+    private final ReservationRepository reservationRepository;
+    private final ObjectProvider<com.finalProject.BookingMeetingRoom.service.ReservationService> reservationServiceProvider;
 
     @Override
     public boolean isRoomBusyWithLearning(String roomId, LocalDateTime startTime, LocalDateTime endTime) {
@@ -168,6 +178,17 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
                 throw new CustomException(ResponseCode.ACADEMIC_SCHEDULE_OVERLAP, String.join("\n", errors));
             }
 
+            for (AcademicSchedule schedule : schedulesToSave) {
+                forceCancelOverlappingReservations(
+                        schedule.getRoom().getId(),
+                        schedule.getFromDate(),
+                        schedule.getToDate(),
+                        schedule.getStartTime(),
+                        schedule.getEndTime(),
+                        schedule.getDaysOfWeek()
+                );
+            }
+
             scheduleRepository.saveAll(schedulesToSave);
             logger.info("Imported {} academic schedules from excel", schedulesToSave.size());
             updateRoomStatusesBySchedule();
@@ -245,6 +266,15 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
             validateNoOverlap(schedule.getRoom().getId(), request.getFromDate(), request.getToDate(),
                     request.getStartTime(), request.getEndTime(), daysOfWeek, schedule.getId());
 
+            forceCancelOverlappingReservations(
+                    schedule.getRoom().getId(),
+                    request.getFromDate(),
+                    request.getToDate(),
+                    request.getStartTime(),
+                    request.getEndTime(),
+                    daysOfWeek
+            );
+
             schedule.setStartTime(request.getStartTime());
             schedule.setEndTime(request.getEndTime());
             schedule.setDaysOfWeek(daysOfWeek);
@@ -294,6 +324,15 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
         validateNoOverlap(room.getId(), request.getFromDate(), request.getToDate(),
                 request.getStartTime(), request.getEndTime(), daysOfWeek, null);
 
+        forceCancelOverlappingReservations(
+                room.getId(),
+                request.getFromDate(),
+                request.getToDate(),
+                request.getStartTime(),
+                request.getEndTime(),
+                daysOfWeek
+        );
+
         AcademicSchedule schedule = AcademicSchedule.builder()
                 .id(UUID.randomUUID().toString())
                 .room(room)
@@ -322,6 +361,15 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
         String daysOfWeek = String.join(",", request.getDaysOfWeek()).toUpperCase();
         validateNoOverlap(schedule.getRoom().getId(), request.getFromDate(), request.getToDate(),
                 request.getStartTime(), request.getEndTime(), daysOfWeek, scheduleId);
+
+        forceCancelOverlappingReservations(
+                schedule.getRoom().getId(),
+                request.getFromDate(),
+                request.getToDate(),
+                request.getStartTime(),
+                request.getEndTime(),
+                daysOfWeek
+        );
 
         schedule.setStartTime(request.getStartTime());
         schedule.setEndTime(request.getEndTime());
@@ -361,6 +409,85 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
                     }
                 }
             }
+        }
+    }
+
+    private void forceCancelOverlappingReservations(
+            String roomId,
+            LocalDate fromDate,
+            LocalDate toDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            String daysOfWeek
+    ) {
+        Authentication authentication = SecurityContextHolder.getContext() != null
+                ? SecurityContextHolder.getContext().getAuthentication()
+                : null;
+        if (authentication == null || authentication.getName() == null) {
+            return;
+        }
+        String principalName = authentication.getName();
+        if (principalName.isBlank() || "anonymousUser".equalsIgnoreCase(principalName)) {
+            return;
+        }
+
+        Set<DayOfWeek> targetDays = parseDaysOfWeek(daysOfWeek);
+        if (targetDays.isEmpty()) {
+            return;
+        }
+
+        LocalDate date = fromDate;
+        while (!date.isAfter(toDate)) {
+            if (targetDays.contains(date.getDayOfWeek())) {
+                LocalDateTime scheduleStart = date.atTime(startTime);
+                LocalDateTime scheduleEnd = date.atTime(endTime);
+
+                List<Reservation> overlapping = reservationRepository.findOverlappingReservations(
+                        roomId,
+                        scheduleStart,
+                        scheduleEnd
+                );
+
+                for (Reservation reservation : overlapping) {
+                    if (reservation.getStatus() == ReservationStatus.RESERVED
+                            || reservation.getStatus() == ReservationStatus.IN_USE) {
+                        reservationServiceProvider.getObject().forceCancelReservation(
+                                reservation.getId(),
+                                "Cancelled due to adding/updating the fixed class schedule.",
+                                authentication
+                        );
+                    }
+                }
+            }
+            date = date.plusDays(1);
+        }
+    }
+
+    private Set<DayOfWeek> parseDaysOfWeek(String daysOfWeek) {
+        Set<DayOfWeek> result = new HashSet<>();
+        if (daysOfWeek == null || daysOfWeek.isBlank()) {
+            return result;
+        }
+
+        String[] tokens = daysOfWeek.split(",");
+        for (String token : tokens) {
+            String t = token == null ? "" : token.trim().toUpperCase();
+            if (t.isEmpty()) continue;
+            result.add(parseDayToken(t));
+        }
+        return result;
+    }
+
+    private DayOfWeek parseDayToken(String token) {
+        switch (token) {
+            case "MON": return DayOfWeek.MONDAY;
+            case "TUE": return DayOfWeek.TUESDAY;
+            case "WED": return DayOfWeek.WEDNESDAY;
+            case "THU": return DayOfWeek.THURSDAY;
+            case "FRI": return DayOfWeek.FRIDAY;
+            case "SAT": return DayOfWeek.SATURDAY;
+            case "SUN": return DayOfWeek.SUNDAY;
+            default: return DayOfWeek.valueOf(token);
         }
     }
 
