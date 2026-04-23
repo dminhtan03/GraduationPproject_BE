@@ -14,4 +14,8 @@ public class ReservationDetailResponse {
     private List<RoomImageResponse> roomImages;
     private List<ReservationHistoryResponse> history;
     private FeedbackResponse feedback;
+
+    // start+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
+    private List<ReservationServiceItemResponse> serviceItems;
+    // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
 }

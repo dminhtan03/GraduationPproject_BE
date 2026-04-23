@@ -27,19 +27,25 @@ import com.finalProject.BookingMeetingRoom.mapper.FeedbackMapper;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapper;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapperFacade;
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.ReservationServiceItem;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.entity.ServiceItem;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
+import com.finalProject.BookingMeetingRoom.model.request.ReservationServiceItemsUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomReserveStatusUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AdminReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationHistoryResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationServiceItemResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationTimelineResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
 import com.finalProject.BookingMeetingRoom.repository.ReservationHistoryRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.ReservationServiceItemRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.repository.ServiceItemRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserInfoRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
@@ -71,9 +77,19 @@ public class ReservationServiceImpl implements ReservationService {
     private final EmailService emailService;
     private final NotificationService notificationService;
     private final AcademicScheduleService academicScheduleService;
+    private final ServiceItemRepository serviceItemRepository;
+    private final ReservationServiceItemRepository reservationServiceItemRepository;
 
     record ReservationContext(Reservation reservation, Room room) {
     }
+
+    // start+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
+    private boolean isAdmin(Authentication authentication) {
+        if (authentication == null || authentication.getAuthorities() == null) return false;
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority()));
+    }
+    // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 
     /**
      * Return a room after use.
@@ -313,6 +329,34 @@ public class ReservationServiceImpl implements ReservationService {
             reservation.setStatus(ReservationStatus.RESERVED); // Change status to RESERVED directly
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
+
+            // start+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
+            if (request.getServiceItems() != null && !request.getServiceItems().isEmpty()) {
+                List<ReservationServiceItem> lines = new ArrayList<>();
+                for (ReservationRequest.ServiceItemLineRequest lineRequest : request.getServiceItems()) {
+                    if (lineRequest.getQuantity() == null || lineRequest.getQuantity() <= 0) {
+                        throw new CustomException(ResponseCode.VALIDATION_FAILED, "Quantity must be > 0");
+                    }
+                    ServiceItem serviceItem = serviceItemRepository.findById(lineRequest.getServiceItemId())
+                            .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Service item not found"));
+                    if (!Boolean.TRUE.equals(serviceItem.getActive())) {
+                        throw new CustomException(ResponseCode.VALIDATION_FAILED, "Service item is not active");
+                    }
+
+                    ReservationServiceItem line = new ReservationServiceItem();
+                    line.setId(UUID.randomUUID().toString());
+                    line.setReservation(reservation);
+                    line.setServiceItem(serviceItem);
+                    line.setQuantity(lineRequest.getQuantity());
+                    line.setNote(lineRequest.getNote());
+                    line.setPriceSnapshot(serviceItem.getPrice());
+                    line.setCreatedAt(LocalDateTime.now());
+                    line.setUpdatedAt(LocalDateTime.now());
+                    lines.add(line);
+                }
+                reservationServiceItemRepository.saveAll(lines);
+            }
+            // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
 
             reservationHistoryService.saveHistory(reservation, user.getId(),
                     ReservationStatus.RESERVED, null, reservation.getUpdatedAt());
@@ -699,11 +743,28 @@ public class ReservationServiceImpl implements ReservationService {
                     ? feedbackMapper.toFeedbackResponse(reservation.getFeedback())
                     : null;
 
+            // start+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
+            var serviceItems = reservationServiceItemRepository.findByReservation_Id(reservationId).stream()
+                    .map(line -> ReservationServiceItemResponse.builder()
+                            .id(line.getId())
+                            .serviceItemId(line.getServiceItem().getId())
+                            .name(line.getServiceItem().getName())
+                            .unit(line.getServiceItem().getUnit())
+                            .priceSnapshot(line.getPriceSnapshot())
+                            .quantity(line.getQuantity())
+                            .note(line.getNote())
+                            .build())
+                    .toList();
+            // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
+
             return ReservationDetailResponse.builder()
                     .reservation(reservationResponse)
                     .roomImages(roomImages)
                     .history(history)
                     .feedback(feedback)
+                    // start+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
+                    .serviceItems(serviceItems)
+                    // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
                     .build();
         } catch (CustomException e) {
             throw e;
@@ -712,6 +773,78 @@ public class ReservationServiceImpl implements ReservationService {
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
+
+    // start+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
+    @Override
+    @Transactional
+    public List<ReservationServiceItemResponse> getReservationServiceItems(String reservationId, Authentication authentication) {
+        var currentUser = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        var reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+        if (!isAdmin(authentication) && !reservation.getUser().getId().equals(currentUser.getId())) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        return reservationServiceItemRepository.findByReservation_Id(reservationId).stream()
+                .map(line -> ReservationServiceItemResponse.builder()
+                        .id(line.getId())
+                        .serviceItemId(line.getServiceItem().getId())
+                        .name(line.getServiceItem().getName())
+                        .unit(line.getServiceItem().getUnit())
+                        .priceSnapshot(line.getPriceSnapshot())
+                        .quantity(line.getQuantity())
+                        .note(line.getNote())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void updateReservationServiceItems(String reservationId, ReservationServiceItemsUpdateRequest request, Authentication authentication) {
+        var currentUser = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        var reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+        if (!isAdmin(authentication) && !reservation.getUser().getId().equals(currentUser.getId())) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        reservationServiceItemRepository.deleteByReservation_Id(reservationId);
+
+        if (request == null || request.getServiceItems() == null || request.getServiceItems().isEmpty()) {
+            return;
+        }
+
+        List<ReservationServiceItem> lines = new ArrayList<>();
+        for (ReservationServiceItemsUpdateRequest.ServiceItemLineRequest lineRequest : request.getServiceItems()) {
+            if (lineRequest.getQuantity() == null || lineRequest.getQuantity() <= 0) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED, "Quantity must be > 0");
+            }
+            ServiceItem serviceItem = serviceItemRepository.findById(lineRequest.getServiceItemId())
+                    .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Service item not found"));
+            if (!Boolean.TRUE.equals(serviceItem.getActive())) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED, "Service item is not active");
+            }
+
+            ReservationServiceItem line = new ReservationServiceItem();
+            line.setId(UUID.randomUUID().toString());
+            line.setReservation(reservation);
+            line.setServiceItem(serviceItem);
+            line.setQuantity(lineRequest.getQuantity());
+            line.setNote(lineRequest.getNote());
+            line.setPriceSnapshot(serviceItem.getPrice());
+            line.setCreatedAt(LocalDateTime.now());
+            line.setUpdatedAt(LocalDateTime.now());
+            lines.add(line);
+        }
+        reservationServiceItemRepository.saveAll(lines);
+    }
+    // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 
     /**
      * Validate the reservation context (Reservation and Room).
