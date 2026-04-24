@@ -67,7 +67,7 @@ application:
       enabled: true
       base-url: https://api.openai.com/v1
       model: gpt-4o-mini
-      api-key: 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
+      api-key: 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
       timeout-ms: 10000
       quota-cooldown-ms: 5000
 springdoc:

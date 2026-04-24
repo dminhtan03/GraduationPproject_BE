@@ -1,61 +1,237 @@
-# BookingMeetingRoom - AI/Chatbot
+# BookingMeetingRoom - AI Chatbot (ChatbotController)
 
-Tai lieu nay tong hop day du:
+Tai lieu nay tong hop chi tiet toan bo nhung gi da duoc trien khai cho AI chatbot trong he thong, bao gom:
 
-- Tat ca nhung thay doi da duoc thuc hien cho luong AI/Chatbot.
-- Luong xu ly AI theo tung man (stage) va endpoint.
-- Danh sach API kem curl chi tiet de test nhanh.
+- Kien truc hybrid Rule-based + GPT.
+- Luong xu ly end-to-end tu controller den service.
+- Danh sach intent, hanh vi va cac business rule da bo sung.
+- Tat ca endpoint trong ChatbotController va bo curl test day du.
+- Mau request/response cho cac use case quan trong.
 
-## 1) Tong ket nhung gi da duoc lam
+## 1) Pham vi da lam
 
-### 1.1 Muc tieu da trien khai
+Da trien khai va nang cap day du cho chatbot endpoint `/api/v1/chatbot/*`:
 
-- Giu nguyen API va business rule-base hien co.
-- Them lop NLP dung GPT de hieu ngon ngu tu nhien tot hon.
-- Neu GPT khong cau hinh/loi/timeout, he thong tu fallback ve rule-base, khong vo luong dat phong.
+- Session management:
+  - Tao session chat.
+  - Xoa session chat.
+  - Xem lich su chat (danh sach session cua user).
+  - Xem chi tiet tung session.
+- NLP/Intent:
+  - Hybrid parser: Rule parser + GPT extractor.
+  - Ho tro tieng Viet + tieng Anh.
+  - Co co che merge context tu cac tin nhan truoc trong cung session.
+- Nghiệp vu chatbot:
+  - Kiem tra phong trong theo tieu chi user hoi.
+  - Goi y phong theo suc chua.
+  - Dat phong.
+  - Huy dat phong.
+  - Gia han dat phong.
+  - Xem chi tiet co so vat chat (building/floor/room).
+- Reliability:
+  - GPT quota/error fallback ve rule parser.
+  - Xu ly business error than thien (vi du booking function locked).
 
-### 1.2 Cac thay doi ky thuat da lam
+## 2) ChatbotController - endpoint hien tai
 
-- Them interface ChatbotLlmService de truu tuong hoa viec parse intent + slot bang LLM.
-- Them OpenAiChatbotLlmService:
-  - Goi OpenAI Chat Completions endpoint /chat/completions.
-  - Yeu cau LLM tra JSON co cau truc: intent, roomCode, date, startTime, endTime, minCapacity.
-  - Parse JSON tra ve, map sang ParseResult.
-  - Bat loi de fail-safe (khong lam sap service).
-- Noi vao ChatbotServiceImpl:
-  - Parse rule-base nhu cu.
-  - Parse bang GPT (neu enabled va co api-key).
-  - Merge rule + GPT theo uu tien an toan:
-    - Rule co du lieu thi giu rule.
-    - Chi bo sung du lieu thieu tu GPT.
-    - Intent chi nhan GPT khi rule dang FALLBACK.
-  - Sau do tiep tuc merge context va chay business flow dat phong cu.
-- Da compile xac nhan build thanh cong.
+File: `src/main/java/com/finalProject/BookingMeetingRoom/controller/ai/ChatbotController.java`
 
-### 1.3 Ket qua dat duoc
+### 2.1 POST `/api/v1/chatbot/session`
 
-- Tang kha nang hieu cau noi tu nhien va da ngon ngu.
-- Giam su phu thuoc vao regex/rule o lop hieu ngon ngu.
-- Khong thay doi hop dong API FE dang dung.
+Muc dich:
 
-## 2) Tong quan kien truc AI hien tai
+- Tao sessionId moi de FE su dung cho hoi thoai.
 
-He thong co 2 nhom endpoint:
-
-1. Chatbot API: /api/v1/chatbot/\*
-2. AI API cu: /api/v1/ai/\*
-
-Trong do:
-
-- /api/v1/chatbot/message la luong hybrid moi: Rule-based + GPT NLP (optional).
-- /api/v1/chatbot/voice la luong voice theo transcript hoac audio.
-- /api/v1/ai/chat va /api/v1/ai/reserve la luong heuristic cu (van giu nguyen).
-
-Tat ca response deu duoc wrap theo dang:
+Response data:
 
 ```json
 {
-  "data": {},
+  "sessionId": "<uuid>"
+}
+```
+
+### 2.2 POST `/api/v1/chatbot/message`
+
+Muc dich:
+
+- Endpoint chinh cho chatbot text.
+- Nhan message + sessionId va tra ket qua xu ly AI.
+
+Request body:
+
+- `message`: noi dung user chat.
+- `sessionId`: co the null o lan dau.
+
+### 2.3 POST `/api/v1/chatbot/voice` (multipart/form-data)
+
+Muc dich:
+
+- Ho tro chatbot qua giong noi.
+
+Tham so:
+
+- `audio` (optional): file audio.
+- `transcript` (optional): neu co thi dung truc tiep, uu tien hon `audio`.
+- `sessionId` (optional).
+- `language` (optional): hint cho STT.
+
+Luong:
+
+- Neu co `transcript` -> dung transcript.
+- Neu khong co transcript, co audio -> STT de lay transcript.
+- Sau do dua ve chung luong `handleMessage` nhu endpoint text.
+
+### 2.4 DELETE `/api/v1/chatbot/session/{sessionId}`
+
+Muc dich:
+
+- Xoa lich su chat cua mot session.
+
+Response data:
+
+```json
+{
+  "sessionId": "<sessionId>",
+  "deletedMessages": 12
+}
+```
+
+### 2.5 GET `/api/v1/chatbot/history`
+
+Muc dich:
+
+- Lay danh sach session chat cua user dang dang nhap.
+
+### 2.6 GET `/api/v1/chatbot/history/{sessionId}`
+
+Muc dich:
+
+- Lay chi tiet tung message trong 1 session cua user.
+
+## 3) Kien truc AI/NLP da trien khai
+
+### 3.1 Hybrid parser
+
+- Rule parser: `ChatbotMessageParser`
+- GPT parser: `OpenAiChatbotLlmService`
+- Merge parser: `ChatbotServiceImpl.mergeRuleWithLlm(...)`
+
+Merge policy tong quat:
+
+- Rule co slot roi thi uu tien giu.
+- GPT bo sung slot con thieu.
+- Intent co can bang de tranh override nguy hiem.
+- Co merge context tu recent user messages trong cung session.
+
+### 3.2 GPT fallback an toan
+
+- Neu GPT disabled/thieu key/timeout/quota -> bo qua GPT va dung rule parser.
+- Khong lam vo luong dat phong.
+
+### 3.3 Intent da ho tro
+
+- `CHECK_AVAILABLE_ROOMS_TODAY`
+- `SUGGEST_ROOMS_BY_CAPACITY`
+- `BOOK_ROOM`
+- `CANCEL_RESERVATION`
+- `EXTEND_RESERVATION`
+- `VIEW_FACILITY_DETAILS`
+- `FALLBACK`
+
+## 4) Luong xu ly chi tiet `/chatbot/message`
+
+1. Controller nhan request.
+2. Service tao/kiem tra `sessionId`.
+3. Lay recent user context (toi da 5 tin nhan USER).
+4. Log USER message vao chat history.
+5. Parse message bang Rule parser.
+6. Parse message bang GPT parser (neu bat).
+7. Merge Rule + GPT.
+8. Merge voi context tu recent messages.
+9. Router theo intent:
+   - Availability / Suggest / Booking / Cancel / Extend / Facility detail.
+10. Bat business exception dac thu (booking lock) de tra thong diep than thien.
+11. Gan `sessionId` vao response.
+12. Log BOT response vao chat history.
+13. Tra response.
+
+## 5) Cac nang cap nghiep vu da lam
+
+### 5.1 Availability - dung theo khung gio user hoi
+
+Da fix:
+
+- Neu user hoi gio cu the (vi du 11:00 ngay mai), ket qua chi lay phong trong dung trong requested window.
+- Khong con tra phong chi vi no trong o gio khac.
+- `availableTimeSlots` trong case co gio cu the se hien thi dung requested window (vi du `11:00-12:00`), khong con `11:00-00:00`.
+- Ho tro filter theo building (vi du "Toa nha Alpha...").
+
+### 5.2 Booking late-night
+
+Da fix case:
+
+- "Dat phong V5-020 vao 23h hom nay" / "Book room ... at 11:00 PM today"
+
+Truoc day:
+
+- End default co the bi wrap ve `00:00` va fail `end <= start`.
+
+Hien tai:
+
+- Co normalize default end an toan cho gio cuoi ngay, tranh invalid range gia.
+
+### 5.3 Cancel reservation qua chatbot
+
+Da them intent va xu ly:
+
+- Nhan lenh huy bang tieng Viet/Anh.
+- Uu tien room code user vua noi trong context session gan nhat neu tin nhan hien tai khong co room code.
+- Goi dung business service: `reservationService.cancelReservation(...)`.
+
+### 5.4 Extend reservation qua chatbot
+
+Da them intent va xu ly:
+
+- Nhan lenh them gio/gia han bang tieng Viet/Anh.
+- Parse so gio tu message (mac dinh 1 gio neu khong neu ro).
+- Uu tien room code theo context session gan nhat.
+- Goi dung business service: `reservationService.extendReservation(...)`.
+- Response da bo sung khung gio moi sau khi extend thanh cong.
+
+### 5.5 Facility details - tra payload giong RoomDetailResponse
+
+Khi user hoi chi tiet phong:
+
+- Chatbot van co `reply` ngan.
+- Dong thoi tra them payload `roomDetail` trong `ChatbotMessageResponse` theo dung format `RoomDetailResponse`:
+  - `id`, `locationCode`, `capacity`
+  - `amenities`, `images`
+  - `score`
+  - `currentUserId`, `currentUserName`, `checkInTime`
+  - `feedbacks`
+
+### 5.6 Booking function locked - response than thien
+
+Da xu ly:
+
+- Neu backend nem `ResponseCode.BOOKING_FUNCTION_LOCKED`, chatbot khong nem loi thang ra client.
+- Chatbot tra response than thien (VI/EN), co kem expected unlock time neu co data.
+
+## 6) Response format cua chatbot
+
+Tat ca endpoint chatbot tra dang chung:
+
+```json
+{
+  "data": {
+    "sessionId": "...",
+    "reply": "...",
+    "intent": "...",
+    "availableRooms": [],
+    "alternativeRooms": [],
+    "reservation": null,
+    "roomDetail": null
+  },
   "meta": {
     "code": "200",
     "message": null
@@ -63,258 +239,202 @@ Tat ca response deu duoc wrap theo dang:
 }
 ```
 
-## 3) Luong AI di qua nhung man nao
+Trong do:
 
-## 3.1 Luong chinh: POST /api/v1/chatbot/message
+- `availableRooms`: dung cho check availability / suggest.
+- `alternativeRooms`: dung khi booking conflict.
+- `reservation`: dung khi booking thanh cong.
+- `roomDetail`: dung khi intent la `VIEW_FACILITY_DETAILS` va resolve duoc room.
 
-Man 1 - Nhan request
+## 7) Curl day du cho ChatbotController
 
-- Controller nhan message + sessionId.
-- Neu sessionId rong -> tao moi.
+Gia su BE chay local: `http://localhost:8080`
 
-Man 2 - Nho ngu canh
+### 7.1 Tao session
 
-- Lay toi da 5 message USER gan nhat theo sessionId.
-- Chua xu ly ngay, chi dung lam context.
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/session"
+```
 
-Man 3 - Log USER
-
-- Luu 1 dong chat history voi sender = USER.
-
-Man 4 - NLP layer
-
-- Rule parser parse message hien tai (intent/room/date/time/capacity).
-- GPT parser (optional) parse cung message + context:
-  - Chi chay khi AI_LLM_ENABLED=true va co AI_LLM_API_KEY.
-  - Neu loi/timeout -> bo qua GPT, he thong van chay.
-
-Man 5 - Merge ket qua NLP
-
-- Merge rule + GPT theo uu tien an toan.
-- Merge tiep voi context de fill slot con thieu.
-
-Man 6 - Router theo intent
-
-- CHECK_AVAILABLE_ROOMS_TODAY -> tim phong trong.
-- SUGGEST_ROOMS_BY_CAPACITY -> goi y phong theo suc chua.
-- BOOK_ROOM -> dat theo roomCode hoac auto-pick theo capacity.
-- FALLBACK -> tra loi huong dan.
-
-Man 7 - Log BOT + Tra response
-
-- Gan sessionId vao response.
-- Log BOT reply vao chat history.
-- Tra ve cho FE.
-
-## 3.2 Luong voice: POST /api/v1/chatbot/voice
-
-Man 1 - Nhan multipart form-data: audio/transcript/sessionId/language.
-
-Man 2 - Xac dinh text dau vao:
-
-- Neu co transcript -> dung transcript.
-- Neu khong co transcript ma co audio -> goi SpeechToTextService.transcribe(...).
-
-Man 3 - Chuyen thanh ChatbotMessageRequest va tai su dung toan bo luong /chatbot/message.
-
-Luu y:
-
-- Neu backend STT chua cau hinh (NoOpSpeechToTextService), can gui transcript truc tiep.
-
-## 3.3 Luong cu: POST /api/v1/ai/chat
-
-Man 1 - Nhap message + optional start/end/capacity.
-
-Man 2 - Heuristic detect keyword booking/suggest/default.
-
-Man 3 - Neu booking:
-
-- Validate du start/end/capacity.
-- Tim candidate room theo capacity.
-- Kiem tra available theo khung gio.
-- Neu co phong hop le -> tao reservation.
-
-Man 4 - Neu suggest:
-
-- Validate start/end.
-- Tim danh sach phong available theo khung gio va capacity.
-
-Man 5 - Log USER/BOT, tra AiChatResponse.
-
-## 3.4 Luong cu: POST /api/v1/ai/reserve
-
-Man 1 - FE gui ReservationRequest day du.
-
-Man 2 - Goi truc tiep ReservationService.reserveRoom(...).
-
-Man 3 - Tra AiChatResponse (co reservationCreated=true neu thanh cong).
-
-## 4) Chi tiet endpoint + curl
-
-Gia su BE chay local tai http://localhost:8080.
-
-### 4.1 Chatbot text
-
-Endpoint:
-
-- POST /api/v1/chatbot/message
-
-Muc dich:
-
-- Chat hoi dap phong hop.
-- Kiem tra phong trong.
-- Dat phong theo roomCode hoac auto-book theo capacity.
-
-Curl (chua login):
+### 7.2 Chat text - hoi phong trong (VI)
 
 ```bash
 curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "Today available rooms?",
-    "sessionId": null
+    "message": "Toa nha Alpha co nhung phong nao trong vao 10h sang ngay mai",
+    "sessionId": "<SESSION_ID>"
   }'
 ```
 
-Curl (can login khi booking):
+### 7.3 Chat text - hoi phong trong (EN)
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Which rooms are available in Alpha building at 11:00 AM tomorrow?",
+    "sessionId": "<SESSION_ID>"
+  }'
+```
+
+### 7.4 Dat phong (yeu cau login)
 
 ```bash
 curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <ACCESS_TOKEN>" \
   -d '{
-    "message": "Book AL-102 from 14:00 to 15:00 tomorrow",
-    "sessionId": "<SESSION_ID_TU_LAN_TRUOC>"
+    "message": "Dat cho toi phong V5-020 vao 23h hom nay",
+    "sessionId": "<SESSION_ID>"
   }'
 ```
 
-### 4.2 Chatbot voice
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "message": "Book me room V5-020 at 11:00 PM today",
+    "sessionId": "<SESSION_ID>"
+  }'
+```
 
-Endpoint:
+### 7.5 Huy dat phong (yeu cau login)
 
-- POST /api/v1/chatbot/voice (multipart/form-data)
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "message": "Toi muon huy phong V5-020",
+    "sessionId": "<SESSION_ID>"
+  }'
+```
 
-Muc dich:
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "message": "Cancel my room V5-020 booking",
+    "sessionId": "<SESSION_ID>"
+  }'
+```
 
-- Voice booking/chat, sau do di chung luong chatbot text.
+### 7.6 Gia han dat phong (yeu cau login)
 
-Curl dung transcript truc tiep (khuyen nghi neu STT backend chua cau hinh):
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "message": "Toi muon them 1 gio",
+    "sessionId": "<SESSION_ID>"
+  }'
+```
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "message": "Extend my reservation by 2 hours for room V5-020",
+    "sessionId": "<SESSION_ID>"
+  }'
+```
+
+### 7.7 Xem chi tiet phong (tra roomDetail)
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Chi tiet phong V5-020",
+    "sessionId": "<SESSION_ID>"
+  }'
+```
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/chatbot/message" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Show details of room V5-020",
+    "sessionId": "<SESSION_ID>"
+  }'
+```
+
+### 7.8 Voice endpoint bang transcript (khuyen nghi)
 
 ```bash
 curl -X POST "http://localhost:8080/api/v1/chatbot/voice" \
   -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -F "transcript=Book room V21-024 tomorrow at 6PM to 8PM" \
+  -F "transcript=Book room V5-020 at 11 PM today" \
   -F "sessionId=<SESSION_ID>" \
   -F "language=en"
 ```
 
-Curl gui audio:
+### 7.9 Voice endpoint bang audio file
 
 ```bash
 curl -X POST "http://localhost:8080/api/v1/chatbot/voice" \
   -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -F "audio=@/path/to/voice.wav" \
+  -F "audio=@/path/to/audio.wav" \
   -F "sessionId=<SESSION_ID>" \
   -F "language=vi"
 ```
 
-### 4.3 AI chat (heuristic cu)
-
-Endpoint:
-
-- POST /api/v1/ai/chat
-
-Muc dich:
-
-- Luong heuristic chat/suggest/booking theo request structure.
-
-Curl suggest:
+### 7.10 Xoa session
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/ai/chat" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -d '{
-    "message": "Goi y phong trong giup minh",
-    "sessionId": null,
-    "startTime": "2026-04-14T09:00:00",
-    "endTime": "2026-04-14T10:00:00",
-    "capacity": 8
-  }'
+curl -X DELETE "http://localhost:8080/api/v1/chatbot/session/<SESSION_ID>"
 ```
 
-Curl booking:
+### 7.11 Lay danh sach lich su session cua user
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/ai/chat" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -d '{
-    "message": "Dat phong giup minh",
-    "sessionId": null,
-    "startTime": "2026-04-14T14:00:00",
-    "endTime": "2026-04-14T15:00:00",
-    "capacity": 10
-  }'
+curl -X GET "http://localhost:8080/api/v1/chatbot/history" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
-### 4.4 AI reserve (heuristic cu)
-
-Endpoint:
-
-- POST /api/v1/ai/reserve
-
-Muc dich:
-
-- Dat phong truc tiep khi FE da co du roomId + khung gio.
-
-Curl:
+### 7.12 Lay chi tiet 1 session
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/ai/reserve" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -d '{
-    "roomId": "<ROOM_ID>",
-    "startTime": "2026-04-14T14:00:00",
-    "endTime": "2026-04-14T15:00:00",
-    "purpose": "Team sync",
-    "note": "Booked via AI"
-  }'
+curl -X GET "http://localhost:8080/api/v1/chatbot/history/<SESSION_ID>" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
-## 5) Cau hinh GPT cho luong chatbot (optional)
+## 8) Cau hinh GPT
 
-Dat bien moi truong:
+Bien moi truong khuyen nghi:
 
-- AI_LLM_ENABLED=true
-- AI_LLM_API_KEY=<OPENAI_API_KEY>
-- AI_LLM_MODEL=gpt-4o-mini
-- AI_LLM_BASE_URL=https://api.openai.com/v1
-- AI_LLM_TIMEOUT_MS=10000
+- `AI_LLM_ENABLED=true`
+- `AI_LLM_API_KEY=<OPENAI_API_KEY>`
+- `AI_LLM_MODEL=gpt-4o-mini`
+- `AI_LLM_BASE_URL=https://api.openai.com/v1`
+- `AI_LLM_TIMEOUT_MS=10000`
+- `AI_LLM_QUOTA_COOLDOWN_MS=600000`
 
-Luu y quan trong:
+Luu y:
 
-- Neu khong bat hoac thieu api-key, he thong tu dong quay lai rule-base.
-- Dat phong van thong qua business service hien co, khong giao cho LLM quyet dinh nghiep vu cuoi cung.
+- Co the tat GPT va he thong van chay bang rule parser.
+- GPT chi lam intent/slot extraction, khong thay the business validation core.
 
-## 6) Session va chat history
+## 9) Cac truong hop business va thong diep
 
-- Lan dau FE gui sessionId = null.
-- Backend sinh sessionId va tra lai trong data.sessionId.
-- FE phai gui lai sessionId o cac lan tiep theo de giu ngu canh.
-- Moi request chatbot/ai chat se log 2 ban ghi history: USER va BOT.
+- `BOOKING_FUNCTION_LOCKED`:
+  - Chatbot tra message than thien VI/EN (co the kem unlock time).
+- Time range invalid:
+  - Da xu ly case gio khuya single-time booking de tranh invalid gia.
+- Availability theo gio:
+  - Tra dung phong trong theo requested window, khong gom phong ban o gio khac.
 
-## 7) Loi thuong gap khi test
+## 10) Checklist test nhanh
 
-- Booking khong kem token -> ACCESS_DENIED.
-- Start time trong qua khu -> chatbot tra loi yeu cau chon thoi gian tuong lai.
-- End <= start -> chatbot tra loi invalid range.
-- Voice gui audio khi STT chua cau hinh -> can gui transcript thay the.
-
-## 8) Khuyên nghi van hanh
-
-- Nen tach ro 2 luong cho FE:
-  - Luong thong minh/chinh: /api/v1/chatbot/message.
-  - Luong cu tuong thich nguoc: /api/v1/ai/chat.
-- Neu san xuat, nen bo api-key vao bien moi truong/secret manager, khong hard-code.
+1. Tao session.
+2. Hoi availability theo building + gio cu the.
+3. Dat phong buoi khuya (23h hom nay).
+4. Gia han dat phong, kiem tra response co khung gio moi.
+5. Huy dat phong voi/khong voi room code (kiem tra context session).
+6. Hoi chi tiet phong va verify `roomDetail` payload.
+7. Goi history endpoint de verify luu USER/BOT log theo session.

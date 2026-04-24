@@ -264,6 +264,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     public ReservationResponse reserveRoom(ReservationRequest request, Authentication connectedUser) {
         try {
+            List<Reservation> listReservationBook = new ArrayList<>();
             // Locking the room to prevent race conditions
             var room = roomRepository.findByIdForUpdate(request.getRoomId())
                     .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
@@ -319,7 +320,8 @@ public class ReservationServiceImpl implements ReservationService {
 
             // Send real-time update
             realTimeService.addReservation(reservation);
-
+            listReservationBook.add(reservation);
+            notificationService.noticeSuccessfulReservation(listReservationBook);
             return reservationMapperFacade.toResponse(reservation);
         } catch (CustomException e) {
             throw e;

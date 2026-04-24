@@ -88,7 +88,7 @@ public class ChatbotServiceImpl implements ChatbotService {
             ChatbotMessageResponse res = ChatbotMessageResponse.builder()
                 .sessionId(sessionId)
                         .intent(ChatbotIntent.FALLBACK)
-                        .reply("Please type a message. For example: 'Today available rooms?' or 'Book AL-102 at 10AM today'.")
+                        .reply("Please type a message. For example: 'Today available rooms?' or 'Book V5-020 at 10AM today'.")
                         .build();
             chatHistoryService.log(user, sessionId, SenderType.BOT, res.getReply());
             return res;

@@ -44,7 +44,7 @@ public class OpenAiChatbotLlmService implements ChatbotLlmService {
     @Value("${application.ai.llm.model:gpt-4o-mini}")
     private String model;
 
-    @Value("${application.ai.llm.api-key:}")
+    @Value("${application.ai.llm.api-key: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}")
     private String apiKey;
 
     @Value("${application.ai.llm.timeout-ms:10000}")
