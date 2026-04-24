@@ -41,6 +41,8 @@ import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationServiceItemResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationTimelineResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
+import com.finalProject.BookingMeetingRoom.repository.EventParticipantRepository;
+import com.finalProject.BookingMeetingRoom.repository.EventRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationHistoryRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationServiceItemRepository;
@@ -79,6 +81,8 @@ public class ReservationServiceImpl implements ReservationService {
     private final AcademicScheduleService academicScheduleService;
     private final ServiceItemRepository serviceItemRepository;
     private final ReservationServiceItemRepository reservationServiceItemRepository;
+    private final EventRepository eventRepository;
+    private final EventParticipantRepository eventParticipantRepository;
 
     record ReservationContext(Reservation reservation, Room room) {
     }
@@ -88,6 +92,13 @@ public class ReservationServiceImpl implements ReservationService {
         if (authentication == null || authentication.getAuthorities() == null) return false;
         return authentication.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority()));
+    }
+
+    private boolean isEventParticipant(String reservationId, String userId) {
+        if (reservationId == null || userId == null) return false;
+        return eventRepository.findByReservation_Id(reservationId)
+                .flatMap(event -> eventParticipantRepository.findByEvent_IdAndUser_Id(event.getId(), userId))
+                .isPresent();
     }
     // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 
@@ -711,7 +722,8 @@ public class ReservationServiceImpl implements ReservationService {
             var reservation = reservationRepository.findById(reservationId)
                     .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
 
-            if (!reservation.getUser().getId().equals(currentUser.getId())) {
+            boolean isOwner = reservation.getUser() != null && reservation.getUser().getId().equals(currentUser.getId());
+            if (!isAdmin(authentication) && !isOwner && !isEventParticipant(reservationId, currentUser.getId())) {
                 throw new CustomException(ResponseCode.PERMISSION_DENIED);
             }
 
@@ -784,7 +796,8 @@ public class ReservationServiceImpl implements ReservationService {
         var reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
 
-        if (!isAdmin(authentication) && !reservation.getUser().getId().equals(currentUser.getId())) {
+        boolean isOwner = reservation.getUser() != null && reservation.getUser().getId().equals(currentUser.getId());
+        if (!isAdmin(authentication) && !isOwner && !isEventParticipant(reservationId, currentUser.getId())) {
             throw new CustomException(ResponseCode.PERMISSION_DENIED);
         }
 
@@ -843,6 +856,7 @@ public class ReservationServiceImpl implements ReservationService {
             lines.add(line);
         }
         reservationServiceItemRepository.saveAll(lines);
+        realTimeService.sendServiceItemUpdate(reservationId);
     }
     // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 

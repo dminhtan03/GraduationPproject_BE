@@ -146,4 +146,26 @@ public class RealTimeServiceImpl implements RealTimeService {
 
         sendRealTimeRoomStatusUpdate(roomStatusUpdateRequest, room.getFloor().getId());
     }
+
+    @Override
+    public void sendServiceItemUpdate(String reservationId) {
+        try {
+            String topic = "/topic/reservations/" + reservationId + "/services";
+            log.info("Sending real-time service item update to topic: {}", topic);
+            messagingTemplate.convertAndSend(topic, "UPDATED");
+        } catch (Exception e) {
+            log.error("Error while sending service item update", e);
+        }
+    }
+
+    @Override
+    public void sendParticipantUpdate(String reservationId) {
+        try {
+            String topic = "/topic/reservations/" + reservationId + "/participants";
+            log.info("Sending real-time participant update to topic: {}", topic);
+            messagingTemplate.convertAndSend(topic, "UPDATED");
+        } catch (Exception e) {
+            log.error("Error while sending participant update", e);
+        }
+    }
 }

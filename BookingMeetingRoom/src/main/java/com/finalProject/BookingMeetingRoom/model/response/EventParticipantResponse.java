@@ -25,5 +25,13 @@ public class EventParticipantResponse {
     private EventParticipantInviteStatus inviteStatus;
     private EventParticipantCheckInStatus checkInStatus;
     private LocalDateTime checkInTime;
+
+    private String eventId;
+    private String reservationId;
+    private String eventTitle;
+    private LocalDateTime reservationStartTime;
+    private LocalDateTime reservationEndTime;
+    private String roomLocationCode;
+    private String roomAddress;
 }
 // end+ chức năng đặt phòng theo sự kiện (participant response)
