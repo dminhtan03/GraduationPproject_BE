@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -56,6 +57,14 @@ public class Reservation {
 
     @Column(name = "UPDATED_AT")
     private LocalDateTime updatedAt;
+
+    // start+ chức năng đặt phòng lặp lại (Reservation Series)
+    @Column(name = "SERIES_ID")
+    private String seriesId;
+
+    @Column(name = "SERIES_DATE")
+    private LocalDate seriesDate;
+    // end+ chức năng đặt phòng lặp lại (Reservation Series)
 
     @ManyToOne
     @JoinColumn(name = "room_id")

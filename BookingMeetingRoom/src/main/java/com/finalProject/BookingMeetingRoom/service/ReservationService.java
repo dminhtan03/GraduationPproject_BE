@@ -9,10 +9,12 @@ import org.springframework.security.core.Authentication;
 
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
+import com.finalProject.BookingMeetingRoom.model.request.ReservationServiceItemsUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AdminReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationServiceItemResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationTimelineResponse;
 
 public interface ReservationService {
@@ -44,4 +46,12 @@ public interface ReservationService {
         ReservationDetailResponse getReservationDetail(String reservationId, Authentication authentication);
         
         void forceCancelReservation(String reservationId, String reason, Authentication adminUser);
+
+        // start+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
+        List<ReservationServiceItemResponse> getReservationServiceItems(String reservationId, Authentication authentication);
+        void updateReservationServiceItems(String reservationId, ReservationServiceItemsUpdateRequest request, Authentication authentication);
+        // start+ chức năng service item status
+        void updateServiceItemStatus(String reservationId, String itemId, String status, Authentication authentication);
+        // end+ chức năng service item status
+        // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 }

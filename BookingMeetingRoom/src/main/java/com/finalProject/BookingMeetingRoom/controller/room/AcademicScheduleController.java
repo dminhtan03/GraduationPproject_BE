@@ -71,8 +71,10 @@ public class AcademicScheduleController {
      */
     @PostMapping("/import")
     public ResponseEntity<?> importSchedules(@RequestParam("file") MultipartFile file) {
-        scheduleService.importSchedulesFromExcel(file);
-        return ResponseEntity.ok(Response.ofSucceeded("Lịch học đã được nhập thành công từ file Excel"));
+        // start+ chức năng import lịch học cố định từ Excel (trả về lỗi đầy đủ + vẫn import các dòng hợp lệ)
+        var result = scheduleService.importSchedulesFromExcel(file);
+        return ResponseEntity.ok(Response.ofSucceeded(result));
+        // end+ chức năng import lịch học cố định từ Excel (trả về lỗi đầy đủ + vẫn import các dòng hợp lệ)
     }
 
     /**

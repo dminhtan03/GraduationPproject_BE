@@ -327,4 +327,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
       @Param("time") LocalDateTime time,
       @Param("roomId") String roomId);
 
+  // start+ chức năng đặt phòng lặp lại (Reservation Series)
+  boolean existsBySeriesIdAndSeriesDate(String seriesId, LocalDate seriesDate);
+  List<Reservation> findBySeriesIdAndStartTimeAfter(String seriesId, LocalDateTime startTime);
+  // end+ chức năng đặt phòng lặp lại (Reservation Series)
+
 }

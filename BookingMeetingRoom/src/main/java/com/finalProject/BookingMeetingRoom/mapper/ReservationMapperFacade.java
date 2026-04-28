@@ -61,6 +61,7 @@ public class ReservationMapperFacade {
         response.setUpdatedAt(reservation.getUpdatedAt());
         response.setReason(reservation.getReason());
         response.setCancelBy(reservation.getCancelBy());
+        response.setUserId(reservation.getUser() != null ? reservation.getUser().getId() : null);
 
         response.setRoom(roomDto);
         response.setFloor(floorDto);
