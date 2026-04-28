@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -13,6 +15,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import com.finalProject.BookingMeetingRoom.common.enums.ServiceItemStatus;
 
 // start+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng (ReservationServiceItem entity)
 @Getter
@@ -42,6 +46,10 @@ public class ReservationServiceItem {
 
     @Column(name = "PRICE_SNAPSHOT")
     private Double priceSnapshot;
+
+    @Column(name = "STATUS")
+    @Enumerated(EnumType.STRING)
+    private ServiceItemStatus status;
 
     @Column(name = "CREATED_AT")
     private LocalDateTime createdAt;

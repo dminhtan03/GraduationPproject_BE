@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import com.finalProject.BookingMeetingRoom.common.enums.HistoryAction;
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.common.enums.ServiceItemStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.mapper.FeedbackMapper;
@@ -361,6 +362,7 @@ public class ReservationServiceImpl implements ReservationService {
                     line.setQuantity(lineRequest.getQuantity());
                     line.setNote(lineRequest.getNote());
                     line.setPriceSnapshot(serviceItem.getPrice());
+                    line.setStatus(ServiceItemStatus.PENDING);
                     line.setCreatedAt(LocalDateTime.now());
                     line.setUpdatedAt(LocalDateTime.now());
                     lines.add(line);
@@ -765,6 +767,7 @@ public class ReservationServiceImpl implements ReservationService {
                             .priceSnapshot(line.getPriceSnapshot())
                             .quantity(line.getQuantity())
                             .note(line.getNote())
+                            .status(line.getStatus() != null ? line.getStatus().name() : ServiceItemStatus.PENDING.name())
                             .build())
                     .toList();
             // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
@@ -810,6 +813,7 @@ public class ReservationServiceImpl implements ReservationService {
                         .priceSnapshot(line.getPriceSnapshot())
                         .quantity(line.getQuantity())
                         .note(line.getNote())
+                        .status(line.getStatus() != null ? line.getStatus().name() : ServiceItemStatus.PENDING.name())
                         .build())
                 .toList();
     }
@@ -827,9 +831,15 @@ public class ReservationServiceImpl implements ReservationService {
             throw new CustomException(ResponseCode.PERMISSION_DENIED);
         }
 
-        reservationServiceItemRepository.deleteByReservation_Id(reservationId);
+        // start+ chức năng bảo toàn lịch sử: chỉ xóa dòng chưa hoàn thành, giữ lại DONE/CANCELLED
+        List<ServiceItemStatus> preservedStatuses = List.of(ServiceItemStatus.DONE, ServiceItemStatus.CANCELLED);
+        List<ReservationServiceItem> activeItems =
+                reservationServiceItemRepository.findByReservation_IdAndStatusNotIn(reservationId, preservedStatuses);
+        reservationServiceItemRepository.deleteAll(activeItems);
+        // end+ chức năng bảo toàn lịch sử
 
         if (request == null || request.getServiceItems() == null || request.getServiceItems().isEmpty()) {
+            realTimeService.sendServiceItemUpdate(reservationId);
             return;
         }
 
@@ -846,6 +856,7 @@ public class ReservationServiceImpl implements ReservationService {
 
             ReservationServiceItem line = new ReservationServiceItem();
             line.setId(UUID.randomUUID().toString());
+            line.setStatus(ServiceItemStatus.PENDING);
             line.setReservation(reservation);
             line.setServiceItem(serviceItem);
             line.setQuantity(lineRequest.getQuantity());
@@ -858,6 +869,38 @@ public class ReservationServiceImpl implements ReservationService {
         reservationServiceItemRepository.saveAll(lines);
         realTimeService.sendServiceItemUpdate(reservationId);
     }
+    // start+ chức năng service item status (admin cập nhật trạng thái dịch vụ)
+    @Override
+    @Transactional
+    public void updateServiceItemStatus(String reservationId, String itemId, String status, Authentication authentication) {
+        if (!isAdmin(authentication)) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+        ReservationServiceItem item = reservationServiceItemRepository.findById(itemId)
+                .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Service item not found"));
+
+        if (!item.getReservation().getId().equals(reservationId)) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        ServiceItemStatus newStatus;
+        try {
+            newStatus = ServiceItemStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED, "Invalid status: " + status);
+        }
+
+        item.setStatus(newStatus);
+        item.setUpdatedAt(LocalDateTime.now());
+        reservationServiceItemRepository.save(item);
+        realTimeService.sendServiceItemUpdate(reservationId);
+    }
+    // end+ chức năng service item status
+
     // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 
     /**

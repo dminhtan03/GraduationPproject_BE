@@ -4,6 +4,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -23,6 +24,7 @@ import com.finalProject.BookingMeetingRoom.model.entity.ReservationSeries;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
 import com.finalProject.BookingMeetingRoom.model.entity.User;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationSeriesCreateRequest;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationSeriesPreviewItem;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationSeriesResponse;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationSeriesRepository;
@@ -255,6 +257,83 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         series.setUpdatedAt(LocalDateTime.now());
         reservationSeriesRepository.save(series);
     }
+
+    // start+ chức năng xem trước lịch đặt định kỳ (preview trước khi tạo series)
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<ReservationSeriesPreviewItem> previewSeries(ReservationSeriesCreateRequest request, Authentication authentication) {
+        com.finalProject.BookingMeetingRoom.model.entity.User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+        com.finalProject.BookingMeetingRoom.model.entity.Room room = roomRepository.findById(request.getRoomId())
+                .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
+
+        if (request.getDaysOfWeek() == null || request.getDaysOfWeek().isEmpty()) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED, "daysOfWeek is required");
+        }
+
+        Set<DayOfWeek> targetDays = request.getDaysOfWeek().stream()
+                .map(String::trim).map(String::toUpperCase)
+                .map(DayOfWeek::valueOf)
+                .collect(Collectors.toSet());
+
+        int rollingWeeks = request.getRollingWindowWeeks() == null ? DEFAULT_ROLLING_WINDOW_WEEKS : request.getRollingWindowWeeks();
+        LocalDate maxUntil = LocalDate.now().plusWeeks(Math.max(1, rollingWeeks));
+        if (request.getUntilDate() != null && request.getUntilDate().isBefore(maxUntil)) {
+            maxUntil = request.getUntilDate();
+        }
+
+        LocalTime startT = request.getStartTimeOfDay();
+        LocalTime endT = request.getEndTimeOfDay();
+
+        List<ReservationSeriesPreviewItem> results = new ArrayList<>();
+        LocalDate cursor = request.getFromDate();
+
+        while (!cursor.isAfter(maxUntil)) {
+            if (targetDays.contains(cursor.getDayOfWeek())) {
+                LocalDateTime startTime = cursor.atTime(startT);
+                LocalDateTime endTime = endT.isAfter(startT) ? cursor.atTime(endT) : cursor.plusDays(1).atTime(endT);
+
+                boolean canBook = true;
+                String conflictReason = null;
+
+                List<com.finalProject.BookingMeetingRoom.model.entity.Reservation> userOverlap =
+                        reservationRepository.checkOverlapByUser(user.getId(), startTime, endTime,
+                                List.of(ReservationStatus.IN_USE.name(), ReservationStatus.RESERVED.name(), ReservationStatus.PENDING.name()));
+                if (!userOverlap.isEmpty()) {
+                    canBook = false;
+                    conflictReason = "USER_CONFLICT";
+                }
+
+                if (canBook) {
+                    boolean roomConflict = reservationRepository
+                            .checkOverlappingReservationsByRoom(room.getId(), startTime, endTime)
+                            .stream()
+                            .anyMatch(r -> Set.of(ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING).contains(r.getStatus()));
+                    if (roomConflict) {
+                        canBook = false;
+                        conflictReason = "ROOM_CONFLICT";
+                    }
+                }
+
+                if (canBook && academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                    canBook = false;
+                    conflictReason = "ACADEMIC_SCHEDULE";
+                }
+
+                results.add(ReservationSeriesPreviewItem.builder()
+                        .date(cursor)
+                        .startTime(startTime)
+                        .endTime(endTime)
+                        .canBook(canBook)
+                        .conflictReason(conflictReason)
+                        .build());
+            }
+            cursor = cursor.plusDays(1);
+        }
+
+        return results;
+    }
+    // end+ chức năng xem trước lịch đặt định kỳ
 
     private void tryCreateReservationForOccurrence(ReservationSeries series, LocalDate occurrenceDate) {
         User user = series.getUser();

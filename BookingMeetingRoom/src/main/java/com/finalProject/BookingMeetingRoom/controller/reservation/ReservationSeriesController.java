@@ -31,6 +31,13 @@ public class ReservationSeriesController {
         return ResponseEntity.ok(Response.ofSucceeded(reservationSeriesService.createSeries(request, authentication)));
     }
 
+    // start+ chức năng xem trước lịch đặt định kỳ
+    @PostMapping("/preview")
+    public ResponseEntity<?> previewSeries(@Valid @RequestBody ReservationSeriesCreateRequest request, Authentication authentication) {
+        return ResponseEntity.ok(Response.ofSucceeded(reservationSeriesService.previewSeries(request, authentication)));
+    }
+    // end+ chức năng xem trước lịch đặt định kỳ
+
     @GetMapping("/my")
     public ResponseEntity<?> getMySeries(Authentication authentication) {
         return ResponseEntity.ok(Response.ofSucceeded(reservationSeriesService.getMySeries(authentication)));

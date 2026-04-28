@@ -20,5 +20,8 @@ public class ReservationServiceItemResponse {
     private Double priceSnapshot;
     private Integer quantity;
     private String note;
+    // start+ chức năng service item status
+    private String status;
+    // end+ chức năng service item status
 }
 // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng (response)

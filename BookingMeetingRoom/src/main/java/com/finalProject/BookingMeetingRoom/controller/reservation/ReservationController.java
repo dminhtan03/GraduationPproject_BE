@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/reservations")
@@ -73,6 +74,19 @@ public class ReservationController {
         reservationService.updateReservationServiceItems(reservationId, request, authentication);
         return ResponseEntity.ok(Response.ofSucceeded("Reservation service items updated successfully"));
     }
+    // start+ chức năng service item status (admin cập nhật trạng thái dịch vụ)
+    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
+    @PutMapping("/{reservationId}/service-items/{itemId}/status")
+    public ResponseEntity<?> updateServiceItemStatus(
+            @PathVariable String reservationId,
+            @PathVariable String itemId,
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+        reservationService.updateServiceItemStatus(reservationId, itemId, body.get("status"), authentication);
+        return ResponseEntity.ok(Response.ofSucceeded("Service item status updated successfully"));
+    }
+    // end+ chức năng service item status
+
     // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 
     @GetMapping
