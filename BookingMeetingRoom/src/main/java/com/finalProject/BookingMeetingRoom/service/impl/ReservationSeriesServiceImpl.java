@@ -74,6 +74,7 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
     }
 
     private ReservationSeriesResponse toResponse(ReservationSeries series) {
+        var user = series.getUser();
         return ReservationSeriesResponse.builder()
                 .id(series.getId())
                 .roomId(series.getRoom().getId())
@@ -89,6 +90,9 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
                 .status(series.getStatus())
                 .lastSyncUntil(series.getLastSyncUntil())
                 .createdAt(series.getCreatedAt())
+                // start+ chức năng admin quản lý recurring series
+                .userEmail(user != null ? user.getUsername() : null)
+                // end+ chức năng admin quản lý recurring series
                 .build();
     }
 
@@ -257,6 +261,16 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         series.setUpdatedAt(LocalDateTime.now());
         reservationSeriesRepository.save(series);
     }
+
+    // start+ chức năng admin quản lý recurring series
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<ReservationSeriesResponse> getAllSeriesForAdmin() {
+        return reservationSeriesRepository.findAll().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+    // end+ chức năng admin quản lý recurring series
 
     // start+ chức năng xem trước lịch đặt định kỳ (preview trước khi tạo series)
     @Override

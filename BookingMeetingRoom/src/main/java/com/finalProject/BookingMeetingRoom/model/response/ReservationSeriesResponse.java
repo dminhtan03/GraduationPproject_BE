@@ -33,5 +33,8 @@ public class ReservationSeriesResponse {
     private ReservationSeriesStatus status;
     private LocalDate lastSyncUntil;
     private LocalDateTime createdAt;
+    // start+ chức năng admin quản lý recurring series
+    private String userEmail;
+    // end+ chức năng admin quản lý recurring series
 }
 // end+ chức năng đặt phòng lặp lại (series response)
