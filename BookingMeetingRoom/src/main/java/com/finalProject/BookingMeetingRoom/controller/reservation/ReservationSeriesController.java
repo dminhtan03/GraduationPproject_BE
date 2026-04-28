@@ -38,6 +38,14 @@ public class ReservationSeriesController {
     }
     // end+ chức năng xem trước lịch đặt định kỳ
 
+    // start+ chức năng admin quản lý recurring series
+    @GetMapping("/admin/all")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
+    public ResponseEntity<?> getAllSeriesForAdmin() {
+        return ResponseEntity.ok(Response.ofSucceeded(reservationSeriesService.getAllSeriesForAdmin()));
+    }
+    // end+ chức năng admin quản lý recurring series
+
     @GetMapping("/my")
     public ResponseEntity<?> getMySeries(Authentication authentication) {
         return ResponseEntity.ok(Response.ofSucceeded(reservationSeriesService.getMySeries(authentication)));

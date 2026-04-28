@@ -17,5 +17,8 @@ public interface ReservationSeriesService {
     // start+ chức năng xem trước lịch đặt định kỳ
     List<ReservationSeriesPreviewItem> previewSeries(ReservationSeriesCreateRequest request, Authentication authentication);
     // end+ chức năng xem trước lịch đặt định kỳ
+    // start+ chức năng admin quản lý recurring series
+    List<ReservationSeriesResponse> getAllSeriesForAdmin();
+    // end+ chức năng admin quản lý recurring series
 }
 // end+ chức năng đặt phòng lặp lại (service)
