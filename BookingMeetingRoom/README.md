@@ -437,4 +437,25 @@ Luu y:
 4. Gia han dat phong, kiem tra response co khung gio moi.
 5. Huy dat phong voi/khong voi room code (kiem tra context session).
 6. Hoi chi tiet phong va verify `roomDetail` payload.
+
+## 11) Auto deploy len VPS tu GitHub
+
+Da them workflow GitHub Actions de build JAR va deploy tu dong len VPS moi khi push code vao `tan` hoac `main`:
+
+- Workflow: `.github/workflows/deploy-vps.yml`
+- JAR se duoc upload vao `/opt/apps/BookingMeetingRoom/target/`
+- Service `bookingmeetingroom` se duoc restart tu dong sau khi upload xong
+
+Ban can tao GitHub Secrets sau:
+
+- `VPS_HOST` = `103.153.68.124`
+- `VPS_USER` = `root`
+- `VPS_PASSWORD` = mat khau SSH cua VPS
+
+Luu y:
+
+- Workflow nay khong phu thuoc vao `.git` tren VPS.
+- Moi lan push source moi len GitHub, GitHub Actions se build JAR moi va day sang VPS.
+- Neu ban muon chi deploy mot branch, chi can sua `on.push.branches` trong workflow.
+
 7. Goi history endpoint de verify luu USER/BOT log theo session.
