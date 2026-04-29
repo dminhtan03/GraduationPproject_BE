@@ -35,6 +35,8 @@ public interface NotificationService {
 
     void noticeExtendReservation(List<Reservation> extendedReservations);
 
+    void noticeInviteParticipantToEvent(String userId, String eventTitle, Reservation reservation);
+
     void remindCheckIn();
 
 }

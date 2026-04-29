@@ -21,6 +21,12 @@
                                 style="background-color: #f0f6ff; padding: 15px 20px; border-left: 4px solid #2a6cdf; border-radius: 6px; font-size: 14px; color: #1a1a1a; line-height: 1.6;">
                                 Your reservation details will appear here.
                             </p>
+                            <div th:if="${confirmationUrl != null && !confirmationUrl.isEmpty()}" style="margin-top: 25px;">
+                                <a th:href="${confirmationUrl}" 
+                                   style="display: inline-block; padding: 12px 25px; background-color: #2a6cdf; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px;">
+                                    Đi tới trang web
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     <tr>

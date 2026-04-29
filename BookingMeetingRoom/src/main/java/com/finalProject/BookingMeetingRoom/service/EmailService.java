@@ -4,6 +4,8 @@ import com.finalProject.BookingMeetingRoom.common.enums.EmailTemplateName;
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.entity.User;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ public class EmailService {
     private final JavaMailSender javaMailSender;
     private final SpringTemplateEngine emailTemplateEngine;
     private final ReservationRepository reservationRepository;
+    private final UserRepository userRepository;
     @Value("${spring.mail.username}")
     private String fromAddress;
 
@@ -76,30 +79,30 @@ public class EmailService {
     }
 
     public void sendEmailStatusReservation(NotificationRequest notificationRequest) {
-        Reservation reservation = reservationRepository.findById(notificationRequest.getReservationId())
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+        User user = userRepository.findById(notificationRequest.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found: " + notificationRequest.getUserId()));
 
-        User user = reservation.getUser();
-        if (user == null || user.getUserInfo().getEmail() == null) {
-            log.warn("User or email not found for reservation: {}", reservation.getId());
+        if (user.getUserInfo() == null || user.getUserInfo().getEmail() == null) {
+            log.warn("User info or email not found for user: {}", user.getId());
             return;
         }
 
         String firstName = Optional.ofNullable(user.getUserInfo().getFirstName()).orElse("");
         String lastName = Optional.ofNullable(user.getUserInfo().getLastName()).orElse("");
         String fullName = (firstName + " " + lastName).trim();
+        if (fullName.isEmpty()) fullName = user.getUsername();
 
         try {
             sendEmail(
                     user.getUserInfo().getEmail(),
                     fullName,
                     EmailTemplateName.RESERVATION_STATUS,
-                    "",
+                    "http://localhost:5173/login",
                     notificationRequest.getContent(),
                     notificationRequest.getTitle()
             );
         } catch (MessagingException e) {
-            log.error("Failed to send reservation status email for reservation: {}", reservation.getId(), e);
+            log.error("Failed to send notification email for user: {}", user.getId(), e);
         }
     }
 
@@ -127,6 +130,36 @@ public class EmailService {
         helper.setText(template, true);
 
         javaMailSender.send(mimeMessage);
+    }
+     /**
+     * NEW METHOD: Sends an invitation email to a specific user by their ID.
+     */
+    public void sendInviteEmail(NotificationRequest request) {
+        try {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found: " + request.getUserId()));
+
+            if (user.getUserInfo() == null || user.getUserInfo().getEmail() == null) {
+                log.warn("User email not found for invitation: {}", user.getId());
+                return;
+            }
+
+            String firstName = Optional.ofNullable(user.getUserInfo().getFirstName()).orElse("");
+            String lastName = Optional.ofNullable(user.getUserInfo().getLastName()).orElse("");
+            String fullName = (firstName + " " + lastName).trim();
+            if (fullName.isEmpty()) fullName = user.getUsername();
+
+            sendEmail(
+                    user.getUserInfo().getEmail(),
+                    fullName,
+                    EmailTemplateName.RESERVATION_STATUS,
+                    "http://localhost:5173/login",
+                    request.getContent(),
+                    request.getTitle()
+            );
+        } catch (Exception e) {
+            log.error("Failed to send invitation email: {}", e.getMessage());
+        }
     }
 
 }

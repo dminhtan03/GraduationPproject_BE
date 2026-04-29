@@ -30,6 +30,7 @@ import com.finalProject.BookingMeetingRoom.repository.EventRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.EventService;
+import com.finalProject.BookingMeetingRoom.service.NotificationService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -46,6 +47,7 @@ public class EventServiceImpl implements EventService {
     private final EventParticipantStatusHistoryRepository eventParticipantStatusHistoryRepository;
     private final ReservationRepository reservationRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     private boolean isAdmin(Authentication authentication) {
         if (authentication == null || authentication.getAuthorities() == null) return false;
@@ -318,6 +320,10 @@ public class EventServiceImpl implements EventService {
                 "Invited participant to event",
                 authentication
         );
+
+        // Gửi thông báo bằng hàm MỚI
+        notificationService.noticeInviteParticipantToEvent(user.getId(), event.getTitle(), event.getReservation());
+
         return toParticipantResponse(participant);
     }
 
