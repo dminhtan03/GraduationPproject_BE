@@ -400,6 +400,38 @@ public class NotificationServiceImpl implements NotificationService {
 
     }
 
-    
+    @Override
+    public void noticeInviteParticipantToEvent(String userId, String eventTitle, Reservation res) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+        String start = res != null ? res.getStartTime().format(formatter) : "N/A";
+        String end = res != null ? res.getEndTime().format(formatter) : "N/A";
+        String room = (res != null && res.getRoom() != null) ? res.getRoom().getLocationCode() : "N/A";
 
+        NotificationRequest request = new NotificationRequest();
+        request.setTitle("Bạn được mời tham gia sự kiện");
+        request.setContent(String.format("Bạn được mời vào sự kiện '%s' từ %s đến %s tại %s, vui lòng vào web để xác nhận tham gia hay từ chối.", eventTitle, start, end, room));
+        request.setUserId(userId);
+        request.reservationId = res != null ? res.getId() : null;
+        request.sendEmail = true;
+        request.setCreatedAt(java.time.LocalDateTime.now());
+
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            // 1. Save DB
+            Notification entity = notificationMapper.toEntity(request);
+            entity.setUser(user);
+            entity.setCreatedAt(java.time.LocalDateTime.now());
+            notificationRepository.save(entity);
+
+            // 2. Real-time
+            messagingTemplate.convertAndSend("/topic/notifications/" + userId, request);
+
+            // 3. Email (NEW method)
+            emailService.sendInviteEmail(request);
+        } catch (Exception e) {
+            log.error("Lỗi gửi thông báo mời: {}", e.getMessage());
+        }
+    }
 }
