@@ -23,6 +23,7 @@ import com.finalProject.BookingMeetingRoom.model.entity.Feedback;
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackRequest;
 import com.finalProject.BookingMeetingRoom.model.response.FeedbackResponse;
+import com.finalProject.BookingMeetingRoom.model.response.AdminFeedbackResponse;
 import com.finalProject.BookingMeetingRoom.repository.FeedbackRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
@@ -122,6 +123,57 @@ public class FeedBackServiceImpl implements FeedBackService {
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
 
+    }
+
+    @Override
+    public Page<AdminFeedbackResponse> getAllFeedbacks(Integer rating, String email, int pageNum, int pageSize) {
+        try {
+            Pageable pageable = PageRequest.of(pageNum, pageSize, Sort.by("createdAt").descending());
+            Page<Feedback> feedbacks = feedbackRepository.findAllWithFilter(rating, email, pageable);
+            return feedbacks.map(this::mapToAdminResponse);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public AdminFeedbackResponse getFeedbackDetail(String id) {
+        Feedback feedback = feedbackRepository.findById(id)
+                .orElseThrow(() -> new CustomException(ResponseCode.FEEDBACK_NOT_FOUND));
+        return mapToAdminResponse(feedback);
+    }
+
+    private AdminFeedbackResponse mapToAdminResponse(Feedback feedback) {
+        AdminFeedbackResponse response = new AdminFeedbackResponse();
+        response.setId(feedback.getId());
+        response.setRating(feedback.getRating());
+        response.setDescription(feedback.getDescription());
+        response.setCreatedAt(feedback.getCreatedAt());
+
+        if (feedback.getReservation() != null) {
+            var reservation = feedback.getReservation();
+            if (reservation.getRoom() != null) {
+                response.setRoomId(reservation.getRoom().getId());
+                response.setRoomName(reservation.getRoom().getLocationCode());
+                if (reservation.getRoom().getFloor() != null) {
+                    response.setFloorName(reservation.getRoom().getFloor().getName());
+                    if (reservation.getRoom().getFloor().getBuilding() != null) {
+                        response.setBuildingName(reservation.getRoom().getFloor().getBuilding().getName());
+                    }
+                }
+            }
+            if (reservation.getUser() != null) {
+                response.setUserId(reservation.getUser().getId());
+                if (reservation.getUser().getUserInfo() != null) {
+                    response.setUserEmail(reservation.getUser().getUserInfo().getEmail());
+                    String firstName = Optional.ofNullable(reservation.getUser().getUserInfo().getFirstName()).orElse("");
+                    String lastName = Optional.ofNullable(reservation.getUser().getUserInfo().getLastName()).orElse("");
+                    response.setUserName((firstName + " " + lastName).trim());
+                }
+            }
+        }
+        return response;
     }
 
 }
