@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
+import org.springframework.data.repository.query.Param;
 
 public interface FeedbackRepository extends JpaRepository<Feedback, String> {
 
@@ -28,6 +29,17 @@ public interface FeedbackRepository extends JpaRepository<Feedback, String> {
 
     @Query(nativeQuery = true, value = findAllFeedbackOfARoom)
     Page<Feedback> findAllFeedbackOfARoom(String roomId, Pageable pageable);
+
+    @Query("""
+            SELECT f FROM Feedback f
+            LEFT JOIN f.reservation r
+            LEFT JOIN r.user u
+            LEFT JOIN u.userInfo ui
+            WHERE (:rating IS NULL OR f.rating = :rating)
+            AND (:email IS NULL OR LOWER(ui.email) LIKE LOWER(CONCAT('%', :email, '%')))
+            ORDER BY f.createdAt DESC
+            """)
+    Page<Feedback> findAllWithFilter(@Param("rating") Integer rating, @Param("email") String email, Pageable pageable);
 
 
 }
