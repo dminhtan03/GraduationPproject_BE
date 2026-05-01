@@ -330,6 +330,20 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
   // start+ chức năng đặt phòng lặp lại (Reservation Series)
   boolean existsBySeriesIdAndSeriesDate(String seriesId, LocalDate seriesDate);
   List<Reservation> findBySeriesIdAndStartTimeAfter(String seriesId, LocalDateTime startTime);
+
+  // start+ fix overlap check cho recurring series (JPQL thay native query để Hibernate auto-flush trước khi query)
+  @Query("""
+      SELECT r FROM Reservation r
+      WHERE r.room.id = :roomId
+        AND r.status IN :statuses
+        AND NOT (:endTime <= r.startTime OR :startTime >= r.endTime)
+      """)
+  List<Reservation> findActiveOverlappingReservationsByRoom(
+      @Param("roomId") String roomId,
+      @Param("startTime") LocalDateTime startTime,
+      @Param("endTime") LocalDateTime endTime,
+      @Param("statuses") Set<ReservationStatus> statuses);
+  // end+ fix overlap check cho recurring series
   // end+ chức năng đặt phòng lặp lại (Reservation Series)
 
 }

@@ -4,6 +4,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -154,6 +155,10 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
             throw new CustomException(ResponseCode.VALIDATION_FAILED, "fromDate must be <= untilDate");
         }
 
+        // start+ validate conflict trước khi tạo series — nếu bất kỳ slot nào bị trùng thì reject toàn bộ
+        validateNoConflictsBeforeCreate(request, user, room);
+        // end+ validate conflict
+
         ReservationSeries series = new ReservationSeries();
         series.setId(UUID.randomUUID().toString());
         series.setRoom(room);
@@ -262,6 +267,67 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         reservationSeriesRepository.save(series);
     }
 
+    // start+ validate conflict trước khi tạo series
+    private void validateNoConflictsBeforeCreate(ReservationSeriesCreateRequest request, User user, Room room) {
+        Set<DayOfWeek> targetDays = request.getDaysOfWeek().stream()
+                .map(String::trim).map(String::toUpperCase)
+                .map(DayOfWeek::valueOf)
+                .collect(Collectors.toSet());
+
+        int rollingWeeks = request.getRollingWindowWeeks() == null
+                ? DEFAULT_ROLLING_WINDOW_WEEKS
+                : request.getRollingWindowWeeks();
+        LocalDate maxUntil = LocalDate.now().plusWeeks(Math.max(1, rollingWeeks));
+        if (request.getUntilDate() != null && request.getUntilDate().isBefore(maxUntil)) {
+            maxUntil = request.getUntilDate();
+        }
+
+        Set<ReservationStatus> activeStatuses = Set.of(
+                ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING);
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
+
+        LocalDate cursor = request.getFromDate();
+        while (!cursor.isAfter(maxUntil)) {
+            if (targetDays.contains(cursor.getDayOfWeek())) {
+                LocalDateTime startTime = cursor.atTime(request.getStartTimeOfDay());
+                LocalDateTime endTime = buildEndDateTime(cursor, request.getStartTimeOfDay(), request.getEndTimeOfDay());
+
+                // Kiểm tra phòng bị trùng
+                List<Reservation> roomConflicts = reservationRepository
+                        .findActiveOverlappingReservationsByRoom(room.getId(), startTime, endTime, activeStatuses);
+                if (!roomConflicts.isEmpty()) {
+                    Reservation existing = roomConflicts.get(0);
+                    String existingTime = existing.getStartTime().format(timeFmt)
+                            + " - " + existing.getEndTime().format(timeFmt);
+                    throw new CustomException(ResponseCode.CANNOT_RESERVE_ROOM,
+                            "Phòng " + room.getLocationCode()
+                            + " đã có lịch đặt vào " + cursor.getDayOfWeek().toString()
+                            + " ngày " + cursor.format(dateFmt)
+                            + " lúc " + existingTime
+                            + ". Không thể tạo lịch định kỳ " + request.getStartTimeOfDay().format(timeFmt)
+                            + " - " + request.getEndTimeOfDay().format(timeFmt) + " bị trùng.");
+                }
+
+                // Kiểm tra user đã có lịch trùng giờ chưa
+                List<Reservation> userConflicts = reservationRepository.checkOverlapByUser(
+                        user.getId(), startTime, endTime,
+                        List.of(ReservationStatus.IN_USE.name(),
+                                ReservationStatus.RESERVED.name(),
+                                ReservationStatus.PENDING.name()));
+                if (!userConflicts.isEmpty()) {
+                    throw new CustomException(ResponseCode.USER_TIME_OVERLAP,
+                            "Bạn đã có lịch đặt phòng khác vào ngày " + cursor.format(dateFmt)
+                            + " lúc " + request.getStartTimeOfDay().format(timeFmt)
+                            + " - " + request.getEndTimeOfDay().format(timeFmt)
+                            + ". Vui lòng chọn khung giờ khác.");
+                }
+            }
+            cursor = cursor.plusDays(1);
+        }
+    }
+    // end+ validate conflict trước khi tạo series
+
     // start+ chức năng admin quản lý recurring series
     @Override
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
@@ -364,22 +430,29 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
             return;
         }
 
-        List<Reservation> checkOverlapByUser = reservationRepository.checkOverlapByUser(
-                user.getId(),
-                startTime,
-                endTime,
-                List.of(ReservationStatus.IN_USE.name(), ReservationStatus.RESERVED.name(), ReservationStatus.PENDING.name()));
-        if (!checkOverlapByUser.isEmpty()) {
+        // start+ fix overlap check: dùng JPQL thay native query
+        // Lý do: native query KHÔNG trigger Hibernate auto-flush → bỏ sót reservation vừa save trong cùng transaction
+        final Set<ReservationStatus> activeStatuses = Set.of(
+                ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING);
+
+        // Kiểm tra user trùng giờ (native query vẫn dùng được vì chỉ cần thấy data đã commit)
+        List<Reservation> overlapByUser = reservationRepository.checkOverlapByUser(
+                user.getId(), startTime, endTime,
+                List.of(ReservationStatus.IN_USE.name(),
+                        ReservationStatus.RESERVED.name(),
+                        ReservationStatus.PENDING.name()));
+        if (!overlapByUser.isEmpty()) {
             return;
         }
 
-        boolean conflict = reservationRepository
-                .checkOverlappingReservationsByRoom(room.getId(), startTime, endTime)
-                .stream()
-                .anyMatch(r -> Set.of(ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING).contains(r.getStatus()));
+        // Kiểm tra phòng trùng giờ — dùng JPQL để Hibernate auto-flush pending saves trước khi query
+        // → đảm bảo thấy cả các reservation vừa saveAndFlush trong cùng syncSeries call
+        boolean conflict = !reservationRepository.findActiveOverlappingReservationsByRoom(
+                room.getId(), startTime, endTime, activeStatuses).isEmpty();
         if (conflict) {
             return;
         }
+        // end+ fix overlap check
 
         Reservation reservation = new Reservation();
         reservation.setId(UUID.randomUUID().toString());
@@ -395,7 +468,9 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         reservation.setSeriesId(series.getId());
         reservation.setSeriesDate(occurrenceDate);
 
-        reservationRepository.save(reservation);
+        // FIX: dùng saveAndFlush thay save → đảm bảo reservation ngay lập tức xuống DB
+        // để các lần gọi tiếp theo trong cùng syncSeries thấy được
+        reservationRepository.saveAndFlush(reservation);
         reservationHistoryService.saveHistory(reservation, user.getId(),
                 ReservationStatus.RESERVED, null, reservation.getUpdatedAt());
         realTimeService.addReservation(reservation);
