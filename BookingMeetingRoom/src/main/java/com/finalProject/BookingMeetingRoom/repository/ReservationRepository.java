@@ -252,6 +252,33 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
   // [ADDED] Count reservations within a time range
   long countByCreateAtBetween(LocalDateTime start, LocalDateTime end);
 
+  // start+ dashboard analytics
+  @Query("SELECT COUNT(r) FROM Reservation r WHERE r.status IN :statuses AND r.createAt BETWEEN :start AND :end")
+  long countByStatusesAndCreateAtBetween(
+      @Param("statuses") List<ReservationStatus> statuses,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
+
+  @Query(value = """
+      SELECT DATE(r.created_at) AS day, COUNT(*) AS cnt
+      FROM tbl_reservation r
+      WHERE r.created_at >= :start
+      GROUP BY DATE(r.created_at)
+      ORDER BY day ASC
+      """, nativeQuery = true)
+  List<Object[]> countByDaySince(@Param("start") LocalDateTime start);
+
+  @Query(value = """
+      SELECT r.status, COUNT(*) AS cnt
+      FROM tbl_reservation r
+      WHERE r.created_at BETWEEN :start AND :end
+      GROUP BY r.status
+      """, nativeQuery = true)
+  List<Object[]> countGroupByStatus(
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
+  // end+ dashboard analytics
+
   // [ADDED] Count distinct users with reservations within a time range
   @Query("SELECT COUNT(DISTINCT r.user.id) FROM Reservation r WHERE r.createAt BETWEEN :start AND :end")
   long countDistinctUsersByCreateAtBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
