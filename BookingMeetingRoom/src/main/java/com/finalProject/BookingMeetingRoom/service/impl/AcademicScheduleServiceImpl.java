@@ -41,8 +41,11 @@ import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleCreateR
 import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AcademicScheduleImportResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AcademicScheduleResponse;
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationSeriesStatus;
+import com.finalProject.BookingMeetingRoom.model.entity.ReservationSeries;
 import com.finalProject.BookingMeetingRoom.repository.AcademicScheduleRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.ReservationSeriesRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
 
@@ -56,6 +59,7 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     private final AcademicScheduleRepository scheduleRepository;
     private final RoomRepository roomRepository;
     private final ReservationRepository reservationRepository;
+    private final ReservationSeriesRepository reservationSeriesRepository;
     private final ObjectProvider<com.finalProject.BookingMeetingRoom.service.ReservationService> reservationServiceProvider;
 
     @Override
@@ -147,6 +151,16 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
                         errors.add(String.format("Dòng %d: %s", i + 1, e.getMessage()));
                         continue;
                     }
+
+                    // start+ check trùng lịch định kỳ (import Excel)
+                    try {
+                        validateNoRecurringSeriesConflict(room.getId(), room.getLocationCode(),
+                                fromDate, toDate, startTime, endTime, daysOfWeek);
+                    } catch (CustomException e) {
+                        errors.add(String.format("Dòng %d: %s", i + 1, e.getMessage()));
+                        continue;
+                    }
+                    // end+ check trùng lịch định kỳ
 
                     // Kiểm tra trùng lặp với các bản ghi khác trong cùng file excel
                     boolean internalOverlap = false;
@@ -279,6 +293,11 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
         for (AcademicSchedule schedule : schedules) {
             validateNoOverlap(schedule.getRoom().getId(), request.getFromDate(), request.getToDate(),
                     request.getStartTime(), request.getEndTime(), daysOfWeek, schedule.getId());
+            // start+ check trùng lịch định kỳ (bulk update)
+            validateNoRecurringSeriesConflict(schedule.getRoom().getId(), schedule.getRoom().getLocationCode(),
+                    request.getFromDate(), request.getToDate(),
+                    request.getStartTime(), request.getEndTime(), daysOfWeek);
+            // end+ check trùng lịch định kỳ
 
             forceCancelOverlappingReservations(
                     schedule.getRoom().getId(),
@@ -337,6 +356,11 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
         String daysOfWeek = String.join(",", request.getDaysOfWeek()).toUpperCase();
         validateNoOverlap(room.getId(), request.getFromDate(), request.getToDate(),
                 request.getStartTime(), request.getEndTime(), daysOfWeek, null);
+        // start+ check trùng lịch định kỳ
+        validateNoRecurringSeriesConflict(room.getId(), room.getLocationCode(),
+                request.getFromDate(), request.getToDate(),
+                request.getStartTime(), request.getEndTime(), daysOfWeek);
+        // end+ check trùng lịch định kỳ
 
         forceCancelOverlappingReservations(
                 room.getId(),
@@ -375,6 +399,11 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
         String daysOfWeek = String.join(",", request.getDaysOfWeek()).toUpperCase();
         validateNoOverlap(schedule.getRoom().getId(), request.getFromDate(), request.getToDate(),
                 request.getStartTime(), request.getEndTime(), daysOfWeek, scheduleId);
+        // start+ check trùng lịch định kỳ
+        validateNoRecurringSeriesConflict(schedule.getRoom().getId(), schedule.getRoom().getLocationCode(),
+                request.getFromDate(), request.getToDate(),
+                request.getStartTime(), request.getEndTime(), daysOfWeek);
+        // end+ check trùng lịch định kỳ
 
         forceCancelOverlappingReservations(
                 schedule.getRoom().getId(),
@@ -395,6 +424,47 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
         scheduleRepository.save(schedule);
         updateRoomStatusesBySchedule();
     }
+
+    // start+ cross-check: lịch học cố định vs lịch đặt phòng định kỳ
+    private void validateNoRecurringSeriesConflict(String roomId, String roomCode,
+            LocalDate fromDate, LocalDate toDate,
+            LocalTime startTime, LocalTime endTime,
+            String daysOfWeek) {
+
+        List<ReservationSeries> activeSeries = reservationSeriesRepository
+                .findActiveSeriesForRoomInPeriod(roomId, fromDate, toDate, ReservationSeriesStatus.ACTIVE);
+
+        if (activeSeries.isEmpty()) return;
+
+        Set<String> schedDays = java.util.Arrays.stream(daysOfWeek.split(","))
+                .map(String::trim).map(String::toUpperCase)
+                .filter(s -> !s.isBlank())
+                .collect(java.util.stream.Collectors.toSet());
+
+        for (ReservationSeries series : activeSeries) {
+            // Kiểm tra trùng ngày trong tuần
+            Set<String> seriesDays = java.util.Arrays.stream(series.getDaysOfWeek().split(","))
+                    .map(String::trim).map(String::toUpperCase)
+                    .filter(s -> !s.isBlank())
+                    .collect(java.util.stream.Collectors.toSet());
+
+            seriesDays.retainAll(schedDays);
+            if (seriesDays.isEmpty()) continue;
+
+            // Kiểm tra trùng giờ
+            if (startTime.isBefore(series.getEndTimeOfDay()) && endTime.isAfter(series.getStartTimeOfDay())) {
+                String conflictDays = String.join(", ", seriesDays);
+                String seriesUser = series.getUser() != null ? series.getUser().getUsername() : "unknown";
+                throw new CustomException(ResponseCode.CANNOT_RESERVE_ROOM,
+                        "Phòng " + roomCode
+                        + " đang có lịch đặt phòng định kỳ vào " + conflictDays
+                        + " lúc " + series.getStartTimeOfDay() + " - " + series.getEndTimeOfDay()
+                        + " (user: " + seriesUser + ")"
+                        + ". Không thể tạo lịch học cố định trùng với lịch định kỳ đang hoạt động.");
+            }
+        }
+    }
+    // end+ cross-check
 
     private void validateNoOverlap(String roomId, LocalDate fromDate, LocalDate toDate, LocalTime startTime, LocalTime endTime, String daysOfWeek, String currentScheduleId) {
         List<AcademicSchedule> potentialOverlaps = scheduleRepository.findPotentialOverlappingSchedules(
