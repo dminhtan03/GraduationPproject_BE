@@ -267,7 +267,7 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         reservationSeriesRepository.save(series);
     }
 
-    // start+ validate conflict trước khi tạo series
+    // start+ validate conflict trước khi tạo series (room reservations + academic schedule)
     private void validateNoConflictsBeforeCreate(ReservationSeriesCreateRequest request, User user, Room room) {
         Set<DayOfWeek> targetDays = request.getDaysOfWeek().stream()
                 .map(String::trim).map(String::toUpperCase)
@@ -293,7 +293,19 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
                 LocalDateTime startTime = cursor.atTime(request.getStartTimeOfDay());
                 LocalDateTime endTime = buildEndDateTime(cursor, request.getStartTimeOfDay(), request.getEndTimeOfDay());
 
-                // Kiểm tra phòng bị trùng
+                // start+ check lịch học cố định (academic schedule)
+                if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
+                    throw new CustomException(ResponseCode.ROOM_IN_ACADEMIC_SCHEDULE,
+                            "Phòng " + room.getLocationCode()
+                            + " có lịch học cố định vào " + cursor.getDayOfWeek().toString()
+                            + " ngày " + cursor.format(dateFmt)
+                            + " lúc " + request.getStartTimeOfDay().format(timeFmt)
+                            + " - " + request.getEndTimeOfDay().format(timeFmt)
+                            + ". Không thể tạo lịch định kỳ trùng với lịch học cố định.");
+                }
+                // end+ check lịch học cố định
+
+                // Kiểm tra phòng bị trùng với reservation khác
                 List<Reservation> roomConflicts = reservationRepository
                         .findActiveOverlappingReservationsByRoom(room.getId(), startTime, endTime, activeStatuses);
                 if (!roomConflicts.isEmpty()) {
