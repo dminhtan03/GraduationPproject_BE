@@ -39,4 +39,14 @@ public interface NotificationService {
 
     void remindCheckIn();
 
+    // start+ service item notifications
+    /** Notify all admins when a user saves/updates service requests for a reservation. */
+    void notifyAdminsNewServiceRequest(String reservationId, String roomCode,
+                                       String userEmail, java.util.List<String> serviceNames);
+
+    /** Notify the reservation owner when admin changes a service item status. */
+    void notifyUserServiceStatusChanged(String userId, String serviceName,
+                                        String newStatus, String reason, String reservationId);
+    // end+ service item notifications
+
 }

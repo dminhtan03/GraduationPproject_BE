@@ -870,16 +870,32 @@ public class ReservationServiceImpl implements ReservationService {
         }
         reservationServiceItemRepository.saveAll(lines);
         realTimeService.sendServiceItemUpdate(reservationId);
+
+        // start+ notify admins about new service request
+        try {
+            String roomCode = reservation.getRoom() != null ? reservation.getRoom().getLocationCode() : reservationId;
+            String userEmail = currentUser.getUsername();
+            java.util.List<String> serviceNames = lines.stream()
+                    .map(l -> l.getServiceItem().getName())
+                    .toList();
+            if (!serviceNames.isEmpty()) {
+                notificationService.notifyAdminsNewServiceRequest(reservationId, roomCode, userEmail, serviceNames);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to notify admins about service request: {}", e.getMessage());
+        }
+        // end+ notify admins
     }
     // start+ chức năng service item status (admin cập nhật trạng thái dịch vụ)
     @Override
     @Transactional
-    public void updateServiceItemStatus(String reservationId, String itemId, String status, Authentication authentication) {
+    public void updateServiceItemStatus(String reservationId, String itemId, String status,
+                                        String reason, Authentication authentication) {
         if (!isAdmin(authentication)) {
             throw new CustomException(ResponseCode.PERMISSION_DENIED);
         }
 
-        reservationRepository.findById(reservationId)
+        var reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
 
         ReservationServiceItem item = reservationServiceItemRepository.findById(itemId)
@@ -896,10 +912,27 @@ public class ReservationServiceImpl implements ReservationService {
             throw new CustomException(ResponseCode.VALIDATION_FAILED, "Invalid status: " + status);
         }
 
+        if (newStatus == ServiceItemStatus.CANCELLED && (reason == null || reason.isBlank())) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED, "A reason is required when cancelling a service item.");
+        }
+
         item.setStatus(newStatus);
         item.setUpdatedAt(LocalDateTime.now());
         reservationServiceItemRepository.save(item);
         realTimeService.sendServiceItemUpdate(reservationId);
+
+        // start+ notify user about status change
+        try {
+            String ownerId = reservation.getUser() != null ? reservation.getUser().getId() : null;
+            if (ownerId != null) {
+                notificationService.notifyUserServiceStatusChanged(
+                        ownerId, item.getServiceItem().getName(),
+                        status, reason, reservationId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to notify user about service status change: {}", e.getMessage());
+        }
+        // end+ notify user
     }
     // end+ chức năng service item status
 

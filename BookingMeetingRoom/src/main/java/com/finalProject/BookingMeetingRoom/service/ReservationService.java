@@ -51,7 +51,7 @@ public interface ReservationService {
         List<ReservationServiceItemResponse> getReservationServiceItems(String reservationId, Authentication authentication);
         void updateReservationServiceItems(String reservationId, ReservationServiceItemsUpdateRequest request, Authentication authentication);
         // start+ chức năng service item status
-        void updateServiceItemStatus(String reservationId, String itemId, String status, Authentication authentication);
+        void updateServiceItemStatus(String reservationId, String itemId, String status, String reason, Authentication authentication);
         // end+ chức năng service item status
         // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 }

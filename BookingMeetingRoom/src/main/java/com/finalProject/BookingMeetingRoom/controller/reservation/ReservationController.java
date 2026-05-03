@@ -82,7 +82,9 @@ public class ReservationController {
             @PathVariable String itemId,
             @RequestBody Map<String, String> body,
             Authentication authentication) {
-        reservationService.updateServiceItemStatus(reservationId, itemId, body.get("status"), authentication);
+        String status = body.get("status");
+        String reason = body.get("reason"); // optional; required when status = CANCELLED
+        reservationService.updateServiceItemStatus(reservationId, itemId, status, reason, authentication);
         return ResponseEntity.ok(Response.ofSucceeded("Service item status updated successfully"));
     }
     // end+ chức năng service item status
