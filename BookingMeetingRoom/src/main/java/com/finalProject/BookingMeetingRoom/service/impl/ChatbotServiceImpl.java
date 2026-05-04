@@ -107,6 +107,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                     case BOOK_ROOM -> handleBookRoom(message, effectiveParsed, authentication);
                     case CANCEL_RESERVATION -> handleCancelReservation(message, effectiveParsed, recentUserMessages, authentication);
                     case EXTEND_RESERVATION -> handleExtendReservation(message, effectiveParsed, recentUserMessages, authentication);
+                    case RETURN_ROOM -> handleReturnRoom(message, effectiveParsed, recentUserMessages, authentication);
                     case VIEW_FACILITY_DETAILS -> handleFacilityDetails(message, effectiveParsed);
                     default -> handleFallback(message);
                 };
@@ -114,7 +115,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                 if (e.getResponseCode() == ResponseCode.BOOKING_FUNCTION_LOCKED) {
                     response = toBookingLockedResponse(message, effectiveParsed.intent(), e.getData());
                 } else {
-                    throw e;
+                    response = toBusinessErrorResponse(message, effectiveParsed.intent(), e);
                 }
             }
 
@@ -324,6 +325,23 @@ public class ChatbotServiceImpl implements ChatbotService {
                 .build();
     }
 
+        private ChatbotMessageResponse toBusinessErrorResponse(String message, ChatbotIntent intent, CustomException e) {
+        String businessMessage = (e.getData() instanceof String s && !s.isBlank())
+            ? s
+            : (e.getResponseCode() != null ? e.getResponseCode().getMessage() : e.getMessage());
+
+        if (businessMessage == null || businessMessage.isBlank()) {
+            businessMessage = isVietnameseMessage(message)
+                ? "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại."
+                : "An error occurred while processing your request. Please try again.";
+        }
+
+        return ChatbotMessageResponse.builder()
+            .intent(intent != null ? intent : ChatbotIntent.FALLBACK)
+            .reply(businessMessage)
+            .build();
+        }
+
     private ChatbotMessageResponse handleCancelReservation(
             String message,
             ChatbotMessageParser.ParseResult parsed,
@@ -410,6 +428,45 @@ public class ChatbotServiceImpl implements ChatbotService {
                 .build();
     }
 
+    private ChatbotMessageResponse handleReturnRoom(
+            String message,
+            ChatbotMessageParser.ParseResult parsed,
+            List<String> recentUserMessages,
+            Authentication authentication
+    ) {
+        if (authentication == null) {
+            throw new CustomException(ResponseCode.ACCESS_DENIED);
+        }
+
+        boolean vi = isVietnameseMessage(message);
+        var user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        String contextualRoomCode = resolveContextualRoomCode(parsed, recentUserMessages);
+        Reservation target = findTargetReservationForAction(user.getId(), contextualRoomCode);
+        if (target == null) {
+            String reply = vi
+                    ? "Mình chưa tìm thấy đặt phòng đang hoạt động để trả phòng. Bạn có thể cung cấp mã phòng hoặc kiểm tra lại lịch đặt phòng."
+                    : "I couldn't find an active reservation to return. Please provide a room code (e.g. V5-020) or check your current bookings.";
+            return ChatbotMessageResponse.builder()
+                    .intent(ChatbotIntent.RETURN_ROOM)
+                    .reply(reply)
+                    .build();
+        }
+
+        reservationService.returnRoom(target.getId(), authentication);
+
+        String roomCode = target.getRoom() != null ? target.getRoom().getLocationCode() : "";
+        String reply = vi
+                ? "Đã trả phòng " + roomCode + " thành công."
+                : "Successfully returned room " + roomCode + ".";
+
+        return ChatbotMessageResponse.builder()
+                .intent(ChatbotIntent.RETURN_ROOM)
+                .reply(reply)
+                .build();
+    }
+
     private String resolveContextualRoomCode(ChatbotMessageParser.ParseResult parsed, List<String> recentUserMessages) {
         if (parsed != null && parsed.roomCode() != null && !parsed.roomCode().isBlank()) {
             return parsed.roomCode();
@@ -454,19 +511,35 @@ public class ChatbotServiceImpl implements ChatbotService {
     private double extractExtendHours(String message) {
         String normalized = Objects.toString(message, "").toLowerCase(Locale.ROOT);
 
-        Pattern viPattern = Pattern.compile("(?:thêm|them|gia hạn|gia han|kéo dài|keo dai)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:giờ|gio)", Pattern.CASE_INSENSITIVE);
+        // VI: "thêm X giờ/tiếng" hoặc "gia hạn X giờ"
+        Pattern viPattern = Pattern.compile("(?:thêm|them|gia hạn|gia han|kéo dài|keo dai)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:giờ|gio|tiếng|tien)", Pattern.CASE_INSENSITIVE);
         Matcher viMatcher = viPattern.matcher(normalized);
         if (viMatcher.find()) {
             return parseHourOrDefault(viMatcher.group(1), 1.0);
         }
 
-        Pattern enPattern = Pattern.compile("(?:extend|add|extra|more)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:hour|hours|hr|hrs)", Pattern.CASE_INSENSITIVE);
+        // VI: "lên X tiếng/giờ"
+        Pattern viUptoPattern = Pattern.compile("(?:lên|len)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:giờ|gio|tiếng|tien)", Pattern.CASE_INSENSITIVE);
+        Matcher viUptoMatcher = viUptoPattern.matcher(normalized);
+        if (viUptoMatcher.find()) {
+            return parseHourOrDefault(viUptoMatcher.group(1), 1.0);
+        }
+
+        // EN: "extend/add X hours" hoặc "by X hours"
+        Pattern enPattern = Pattern.compile("(?:extend|add|extra|more|by)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:hour|hours|hr|hrs)", Pattern.CASE_INSENSITIVE);
         Matcher enMatcher = enPattern.matcher(normalized);
         if (enMatcher.find()) {
             return parseHourOrDefault(enMatcher.group(1), 1.0);
         }
 
-        Pattern trailingPattern = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(?:hour|hours|hr|hrs|giờ|gio)", Pattern.CASE_INSENSITIVE);
+        // EN: "to/up to X hours"
+        Pattern enUptPattern = Pattern.compile("(?:to|up\\s*to)\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:hour|hours|hr|hrs)", Pattern.CASE_INSENSITIVE);
+        Matcher enUptMatcher = enUptPattern.matcher(normalized);
+        if (enUptMatcher.find()) {
+            return parseHourOrDefault(enUptMatcher.group(1), 1.0);
+        }
+
+        Pattern trailingPattern = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(?:hour|hours|hr|hrs|giờ|gio|tiếng|tien)", Pattern.CASE_INSENSITIVE);
         Matcher trailingMatcher = trailingPattern.matcher(normalized);
         if (trailingMatcher.find()) {
             return parseHourOrDefault(trailingMatcher.group(1), 1.0);

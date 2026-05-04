@@ -207,6 +207,18 @@ public class ChatbotMessageParser {
             return ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY;
         }
 
+        boolean hasReturnHint = containsAnyEither(normalized, folded,
+            "return",
+            "trả phòng",
+            "tra phong",
+            "trả",
+            "tra",
+            "check out");
+
+        if (hasReturnHint && containsAnyEither(normalized, folded, "phòng", "phong", "room", "reservation", "booking")) {
+            return ChatbotIntent.RETURN_ROOM;
+        }
+
         boolean hasCancelHint = containsAnyEither(normalized, folded,
             "cancel",
             "abort",
@@ -229,11 +241,14 @@ public class ChatbotMessageParser {
             "gia han",
             "thêm",
             "them",
+            "lên",
+            "len",
             "kéo dài",
             "keo dai",
             "more hour",
             "extra hour",
-            "add hour");
+            "add hour",
+            "up to");
 
         if (hasExtendHint && containsAnyEither(normalized, folded,
             "reservation",
@@ -243,6 +258,8 @@ public class ChatbotMessageParser {
             "room",
             "giờ",
             "gio",
+            "tiếng",
+            "tien",
             "hour",
             "hours")) {
             return ChatbotIntent.EXTEND_RESERVATION;
