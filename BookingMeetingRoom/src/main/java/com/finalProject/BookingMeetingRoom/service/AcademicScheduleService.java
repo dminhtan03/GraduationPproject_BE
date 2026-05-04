@@ -3,6 +3,7 @@ package com.finalProject.BookingMeetingRoom.service;
 import com.finalProject.BookingMeetingRoom.model.entity.AcademicSchedule;
 import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.AcademicScheduleUpdateRequest;
+import com.finalProject.BookingMeetingRoom.model.response.AcademicScheduleImportResponse;
 import com.finalProject.BookingMeetingRoom.model.response.AcademicScheduleResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,7 +23,7 @@ public interface AcademicScheduleService {
     /**
      * Import lịch học từ file Excel.
      */
-    void importSchedulesFromExcel(MultipartFile file);
+    AcademicScheduleImportResponse importSchedulesFromExcel(MultipartFile file);
 
     /**
      * Lấy tất cả lịch học của một phòng.

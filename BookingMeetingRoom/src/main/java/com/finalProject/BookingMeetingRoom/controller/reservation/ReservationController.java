@@ -3,6 +3,7 @@ package com.finalProject.BookingMeetingRoom.controller.reservation;
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.model.request.CancelReservationRequest;
+import com.finalProject.BookingMeetingRoom.model.request.ReservationServiceItemsUpdateRequest;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/reservations")
@@ -57,6 +59,37 @@ public class ReservationController {
                                                Authentication authentication) {
         return ResponseEntity.ok((reservationService.reserveRoom(request, authentication)));
     }
+
+    // start+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
+    @GetMapping("/{reservationId}/service-items")
+    public ResponseEntity<?> getReservationServiceItems(@PathVariable String reservationId, Authentication authentication) {
+        return ResponseEntity.ok(Response.ofSucceeded(reservationService.getReservationServiceItems(reservationId, authentication)));
+    }
+
+    @PutMapping("/{reservationId}/service-items")
+    public ResponseEntity<?> updateReservationServiceItems(
+            @PathVariable String reservationId,
+            @Valid @RequestBody ReservationServiceItemsUpdateRequest request,
+            Authentication authentication) {
+        reservationService.updateReservationServiceItems(reservationId, request, authentication);
+        return ResponseEntity.ok(Response.ofSucceeded("Reservation service items updated successfully"));
+    }
+    // start+ chức năng service item status (admin cập nhật trạng thái dịch vụ)
+    @PreAuthorize("hasAnyAuthority(@authorityConstant.ADMIN)")
+    @PutMapping("/{reservationId}/service-items/{itemId}/status")
+    public ResponseEntity<?> updateServiceItemStatus(
+            @PathVariable String reservationId,
+            @PathVariable String itemId,
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+        String status = body.get("status");
+        String reason = body.get("reason"); // optional; required when status = CANCELLED
+        reservationService.updateServiceItemStatus(reservationId, itemId, status, reason, authentication);
+        return ResponseEntity.ok(Response.ofSucceeded("Service item status updated successfully"));
+    }
+    // end+ chức năng service item status
+
+    // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 
     @GetMapping
     public ResponseEntity<?> getAllReservations(@RequestParam(defaultValue = "0") int page,

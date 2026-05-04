@@ -36,7 +36,9 @@ public class ReservationResponse {
 
     private String reason;
 
-    private  String cancelBy;
+    private String cancelBy;
+
+    private String userId;
 
     private RoomDto room;
 

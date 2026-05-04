@@ -400,6 +400,124 @@ public class NotificationServiceImpl implements NotificationService {
 
     }
 
-    
+    // start+ service item notifications
+    @Override
+    public void notifyAdminsNewServiceRequest(String reservationId, String roomCode,
+                                              String userEmail, java.util.List<String> serviceNames) {
+        try {
+            java.util.List<User> admins = userRepository.findAllAdmins();
+            if (admins.isEmpty()) return;
 
+            String servicesText = String.join(", ", serviceNames);
+            String title = "New Service Request";
+            String content = String.format(
+                "User %s has requested services [%s] for room %s (Reservation: %s). Please review and process.",
+                userEmail, servicesText, roomCode, reservationId);
+
+            java.util.List<Notification> notifications = new ArrayList<>();
+            for (User admin : admins) {
+                NotificationRequest req = new NotificationRequest();
+                req.setTitle(title);
+                req.setContent(content);
+                req.setUserId(admin.getId());
+                req.reservationId = reservationId;
+                req.sendEmail = false;
+                req.setCreatedAt(java.time.LocalDateTime.now());
+
+                Notification entity = notificationMapper.toEntity(req);
+                entity.setUser(admin);
+                entity.setCreatedAt(java.time.LocalDateTime.now());
+                entity.setReservationId(reservationId);
+                notifications.add(entity);
+
+                // Real-time push
+                messagingTemplate.convertAndSend("/topic/notifications/" + admin.getId(), req);
+            }
+            notificationRepository.saveAll(notifications);
+        } catch (Exception e) {
+            log.error("Error notifying admins about service request: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public void notifyUserServiceStatusChanged(String userId, String serviceName,
+                                               String newStatus, String reason, String reservationId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            String title = "Service Request Updated";
+            String content;
+            if ("CANCELLED".equalsIgnoreCase(newStatus) && reason != null && !reason.isBlank()) {
+                content = String.format(
+                    "Your service request '%s' has been cancelled. Reason: %s",
+                    serviceName, reason.trim());
+            } else {
+                String statusLabel = switch (newStatus.toUpperCase()) {
+                    case "CONFIRMED"   -> "Confirmed";
+                    case "IN_PROGRESS" -> "In Progress";
+                    case "DONE"        -> "Completed";
+                    case "CANCELLED"   -> "Cancelled";
+                    default            -> newStatus;
+                };
+                content = String.format(
+                    "Your service request '%s' status has been updated to: %s.",
+                    serviceName, statusLabel);
+            }
+
+            NotificationRequest req = new NotificationRequest();
+            req.setTitle(title);
+            req.setContent(content);
+            req.setUserId(userId);
+            req.reservationId = reservationId;
+            req.sendEmail = false;
+            req.setCreatedAt(java.time.LocalDateTime.now());
+
+            Notification entity = notificationMapper.toEntity(req);
+            entity.setUser(user);
+            entity.setCreatedAt(java.time.LocalDateTime.now());
+            entity.setReservationId(reservationId);
+            notificationRepository.save(entity);
+
+            messagingTemplate.convertAndSend("/topic/notifications/" + userId, req);
+        } catch (Exception e) {
+            log.error("Error notifying user about service status change: {}", e.getMessage());
+        }
+    }
+    // end+ service item notifications
+
+    @Override
+    public void noticeInviteParticipantToEvent(String userId, String eventTitle, Reservation res) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+        String start = res != null ? res.getStartTime().format(formatter) : "N/A";
+        String end = res != null ? res.getEndTime().format(formatter) : "N/A";
+        String room = (res != null && res.getRoom() != null) ? res.getRoom().getLocationCode() : "N/A";
+
+        NotificationRequest request = new NotificationRequest();
+        request.setTitle("Bạn được mời tham gia sự kiện");
+        request.setContent(String.format("Bạn được mời vào sự kiện '%s' từ %s đến %s tại %s, vui lòng vào web để xác nhận tham gia hay từ chối.", eventTitle, start, end, room));
+        request.setUserId(userId);
+        request.reservationId = res != null ? res.getId() : null;
+        request.sendEmail = true;
+        request.setCreatedAt(java.time.LocalDateTime.now());
+
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            // 1. Save DB
+            Notification entity = notificationMapper.toEntity(request);
+            entity.setUser(user);
+            entity.setCreatedAt(java.time.LocalDateTime.now());
+            notificationRepository.save(entity);
+
+            // 2. Real-time
+            messagingTemplate.convertAndSend("/topic/notifications/" + userId, request);
+
+            // 3. Email (NEW method)
+            emailService.sendInviteEmail(request);
+        } catch (Exception e) {
+            log.error("Lỗi gửi thông báo mời: {}", e.getMessage());
+        }
+    }
 }

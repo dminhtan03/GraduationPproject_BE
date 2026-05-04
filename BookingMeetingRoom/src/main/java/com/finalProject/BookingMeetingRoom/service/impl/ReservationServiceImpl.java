@@ -21,25 +21,34 @@ import org.springframework.stereotype.Service;
 import com.finalProject.BookingMeetingRoom.common.enums.HistoryAction;
 import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
 import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
+import com.finalProject.BookingMeetingRoom.common.enums.ServiceItemStatus;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 import com.finalProject.BookingMeetingRoom.mapper.FeedbackMapper;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapper;
 import com.finalProject.BookingMeetingRoom.mapper.ReservationMapperFacade;
 import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.ReservationServiceItem;
 import com.finalProject.BookingMeetingRoom.model.entity.Room;
+import com.finalProject.BookingMeetingRoom.model.entity.ServiceItem;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
+import com.finalProject.BookingMeetingRoom.model.request.ReservationServiceItemsUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomReserveStatusUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AdminReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.MyReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationDetailResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationHistoryResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ReservationServiceItemResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationTimelineResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomImageResponse;
+import com.finalProject.BookingMeetingRoom.repository.EventParticipantRepository;
+import com.finalProject.BookingMeetingRoom.repository.EventRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationHistoryRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.ReservationServiceItemRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
+import com.finalProject.BookingMeetingRoom.repository.ServiceItemRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserInfoRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
@@ -71,9 +80,28 @@ public class ReservationServiceImpl implements ReservationService {
     private final EmailService emailService;
     private final NotificationService notificationService;
     private final AcademicScheduleService academicScheduleService;
+    private final ServiceItemRepository serviceItemRepository;
+    private final ReservationServiceItemRepository reservationServiceItemRepository;
+    private final EventRepository eventRepository;
+    private final EventParticipantRepository eventParticipantRepository;
 
     record ReservationContext(Reservation reservation, Room room) {
     }
+
+    // start+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
+    private boolean isAdmin(Authentication authentication) {
+        if (authentication == null || authentication.getAuthorities() == null) return false;
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority()));
+    }
+
+    private boolean isEventParticipant(String reservationId, String userId) {
+        if (reservationId == null || userId == null) return false;
+        return eventRepository.findByReservation_Id(reservationId)
+                .flatMap(event -> eventParticipantRepository.findByEvent_IdAndUser_Id(event.getId(), userId))
+                .isPresent();
+    }
+    // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 
     /**
      * Return a room after use.
@@ -314,6 +342,35 @@ public class ReservationServiceImpl implements ReservationService {
             reservation.setStatus(ReservationStatus.RESERVED); // Change status to RESERVED directly
             reservation.setUpdatedAt(LocalDateTime.now());
             reservationRepository.save(reservation);
+
+            // start+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
+            if (request.getServiceItems() != null && !request.getServiceItems().isEmpty()) {
+                List<ReservationServiceItem> lines = new ArrayList<>();
+                for (ReservationRequest.ServiceItemLineRequest lineRequest : request.getServiceItems()) {
+                    if (lineRequest.getQuantity() == null || lineRequest.getQuantity() <= 0) {
+                        throw new CustomException(ResponseCode.VALIDATION_FAILED, "Quantity must be > 0");
+                    }
+                    ServiceItem serviceItem = serviceItemRepository.findById(lineRequest.getServiceItemId())
+                            .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Service item not found"));
+                    if (!Boolean.TRUE.equals(serviceItem.getActive())) {
+                        throw new CustomException(ResponseCode.VALIDATION_FAILED, "Service item is not active");
+                    }
+
+                    ReservationServiceItem line = new ReservationServiceItem();
+                    line.setId(UUID.randomUUID().toString());
+                    line.setReservation(reservation);
+                    line.setServiceItem(serviceItem);
+                    line.setQuantity(lineRequest.getQuantity());
+                    line.setNote(lineRequest.getNote());
+                    line.setPriceSnapshot(serviceItem.getPrice());
+                    line.setStatus(ServiceItemStatus.PENDING);
+                    line.setCreatedAt(LocalDateTime.now());
+                    line.setUpdatedAt(LocalDateTime.now());
+                    lines.add(line);
+                }
+                reservationServiceItemRepository.saveAll(lines);
+            }
+            // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
 
             reservationHistoryService.saveHistory(reservation, user.getId(),
                     ReservationStatus.RESERVED, null, reservation.getUpdatedAt());
@@ -669,7 +726,8 @@ public class ReservationServiceImpl implements ReservationService {
             var reservation = reservationRepository.findById(reservationId)
                     .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
 
-            if (!reservation.getUser().getId().equals(currentUser.getId())) {
+            boolean isOwner = reservation.getUser() != null && reservation.getUser().getId().equals(currentUser.getId());
+            if (!isAdmin(authentication) && !isOwner && !isEventParticipant(reservationId, currentUser.getId())) {
                 throw new CustomException(ResponseCode.PERMISSION_DENIED);
             }
 
@@ -701,11 +759,29 @@ public class ReservationServiceImpl implements ReservationService {
                     ? feedbackMapper.toFeedbackResponse(reservation.getFeedback())
                     : null;
 
+            // start+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
+            var serviceItems = reservationServiceItemRepository.findByReservation_Id(reservationId).stream()
+                    .map(line -> ReservationServiceItemResponse.builder()
+                            .id(line.getId())
+                            .serviceItemId(line.getServiceItem().getId())
+                            .name(line.getServiceItem().getName())
+                            .unit(line.getServiceItem().getUnit())
+                            .priceSnapshot(line.getPriceSnapshot())
+                            .quantity(line.getQuantity())
+                            .note(line.getNote())
+                            .status(line.getStatus() != null ? line.getStatus().name() : ServiceItemStatus.PENDING.name())
+                            .build())
+                    .toList();
+            // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
+
             return ReservationDetailResponse.builder()
                     .reservation(reservationResponse)
                     .roomImages(roomImages)
                     .history(history)
                     .feedback(feedback)
+                    // start+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
+                    .serviceItems(serviceItems)
+                    // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
                     .build();
         } catch (CustomException e) {
             throw e;
@@ -714,6 +790,153 @@ public class ReservationServiceImpl implements ReservationService {
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
+
+    // start+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
+    @Override
+    @Transactional
+    public List<ReservationServiceItemResponse> getReservationServiceItems(String reservationId, Authentication authentication) {
+        var currentUser = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        var reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+        boolean isOwner = reservation.getUser() != null && reservation.getUser().getId().equals(currentUser.getId());
+        if (!isAdmin(authentication) && !isOwner && !isEventParticipant(reservationId, currentUser.getId())) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        return reservationServiceItemRepository.findByReservation_Id(reservationId).stream()
+                .map(line -> ReservationServiceItemResponse.builder()
+                        .id(line.getId())
+                        .serviceItemId(line.getServiceItem().getId())
+                        .name(line.getServiceItem().getName())
+                        .unit(line.getServiceItem().getUnit())
+                        .priceSnapshot(line.getPriceSnapshot())
+                        .quantity(line.getQuantity())
+                        .note(line.getNote())
+                        .status(line.getStatus() != null ? line.getStatus().name() : ServiceItemStatus.PENDING.name())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void updateReservationServiceItems(String reservationId, ReservationServiceItemsUpdateRequest request, Authentication authentication) {
+        var currentUser = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        var reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+        if (!isAdmin(authentication) && !reservation.getUser().getId().equals(currentUser.getId())) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        // start+ chức năng bảo toàn lịch sử: chỉ xóa dòng chưa hoàn thành, giữ lại DONE/CANCELLED
+        List<ServiceItemStatus> preservedStatuses = List.of(ServiceItemStatus.DONE, ServiceItemStatus.CANCELLED);
+        List<ReservationServiceItem> activeItems =
+                reservationServiceItemRepository.findByReservation_IdAndStatusNotIn(reservationId, preservedStatuses);
+        reservationServiceItemRepository.deleteAll(activeItems);
+        // end+ chức năng bảo toàn lịch sử
+
+        if (request == null || request.getServiceItems() == null || request.getServiceItems().isEmpty()) {
+            realTimeService.sendServiceItemUpdate(reservationId);
+            return;
+        }
+
+        List<ReservationServiceItem> lines = new ArrayList<>();
+        for (ReservationServiceItemsUpdateRequest.ServiceItemLineRequest lineRequest : request.getServiceItems()) {
+            if (lineRequest.getQuantity() == null || lineRequest.getQuantity() <= 0) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED, "Quantity must be > 0");
+            }
+            ServiceItem serviceItem = serviceItemRepository.findById(lineRequest.getServiceItemId())
+                    .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Service item not found"));
+            if (!Boolean.TRUE.equals(serviceItem.getActive())) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED, "Service item is not active");
+            }
+
+            ReservationServiceItem line = new ReservationServiceItem();
+            line.setId(UUID.randomUUID().toString());
+            line.setStatus(ServiceItemStatus.PENDING);
+            line.setReservation(reservation);
+            line.setServiceItem(serviceItem);
+            line.setQuantity(lineRequest.getQuantity());
+            line.setNote(lineRequest.getNote());
+            line.setPriceSnapshot(serviceItem.getPrice());
+            line.setCreatedAt(LocalDateTime.now());
+            line.setUpdatedAt(LocalDateTime.now());
+            lines.add(line);
+        }
+        reservationServiceItemRepository.saveAll(lines);
+        realTimeService.sendServiceItemUpdate(reservationId);
+
+        // start+ notify admins about new service request
+        try {
+            String roomCode = reservation.getRoom() != null ? reservation.getRoom().getLocationCode() : reservationId;
+            String userEmail = currentUser.getUsername();
+            java.util.List<String> serviceNames = lines.stream()
+                    .map(l -> l.getServiceItem().getName())
+                    .toList();
+            if (!serviceNames.isEmpty()) {
+                notificationService.notifyAdminsNewServiceRequest(reservationId, roomCode, userEmail, serviceNames);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to notify admins about service request: {}", e.getMessage());
+        }
+        // end+ notify admins
+    }
+    // start+ chức năng service item status (admin cập nhật trạng thái dịch vụ)
+    @Override
+    @Transactional
+    public void updateServiceItemStatus(String reservationId, String itemId, String status,
+                                        String reason, Authentication authentication) {
+        if (!isAdmin(authentication)) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        var reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+        ReservationServiceItem item = reservationServiceItemRepository.findById(itemId)
+                .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Service item not found"));
+
+        if (!item.getReservation().getId().equals(reservationId)) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        ServiceItemStatus newStatus;
+        try {
+            newStatus = ServiceItemStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED, "Invalid status: " + status);
+        }
+
+        if (newStatus == ServiceItemStatus.CANCELLED && (reason == null || reason.isBlank())) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED, "A reason is required when cancelling a service item.");
+        }
+
+        item.setStatus(newStatus);
+        item.setUpdatedAt(LocalDateTime.now());
+        reservationServiceItemRepository.save(item);
+        realTimeService.sendServiceItemUpdate(reservationId);
+
+        // start+ notify user about status change
+        try {
+            String ownerId = reservation.getUser() != null ? reservation.getUser().getId() : null;
+            if (ownerId != null) {
+                notificationService.notifyUserServiceStatusChanged(
+                        ownerId, item.getServiceItem().getName(),
+                        status, reason, reservationId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to notify user about service status change: {}", e.getMessage());
+        }
+        // end+ notify user
+    }
+    // end+ chức năng service item status
+
+    // end+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
 
     /**
      * Validate the reservation context (Reservation and Room).

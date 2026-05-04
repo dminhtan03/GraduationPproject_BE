@@ -1,6 +1,8 @@
 package com.finalProject.BookingMeetingRoom.service.impl;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -168,32 +170,89 @@ public class DashboardServiceImpl implements DashboardService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startOfThisMonth = now.withDayOfMonth(1).toLocalDate().atStartOfDay();
         LocalDateTime startOfLastMonth = startOfThisMonth.minusMonths(1);
-        LocalDateTime endOfLastMonth = startOfThisMonth.minusNanos(1);
+        LocalDateTime endOfLastMonth  = startOfThisMonth.minusNanos(1);
 
-        // Total Bookings
+        // ── Total Bookings ───────────────────────────────────────────────────
         long currentMonthBookings = reservationRepository.countByCreateAtBetween(startOfThisMonth, now);
-        long lastMonthBookings = reservationRepository.countByCreateAtBetween(startOfLastMonth, endOfLastMonth);
-        double bookingChange = calculateChange(currentMonthBookings, lastMonthBookings);
+        long lastMonthBookings    = reservationRepository.countByCreateAtBetween(startOfLastMonth, endOfLastMonth);
+        double bookingChange      = calculateChange(currentMonthBookings, lastMonthBookings);
 
-        // Active Users
+        // ── Active Users ─────────────────────────────────────────────────────
         long currentMonthActiveUsers = reservationRepository.countDistinctUsersByCreateAtBetween(startOfThisMonth, now);
-        long lastMonthActiveUsers = reservationRepository.countDistinctUsersByCreateAtBetween(startOfLastMonth, endOfLastMonth);
-        double activeUsersChange = calculateChange(currentMonthActiveUsers, lastMonthActiveUsers);
+        long lastMonthActiveUsers    = reservationRepository.countDistinctUsersByCreateAtBetween(startOfLastMonth, endOfLastMonth);
+        double activeUsersChange     = calculateChange(currentMonthActiveUsers, lastMonthActiveUsers);
 
-        // Utilization Rate
-        long totalRooms = roomRepository.count();
-        long occupiedRooms = roomRepository.countByStatus(RoomStatus.UNAVAILABLE);
-        double utilizationRate = (totalRooms > 0) ? (double) occupiedRooms / totalRooms : 0.0;
-        // For simplicity, change for utilization is not calculated in this example.
+        // ── Completed Bookings (thay utilizationRate) ────────────────────────
+        List<com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus> completedStatuses =
+                List.of(com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.COMPLETED);
+        long completedThisMonth = reservationRepository.countByStatusesAndCreateAtBetween(completedStatuses, startOfThisMonth, now);
+        long completedLastMonth = reservationRepository.countByStatusesAndCreateAtBetween(completedStatuses, startOfLastMonth, endOfLastMonth);
+        double completedChange  = calculateChange(completedThisMonth, completedLastMonth);
 
-        // Today's Bookings
+        // ── Cancellation Rate (%) ────────────────────────────────────────────
+        List<com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus> cancelStatuses =
+                List.of(com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.CANCELLED,
+                        com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.FORCE_CANCELLED);
+        long cancelledThisMonth = reservationRepository.countByStatusesAndCreateAtBetween(cancelStatuses, startOfThisMonth, now);
+        long cancelledLastMonth = reservationRepository.countByStatusesAndCreateAtBetween(cancelStatuses, startOfLastMonth, endOfLastMonth);
+        long totalThisMonth     = currentMonthBookings > 0 ? currentMonthBookings : 1;
+        long totalLastMonth     = lastMonthBookings > 0 ? lastMonthBookings : 1;
+        long cancelRatePct      = Math.round((double) cancelledThisMonth / totalThisMonth * 100);
+        long cancelRateLastPct  = Math.round((double) cancelledLastMonth / totalLastMonth * 100);
+        double cancelRateChange = calculateChange(cancelRatePct, cancelRateLastPct);
+
+        // ── Today's Bookings ─────────────────────────────────────────────────
         long todaysBookings = reservationRepository.countTodaysReservations(now.toLocalDate().atStartOfDay());
+
+        // ── No-Show Bookings ─────────────────────────────────────────────────
+        List<com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus> noShowStatuses =
+                List.of(com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.NO_SHOW);
+        long noShowThisMonth = reservationRepository.countByStatusesAndCreateAtBetween(noShowStatuses, startOfThisMonth, now);
+        long noShowLastMonth = reservationRepository.countByStatusesAndCreateAtBetween(noShowStatuses, startOfLastMonth, endOfLastMonth);
+        double noShowChange  = calculateChange(noShowThisMonth, noShowLastMonth);
+
+        // ── Daily Trend (7 ngày gần nhất) — bar chart ────────────────────────
+        LocalDateTime sevenDaysAgo = now.minusDays(6).toLocalDate().atStartOfDay();
+        List<Object[]> rawDaily = reservationRepository.countByDaySince(sevenDaysAgo);
+
+        // Build full 7-day map (fill zero cho ngày không có data)
+        Map<String, Long> dailyMap = new java.util.LinkedHashMap<>();
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        for (int i = 6; i >= 0; i--) {
+            dailyMap.put(LocalDate.now().minusDays(i).format(dateFmt), 0L);
+        }
+        for (Object[] row : rawDaily) {
+            String day   = String.valueOf(row[0]).substring(0, 10); // "YYYY-MM-DD"
+            long   count = ((Number) row[1]).longValue();
+            if (dailyMap.containsKey(day)) {
+                dailyMap.put(day, count);
+            }
+        }
+        List<DashboardOverviewStatsResponse.DailyTrend> dailyTrend = dailyMap.entrySet().stream()
+                .map(e -> new DashboardOverviewStatsResponse.DailyTrend(e.getKey(), e.getValue()))
+                .toList();
+
+        // ── Status Distribution (tháng này) — pie chart ─────────────────────
+        List<Object[]> rawStatus = reservationRepository.countGroupByStatus(startOfThisMonth, now);
+        long grandTotal = rawStatus.stream().mapToLong(r -> ((Number) r[1]).longValue()).sum();
+        long gt = grandTotal > 0 ? grandTotal : 1;
+        List<DashboardOverviewStatsResponse.StatusCount> statusDistribution = rawStatus.stream()
+                .map(r -> new DashboardOverviewStatsResponse.StatusCount(
+                        String.valueOf(r[0]),
+                        ((Number) r[1]).longValue(),
+                        Math.round((double) ((Number) r[1]).longValue() / gt * 1000) / 10.0))
+                .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+                .toList();
 
         return DashboardOverviewStatsResponse.builder()
                 .totalBookings(new DashboardOverviewStatsResponse.StatItem(currentMonthBookings, bookingChange))
                 .activeUsers(new DashboardOverviewStatsResponse.StatItem(currentMonthActiveUsers, activeUsersChange))
-                .utilizationRate(new DashboardOverviewStatsResponse.StatItem((long) (utilizationRate * 100), 0))
+                .completedBookings(new DashboardOverviewStatsResponse.StatItem(completedThisMonth, completedChange))
+                .cancellationRate(new DashboardOverviewStatsResponse.StatItem(cancelRatePct, cancelRateChange))
                 .todaysBookings(new DashboardOverviewStatsResponse.StatItem(todaysBookings, 0))
+                .noShowBookings(new DashboardOverviewStatsResponse.StatItem(noShowThisMonth, noShowChange))
+                .dailyTrend(dailyTrend)
+                .statusDistribution(statusDistribution)
                 .build();
     }
 

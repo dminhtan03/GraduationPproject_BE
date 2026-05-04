@@ -20,4 +20,8 @@ public interface RealTimeService {
     void sendReservationStatus(Reservation reservation);
 
     void sendRoomStatus(Room room);
+
+    void sendServiceItemUpdate(String reservationId);
+
+    void sendParticipantUpdate(String reservationId);
 }

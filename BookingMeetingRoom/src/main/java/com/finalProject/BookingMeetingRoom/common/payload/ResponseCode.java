@@ -90,6 +90,7 @@ public enum ResponseCode {
     // ======= Other Errors =======
     AUTH_HEADER_NOT_FOUND("AUTH_401", "Authorization header not found", HttpStatus.UNAUTHORIZED),
     FEEDBACK_ALREADY_EXISTS("FBD_409", "Feedback already exists for this reservation", HttpStatus.CONFLICT),
+    FEEDBACK_NOT_FOUND("FBD_404", "Feedback not found", HttpStatus.NOT_FOUND),
     CANNOT_FORCE_RETURN("RTN_401","ROOM cannot be force returned",HttpStatus.CONFLICT),
     INVALID_DATE_FORMAT("DATE_400", "Invalid date format", HttpStatus.BAD_REQUEST),
 
