@@ -67,7 +67,7 @@ public class ReservationSeries {
     private Integer rollingWindowWeeks;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "STATUS", nullable = false)
+    @Column(name = "STATUS", nullable = false, length = 20)
     private ReservationSeriesStatus status;
 
     @Column(name = "LAST_SYNC_UNTIL")
