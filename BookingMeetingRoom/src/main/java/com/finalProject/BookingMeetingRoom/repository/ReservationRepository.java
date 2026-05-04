@@ -124,7 +124,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
                                       )
                                  THEN FALSE
                                  ELSE TRUE
-                                 END AS isFeedback
+                                 END AS isFeedback,
+
+          tr.series_id AS seriesId,
+          CASE WHEN EXISTS (
+              SELECT 1 FROM tbl_event te WHERE te.reservation_id = tr.id
+          ) THEN 1 ELSE 0 END AS hasEvent
 
       FROM tbl_reservation tr
       JOIN tbl_user tu ON tu.id = tr.user_id

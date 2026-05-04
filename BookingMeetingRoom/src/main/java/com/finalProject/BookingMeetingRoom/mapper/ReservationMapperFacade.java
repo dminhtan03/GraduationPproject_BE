@@ -89,6 +89,20 @@ public class ReservationMapperFacade {
         response.setDuration(myReservationProjection.getDuration());
         var isFeedback = myReservationProjection.getIsFeedback();
         response.setIsFeedback(isFeedback != null && isFeedback == 1L);
+
+        // start+ booking type
+        String seriesId = myReservationProjection.getSeriesId();
+        Long hasEvent   = myReservationProjection.getHasEvent();
+        response.setSeriesId(seriesId);
+        if (seriesId != null && !seriesId.isBlank()) {
+            response.setBookingType("RECURRING");
+        } else if (hasEvent != null && hasEvent == 1L) {
+            response.setBookingType("EVENT");
+        } else {
+            response.setBookingType("NORMAL");
+        }
+        // end+ booking type
+
         return response;
     }
 

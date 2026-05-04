@@ -484,6 +484,33 @@ public class NotificationServiceImpl implements NotificationService {
             log.error("Error notifying user about service status change: {}", e.getMessage());
         }
     }
+    @Override
+    public void notifyUserRemovedFromEvent(String userId, String eventTitle, String reservationId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            NotificationRequest req = new NotificationRequest();
+            req.setTitle("Removed from Event");
+            req.setContent(String.format(
+                "You have been removed from the event '%s'. If you have any questions, please contact the event organizer.",
+                eventTitle));
+            req.setUserId(userId);
+            req.reservationId = reservationId;
+            req.sendEmail = false;
+            req.setCreatedAt(java.time.LocalDateTime.now());
+
+            Notification entity = notificationMapper.toEntity(req);
+            entity.setUser(user);
+            entity.setCreatedAt(java.time.LocalDateTime.now());
+            entity.setReservationId(reservationId);
+            notificationRepository.save(entity);
+
+            messagingTemplate.convertAndSend("/topic/notifications/" + userId, req);
+        } catch (Exception e) {
+            log.error("Error notifying user about removal from event: {}", e.getMessage());
+        }
+    }
     // end+ service item notifications
 
     @Override

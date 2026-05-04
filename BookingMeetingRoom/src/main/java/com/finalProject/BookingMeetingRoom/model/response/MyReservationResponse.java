@@ -26,5 +26,9 @@ public class MyReservationResponse {
     private LocalDateTime endTime;
     private Double duration;
     private Boolean isFeedback;
+    // start+ booking type: NORMAL | RECURRING | EVENT
+    private String seriesId;
+    private String bookingType;
+    // end+ booking type
 }
 

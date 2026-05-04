@@ -161,6 +161,15 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
             throw new CustomException(ResponseCode.VALIDATION_FAILED, "fromDate must be <= untilDate");
         }
 
+        // start+ giới hạn 1 recurring series active per user
+        boolean hasActiveSeries = reservationSeriesRepository.findByStatus(ReservationSeriesStatus.ACTIVE).stream()
+                .anyMatch(s -> s.getUser() != null && s.getUser().getId().equals(user.getId()));
+        if (hasActiveSeries) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED,
+                    "You already have an active recurring booking series. Please cancel it before creating a new one.");
+        }
+        // end+ giới hạn 1 recurring series active per user
+
         // start+ validate conflict trước khi tạo series — nếu bất kỳ slot nào bị trùng
         // thì reject toàn bộ
         validateNoConflictsBeforeCreate(request, user, room);
