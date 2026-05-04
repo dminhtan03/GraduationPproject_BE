@@ -540,6 +540,7 @@ public class ReservationServiceImpl implements ReservationService {
 
             if (user.getCancellationCount() >= 3) {
                 user.setBookingLockedUntil(LocalDateTime.now().plusHours(24));
+                notificationService.noticeUserLocked(user, user.getBookingLockedUntil());
             }
             userRepository.save(user);
             // end add cancellation limit logic
@@ -591,7 +592,7 @@ public class ReservationServiceImpl implements ReservationService {
             List<Reservation> listReservationForceReturned = new ArrayList<>();
 
             // Update reservation status to cancelled
-            reservation.setStatus(ReservationStatus.CANCELLED);
+            reservation.setStatus(ReservationStatus.FORCE_CANCELLED);
             reservation.setReason(reason);
             reservation.setCancelBy(admin.getEmail()); // Save admin email
             reservation.setUpdatedAt(LocalDateTime.now());

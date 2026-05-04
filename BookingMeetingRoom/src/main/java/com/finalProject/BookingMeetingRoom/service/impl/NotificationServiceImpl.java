@@ -520,4 +520,84 @@ public class NotificationServiceImpl implements NotificationService {
             log.error("Lỗi gửi thông báo mời: {}", e.getMessage());
         }
     }
+
+    @Override
+    public void noticeCancelSeries(com.finalProject.BookingMeetingRoom.model.entity.ReservationSeries series, String reason) {
+        if (series == null || series.getUser() == null) return;
+
+        String title = "Recurring Reservation Series Cancelled";
+        String message = "Your recurring reservation series has been cancelled by an administrator.";
+        String content = String.format(
+                "%s\nRoom: %s\nReason: %s",
+                message,
+                series.getRoom() != null ? series.getRoom().getLocationCode() : "N/A",
+                (reason == null || reason.isBlank()) ? "No reason provided" : reason
+        );
+
+        NotificationRequest request = new NotificationRequest();
+        request.setTitle(title);
+        request.setContent(content);
+        request.setUserId(series.getUser().getId());
+        request.sendEmail = true;
+        request.setCreatedAt(java.time.LocalDateTime.now());
+
+        try {
+            User user = series.getUser();
+
+            // 1. Save to Database
+            Notification entity = notificationMapper.toEntity(request);
+            entity.setUser(user);
+            entity.setCreatedAt(java.time.LocalDateTime.now());
+            notificationRepository.save(entity);
+
+            // 2. Push Real-time via WebSocket
+            messagingTemplate.convertAndSend("/topic/notifications/" + user.getId(), request);
+
+            // 3. Send Email
+            emailService.sendEmailStatusReservation(request);
+
+            log.info("Notification sent to user {} for series {} cancellation", user.getUsername(), series.getId());
+        } catch (Exception e) {
+            log.error("Error sending series cancellation notification: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public void noticeUserLocked(com.finalProject.BookingMeetingRoom.model.entity.User user, java.time.LocalDateTime lockedUntil) {
+        if (user == null) return;
+
+        String title = "Account Locked: Booking Restricted";
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+        String lockedUntilStr = lockedUntil != null ? lockedUntil.format(formatter) : "24 hours";
+        
+        String content = String.format(
+                "Your booking privilege has been restricted until %s because you have reached the maximum daily cancellation limit 3 times. Please plan your reservations more carefully.",
+                lockedUntilStr
+        );
+
+        NotificationRequest request = new NotificationRequest();
+        request.setTitle(title);
+        request.setContent(content);
+        request.setUserId(user.getId());
+        request.sendEmail = true;
+        request.setCreatedAt(java.time.LocalDateTime.now());
+
+        try {
+            // 1. Save to Database
+            Notification entity = notificationMapper.toEntity(request);
+            entity.setUser(user);
+            entity.setCreatedAt(java.time.LocalDateTime.now());
+            notificationRepository.save(entity);
+
+            // 2. Push Real-time via WebSocket
+            messagingTemplate.convertAndSend("/topic/notifications/" + user.getId(), request);
+
+            // 3. Send Email
+            emailService.sendEmailStatusReservation(request);
+
+            log.info("Lock notification sent to user {}", user.getUsername());
+        } catch (Exception e) {
+            log.error("Error sending user lock notification: {}", e.getMessage());
+        }
+    }
 }

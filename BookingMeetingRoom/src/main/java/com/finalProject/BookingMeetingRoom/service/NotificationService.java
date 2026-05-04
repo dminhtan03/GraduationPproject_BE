@@ -48,5 +48,8 @@ public interface NotificationService {
     void notifyUserServiceStatusChanged(String userId, String serviceName,
                                         String newStatus, String reason, String reservationId);
     // end+ service item notifications
+    
+    void noticeCancelSeries(com.finalProject.BookingMeetingRoom.model.entity.ReservationSeries series, String reason);
 
+    void noticeUserLocked(com.finalProject.BookingMeetingRoom.model.entity.User user, java.time.LocalDateTime lockedUntil);
 }

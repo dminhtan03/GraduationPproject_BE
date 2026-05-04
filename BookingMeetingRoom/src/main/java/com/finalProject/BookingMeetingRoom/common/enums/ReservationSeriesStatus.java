@@ -4,6 +4,7 @@ package com.finalProject.BookingMeetingRoom.common.enums;
 public enum ReservationSeriesStatus {
     ACTIVE,
     PAUSED,
-    CANCELLED
+    CANCELLED,
+    FORCE_CANCELLED
 }
 // end+ chức năng đặt phòng lặp lại (Reservation Series status)

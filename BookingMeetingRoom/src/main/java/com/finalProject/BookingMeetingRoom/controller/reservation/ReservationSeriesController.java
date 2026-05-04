@@ -58,8 +58,10 @@ public class ReservationSeriesController {
     }
 
     @DeleteMapping("/{seriesId}")
-    public ResponseEntity<?> cancelSeries(@PathVariable String seriesId, Authentication authentication) {
-        reservationSeriesService.cancelSeries(seriesId, authentication);
+    public ResponseEntity<?> cancelSeries(@PathVariable String seriesId, 
+                                        @org.springframework.web.bind.annotation.RequestParam(required = false) String reason, 
+                                        Authentication authentication) {
+        reservationSeriesService.cancelSeries(seriesId, reason, authentication);
         return ResponseEntity.ok(Response.ofSucceeded("Series cancelled successfully"));
     }
 }
