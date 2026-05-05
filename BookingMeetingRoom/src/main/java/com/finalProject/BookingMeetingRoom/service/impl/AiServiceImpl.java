@@ -41,8 +41,12 @@ import com.finalProject.BookingMeetingRoom.service.AiService;
 import com.finalProject.BookingMeetingRoom.service.DashboardService;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
+import com.finalProject.BookingMeetingRoom.service.chat.ChatHistoryService;
 import com.finalProject.BookingMeetingRoom.service.ai.RagRoomResolver;
 import com.finalProject.BookingMeetingRoom.model.dto.RoomLookupItem;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.common.enums.SenderType;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,26 +79,52 @@ public class AiServiceImpl implements AiService {
     private final RoomService roomService;
     private final ReservationService reservationService;
     private final RagRoomResolver ragRoomResolver;
+    private final ChatHistoryService chatHistoryService;
+    private final UserRepository userRepository;
 
     @Override
     public AiChatResponse chat(AiChatRequest request, Authentication authentication) {
         String sessionId = StringUtils.hasText(request.getSessionId()) ? request.getSessionId() : UUID.randomUUID().toString();
+        User chatUser = resolveChatUser(authentication);
+        logChatMessage(chatUser, sessionId, SenderType.USER, request == null ? null : request.getMessage());
 
         AiChatResponse fastPath = tryFastPathReservationAction(request, authentication, sessionId);
         if (fastPath != null) {
+            logChatMessage(chatUser, sessionId, SenderType.BOT, fastPath.getReply());
+            return fastPath;
+        }
+
+        fastPath = tryFastPathRoomDetail(request, sessionId);
+        if (fastPath != null) {
+            logChatMessage(chatUser, sessionId, SenderType.BOT, fastPath.getReply());
             return fastPath;
         }
 
         fastPath = tryFastPathBooking(request, authentication, sessionId);
         if (fastPath != null) {
+            logChatMessage(chatUser, sessionId, SenderType.BOT, fastPath.getReply());
+            return fastPath;
+        }
+
+        fastPath = tryFastPathCurrentAvailability(request, sessionId);
+        if (fastPath != null) {
+            logChatMessage(chatUser, sessionId, SenderType.BOT, fastPath.getReply());
+            return fastPath;
+        }
+
+        fastPath = tryFastPathAvailability(request, sessionId);
+        if (fastPath != null) {
+            logChatMessage(chatUser, sessionId, SenderType.BOT, fastPath.getReply());
             return fastPath;
         }
 
         if (!StringUtils.hasText(openAiProperties.getApiKey())) {
-            return AiChatResponse.builder()
+            AiChatResponse response = AiChatResponse.builder()
                     .sessionId(sessionId)
                     .reply("Chua cau hinh OpenAI API key. Vui long them ai.openai.api-key trong application-local.yml.")
                     .build();
+            logChatMessage(chatUser, sessionId, SenderType.BOT, response.getReply());
+            return response;
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
@@ -134,9 +164,9 @@ public class AiServiceImpl implements AiService {
 
             String reply = messageNode.path("content").asText("");
             if (context.roomDetail != null) {
-                reply = toSingleLine(stripMarkdown(reply));
+                reply = buildRoomDetailReply(request.getMessage(), context.roomDetail.getLocationCode());
             }
-            return AiChatResponse.builder()
+                AiChatResponse aiResponse = AiChatResponse.builder()
                     .sessionId(sessionId)
                     .reply(reply)
                     .suggestions(context.suggestions)
@@ -144,6 +174,9 @@ public class AiServiceImpl implements AiService {
                     .reservation(context.reservation)
                     .roomDetail(context.roomDetail)
                     .build();
+                aiResponse = normalizeAvailabilityResponse(request.getMessage(), aiResponse);
+                logChatMessage(chatUser, sessionId, SenderType.BOT, aiResponse.getReply());
+                return aiResponse;
         }
 
         String fallbackReply = (context.suggestions != null && !context.suggestions.isEmpty())
@@ -151,10 +184,10 @@ public class AiServiceImpl implements AiService {
             : "He thong AI da dat gioi han buoc xu ly. Vui long thu lai voi yeu cau ro rang hon.";
 
         if (context.roomDetail != null) {
-            fallbackReply = toSingleLine(stripMarkdown(fallbackReply));
+            fallbackReply = buildRoomDetailReply(null, context.roomDetail.getLocationCode());
         }
 
-        return AiChatResponse.builder()
+        AiChatResponse response = AiChatResponse.builder()
                 .sessionId(sessionId)
                 .reply(fallbackReply)
                 .suggestions(context.suggestions)
@@ -162,6 +195,28 @@ public class AiServiceImpl implements AiService {
                 .reservation(context.reservation)
                 .roomDetail(context.roomDetail)
                 .build();
+        response = normalizeAvailabilityResponse(request.getMessage(), response);
+        logChatMessage(chatUser, sessionId, SenderType.BOT, response.getReply());
+        return response;
+    }
+
+    private User resolveChatUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || !StringUtils.hasText(authentication.getName())) {
+            return null;
+        }
+        return userRepository.findByEmail(authentication.getName()).orElse(null);
+    }
+
+    private void logChatMessage(User user, String sessionId, SenderType sender, String message) {
+        if (!StringUtils.hasText(sessionId) || !StringUtils.hasText(message)) {
+            return;
+        }
+
+        try {
+            chatHistoryService.log(user, sessionId, sender, message);
+        } catch (Exception ex) {
+            logger.debug("Failed to log chat history for session {} sender {}: {}", sessionId, sender, ex.getMessage());
+        }
     }
 
     private Map<String, Object> systemMessage(String language) {
@@ -171,6 +226,7 @@ public class AiServiceImpl implements AiService {
             content = "You are a meeting-room booking assistant. "
                 + "Reply in the user's language (English or Vietnamese with accents). "
                 + "Use tools only for actions (search, book, cancel, return, extend). "
+                + "For room availability or room-listing questions, use search_random_available_rooms and return at most 20 random valid rooms that match the user's conditions. Do not manually loop through buildings and floors. Keep the reply concise. "
                 + "If the user provides a locationCode (e.g., V5-020) call find_room_by_location_code to get roomId. "
                 + "If a tool returns ok=false, explain the reason from code/message and suggest the next step. "
                 + "If booking overlaps, suggest alternative rooms if possible. "
@@ -182,6 +238,7 @@ public class AiServiceImpl implements AiService {
             content = "Ban la tro ly AI dat phong hop. "
                 + "Tra loi bang dung ngon ngu nguoi dung (neu nguoi dung hoi tieng Viet thi tra loi tieng Viet co dau, neu hoi tieng Anh thi tra loi tieng Anh). "
                 + "Chi su dung tool de thuc hien hanh dong (tim phong, dat phong, huy, tra phong, gia han). "
+                + "Voi cau hoi ve danh sach phong hoac phong trong, hay dung search_random_available_rooms de lay toi da 20 phong hop le ngau nhien theo dieu kien nguoi dung. Khong tu lap vong qua building va floor. Giữ cau tra loi ngan gon. "
                 + "Neu nguoi dung dua locationCode (vi du V5-020) thi goi tool find_room_by_location_code de lay roomId. "
                 + "Neu tool tra ve ok=false thi phai noi ro ly do tu code/message va de xuat buoc tiep theo. "
                 + "Neu dat phong bi overlap thi de xuat phong khac phu hop neu co the. "
@@ -319,6 +376,61 @@ public class AiServiceImpl implements AiService {
                 .build();
     }
 
+    private AiChatResponse tryFastPathRoomDetail(AiChatRequest request, String sessionId) {
+        if (request == null || !StringUtils.hasText(request.getMessage())) {
+            return null;
+        }
+
+        String normalized = normalizeMessage(request.getMessage());
+        boolean asksDetail = normalized.contains("chi tiet")
+                || normalized.contains("thong tin chi tiet")
+                || normalized.contains("thong tin phong")
+                || normalized.contains("room detail")
+                || normalized.contains("details");
+        if (!asksDetail) {
+            return null;
+        }
+
+        String locationCode = extractLocationCode(request.getMessage());
+        if (!StringUtils.hasText(locationCode)) {
+            return null;
+        }
+
+        try {
+            RoomSearchResponse room = roomService.findRoomByLocationCode(locationCode);
+            if (room == null || !StringUtils.hasText(room.getRoomId())) {
+                return AiChatResponse.builder()
+                        .sessionId(sessionId)
+                        .reply("Khong tim thay phong theo ma " + locationCode + ".")
+                        .build();
+            }
+
+            RoomDetailResponse detail = roomService.getRoomDetail(room.getRoomId());
+            if (detail == null) {
+                return AiChatResponse.builder()
+                        .sessionId(sessionId)
+                        .reply("Khong lay duoc chi tiet phong " + locationCode + ".")
+                        .build();
+            }
+
+                    String reply = buildRoomDetailReply(request.getMessage(), locationCode);
+            return AiChatResponse.builder()
+                    .sessionId(sessionId)
+                    .reply(reply)
+                    .roomDetail(detail)
+                    .build();
+        } catch (CustomException ex) {
+            String message = ex.getResponseCode() != null ? ex.getResponseCode().getMessage() : "Khong tim thay phong.";
+            return AiChatResponse.builder()
+                    .sessionId(sessionId)
+                    .reply(message)
+                    .build();
+        } catch (Exception ex) {
+            logger.warn("Fast room detail lookup failed for {}: {}", locationCode, ex.getMessage());
+            return null;
+        }
+    }
+
     private AiChatResponse tryFastPathReservationAction(AiChatRequest request, Authentication authentication, String sessionId) {
         if (request == null || !StringUtils.hasText(request.getMessage())) {
             return null;
@@ -418,6 +530,178 @@ public class AiServiceImpl implements AiService {
         }
     }
 
+    private AiChatResponse tryFastPathCurrentAvailability(AiChatRequest request, String sessionId) {
+        if (request == null || !StringUtils.hasText(request.getMessage())) return null;
+
+        String normalized = normalizeMessage(request.getMessage());
+        
+        // detect current/instant availability question (Vietnamese & English)
+        boolean asksAvailability = (normalized.contains("co phong")
+                || normalized.contains("phong trong")
+                || normalized.contains("phong nao")
+                || normalized.contains("available") || normalized.contains("empty") || normalized.contains("free"))
+                && (normalized.contains("hien tai")
+                    || normalized.contains("bay gio")
+                    || normalized.contains("dang")
+                    || normalized.contains("now") || normalized.contains("currently") || normalized.contains("right now"));
+        
+        if (!asksAvailability) return null;
+
+        // ensure NO explicit time range like "10h" - delegate to tryFastPathAvailability
+        if (extractTimeRange(request.getMessage()) != null || 
+            parseSingleHourRange(request.getMessage()) != null) {
+            return null;
+        }
+
+        List<String> buildingIds = resolveBuildingIds(normalized);
+        LocalDateTime now = LocalDateTime.now();
+        List<RoomSearchResponse> suggestions = roomService.searchRandomAvailableRooms(buildingIds, now, now.plusHours(1), 20);
+
+        if (suggestions.isEmpty()) return null;
+
+        String language = detectLanguage(request.getMessage());
+        String reply = "vi".equals(language)
+                ? "Mình tìm được " + suggestions.size() + " phòng trống hiện tại phù hợp."
+                : "I found " + suggestions.size() + " rooms available now.";
+
+        return AiChatResponse.builder()
+                .sessionId(sessionId)
+                .reply(reply)
+                .suggestions(suggestions)
+                .reservationCreated(false)
+                .build();
+    }
+
+    private AiChatResponse tryFastPathAvailability(AiChatRequest request, String sessionId) {
+        if (request == null || !StringUtils.hasText(request.getMessage())) return null;
+
+        String normalized = normalizeMessage(request.getMessage());
+        // detect availability question in Vietnamese/English
+        boolean asksAvailability = normalized.contains("co phong")
+                || normalized.contains("phong trong") || normalized.contains("trong")
+                || normalized.contains("available") || normalized.contains("free rooms") || normalized.contains("any rooms");
+        if (!asksAvailability) return null;
+
+        TimeRange range = extractTimeRange(request.getMessage());
+        if (range == null) {
+            // try single hour like "10h" or "10:00"
+            range = parseSingleHourRange(request.getMessage());
+        }
+        if (range == null) {
+            // try English time format like "11PM today" or "at 10am"
+            range = parseEnglishTimeWithToday(request.getMessage());
+        }
+        if (range == null) return null;
+
+        List<String> buildingIds = resolveBuildingIds(normalized);
+        List<RoomSearchResponse> suggestions = roomService.searchRandomAvailableRooms(buildingIds, range.start, range.end, 20);
+
+        if (suggestions.isEmpty()) return null;
+
+        String language = detectLanguage(request.getMessage());
+        String reply = "vi".equals(language)
+                ? "Mình tìm được " + suggestions.size() + " phòng trống phù hợp."
+                : "I found " + suggestions.size() + " available rooms.";
+
+        return AiChatResponse.builder()
+                .sessionId(sessionId)
+                .reply(reply)
+                .suggestions(suggestions)
+                .reservationCreated(false)
+                .build();
+    }
+
+    private TimeRange parseEnglishTimeWithToday(String message) {
+        if (!StringUtils.hasText(message)) return null;
+        
+        // Pattern: "11PM", "10am", "11:30pm", "at 10am", "at 11PM today", etc.
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "(?:at\\s+)?(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(message);
+        
+        if (!matcher.find()) {
+            return null;
+        }
+        
+        int hour = Integer.parseInt(matcher.group(1));
+        int minute = matcher.group(2) != null ? Integer.parseInt(matcher.group(2)) : 0;
+        String ampm = matcher.group(3).toLowerCase(Locale.ROOT);
+        
+        // Convert to 24h format
+        if ("pm".equals(ampm) && hour != 12) {
+            hour += 12;
+        } else if ("am".equals(ampm) && hour == 12) {
+            hour = 0;
+        }
+        
+        // Use today's date or tomorrow if specified
+        LocalDate date = LocalDate.now();
+        String normalized = normalizeMessage(message);
+        if (normalized.contains("ngay mai") || normalized.contains("tomorrow")) {
+            date = date.plusDays(1);
+        }
+        
+        LocalDateTime start = date.atTime(hour, minute);
+        LocalDateTime end = start.plusHours(1);
+        
+        return new TimeRange(start, end);
+    }
+
+    private List<String> resolveBuildingIds(String normalizedMessage) {
+        List<com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse> buildings = dashboardService.getAllBuildings();
+        List<String> buildingIds = new ArrayList<>();
+
+        for (com.finalProject.BookingMeetingRoom.model.response.AmbiguousBuildingResponse building : buildings) {
+            if (buildingMatchesMessage(normalizedMessage, building.getName())) {
+                buildingIds.add(building.getId());
+            }
+        }
+
+        return buildingIds;
+    }
+
+    private boolean buildingMatchesMessage(String normalizedMessage, String buildingName) {
+        if (!StringUtils.hasText(normalizedMessage) || !StringUtils.hasText(buildingName)) {
+            return false;
+        }
+
+        String normalizedBuildingName = normalizeMessage(buildingName);
+        String[] tokens = normalizedBuildingName.split("\\s+");
+        for (String token : tokens) {
+            if (token.length() < 2) {
+                continue;
+            }
+            if (token.matches("^(toa|nha|building|tac|nhan|day|khu|house|block|tower|complex|center|centre)$")) {
+                continue;
+            }
+            if (normalizedMessage.contains(token)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private TimeRange parseSingleHourRange(String message) {
+        if (!StringUtils.hasText(message)) return null;
+        String normalized = normalizeMessage(message);
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\b(\\d{1,2})h\\b");
+        java.util.regex.Matcher m = p.matcher(normalized);
+        if (m.find()) {
+            int hour = Integer.parseInt(m.group(1));
+            LocalDate date = LocalDate.now();
+            if (normalized.contains("ngay mai") || normalized.contains("tomorrow")) {
+                date = date.plusDays(1);
+            }
+            LocalDateTime start = date.atTime(hour, 0);
+            LocalDateTime end = start.plusHours(1);
+            return new TimeRange(start, end);
+        }
+        return null;
+    }
+
     private String generateResponseReply(String userMessage, String outcome, Object data) {
         if (!StringUtils.hasText(openAiProperties.getApiKey())) {
             return data == null ? "" : String.valueOf(data);
@@ -432,6 +716,17 @@ public class AiServiceImpl implements AiService {
             systemPrompt = "You are an AI assistant. Reply briefly in the user's language (English or Vietnamese with accents). "
                 + "Use 1-2 sentences, do not mention the system. If needed, suggest the next step briefly.";
         }
+        if ("ROOM_DETAIL".equals(outcome)) {
+            if ("en".equals(language)) {
+                systemPrompt = "You are an AI assistant that replies with a simple room intro in English. "
+                    + "Return exactly one short sentence only. Start with 'Here is the room information for ...'. "
+                    + "Do not use bullet points, markdown, lists, or extra details. Do not invent information.";
+            } else {
+                systemPrompt = "Ban la tro ly AI tra loi gioi thieu phong bang tieng Viet co dau. "
+                    + "Tra loi dung 1 cau ngan, bat dau bang 'Day la thong tin cua phong ...'. "
+                    + "Khong dung bullet points, markdown, danh sach, hay thong tin bo sung. Khong tu tao them du lieu.";
+            }
+        }
         system.put("role", "system");
         system.put("content", systemPrompt);
         messages.add(system);
@@ -445,6 +740,66 @@ public class AiServiceImpl implements AiService {
 
         JsonNode response = callOpenAiForResponseOnly(messages);
         return response.path("choices").path(0).path("message").path("content").asText("");
+    }
+
+    private String buildRoomDetailReply(String userMessage, String locationCode) {
+        String code = StringUtils.hasText(locationCode) ? locationCode.trim() : "phong nay";
+        String language = detectLanguage(userMessage);
+        if ("en".equals(language)) {
+            return "Here is the room information for " + code + ".";
+        }
+        return "Đây là thông tin của phòng " + code + ".";
+    }
+
+    private AiChatResponse normalizeAvailabilityResponse(String userMessage, AiChatResponse response) {
+        if (response == null || response.getSuggestions() == null || response.getSuggestions().isEmpty()) {
+            return response;
+        }
+
+        if (!isAvailabilityListQuery(userMessage)) {
+            return response;
+        }
+
+        List<RoomSearchResponse> filteredSuggestions = response.getSuggestions().stream()
+                .filter(item -> item != null && item.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.RoomStatus.AVAILABLE)
+                .limit(20)
+                .toList();
+
+        if (filteredSuggestions.isEmpty()) {
+            return response;
+        }
+
+        String language = detectLanguage(userMessage);
+        String reply = "vi".equals(language)
+                ? "Mình tìm được " + filteredSuggestions.size() + " phòng phù hợp."
+                : "I found " + filteredSuggestions.size() + " matching rooms.";
+
+        return AiChatResponse.builder()
+                .sessionId(response.getSessionId())
+                .reply(reply)
+                .suggestions(filteredSuggestions)
+                .reservationCreated(response.isReservationCreated())
+                .reservation(response.getReservation())
+                .roomDetail(response.getRoomDetail())
+                .build();
+    }
+
+    private boolean isAvailabilityListQuery(String message) {
+        if (!StringUtils.hasText(message)) {
+            return false;
+        }
+
+        String normalized = normalizeMessage(message);
+        boolean asksAvailability = normalized.contains("phòng") || normalized.contains("phong")
+                || normalized.contains("available") || normalized.contains("free") || normalized.contains("empty");
+        boolean asksList = normalized.contains("những phòng") || normalized.contains("phong nao")
+                || normalized.contains("phong nào") || normalized.contains("rooms")
+                || normalized.contains("which rooms") || normalized.contains("what rooms");
+        boolean asksTime = normalized.contains("ngay mai") || normalized.contains("tomorrow")
+                || normalized.contains("hien tai") || normalized.contains("now") || normalized.contains("currently")
+                || normalized.matches(".*\\b\\d{1,2}h\\b.*") || normalized.matches(".*\\b\\d{1,2}(?::\\d{2})?\\s*(am|pm)\\b.*");
+
+        return asksAvailability && (asksList || asksTime);
     }
 
     private String detectLanguage(String message) {
@@ -860,6 +1215,34 @@ public class AiServiceImpl implements AiService {
                     request.setEndTime(endTime);
 
                     List<RoomSearchResponse> rooms = roomService.searchRooms(request);
+                    context.suggestions = rooms;
+                    yield okJson(rooms);
+                }
+                case "search_random_available_rooms" -> {
+                    LocalDateTime startTime = parseDateTime(args.path("startTime").asText(null));
+                    LocalDateTime endTime = parseDateTime(args.path("endTime").asText(null));
+                    int limit = args.path("limit").asInt(20);
+
+                    LocalDateTime[] normalized = normalizeTimeRange(startTime, endTime);
+                    startTime = normalized[0];
+                    endTime = normalized[1];
+
+                    List<String> buildingIds = new ArrayList<>();
+                    JsonNode buildingIdsNode = args.path("buildingIds");
+                    if (buildingIdsNode.isArray()) {
+                        for (JsonNode buildingIdNode : buildingIdsNode) {
+                            if (StringUtils.hasText(buildingIdNode.asText())) {
+                                buildingIds.add(buildingIdNode.asText());
+                            }
+                        }
+                    }
+
+                    if (limit <= 0) {
+                        limit = 20;
+                    }
+                    limit = Math.min(limit, 20);
+
+                    List<RoomSearchResponse> rooms = roomService.searchRandomAvailableRooms(buildingIds, startTime, endTime, limit);
                     context.suggestions = rooms;
                     yield okJson(rooms);
                 }

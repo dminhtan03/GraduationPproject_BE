@@ -6,6 +6,9 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -145,6 +148,56 @@ public class RoomServiceImpl implements RoomService {
                     })
                     .filter(roomResponse -> roomResponse.getStatus() == RoomStatus.AVAILABLE || roomResponse.getStatus() == RoomStatus.LEARNING)
                     .collect(Collectors.toList());
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoomSearchResponse> searchRandomAvailableRooms(List<String> buildingIds, LocalDateTime startTime, LocalDateTime endTime, int limit) {
+        try {
+            if (startTime == null || endTime == null || !startTime.isBefore(endTime) || limit <= 0) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED);
+            }
+
+            List<Room> rooms = (buildingIds != null && !buildingIds.isEmpty())
+                    ? roomRepository.findAllWithDetailsByBuildingIds(buildingIds)
+                    : roomRepository.findAllWithDetails();
+
+            Set<String> buildingFilter = buildingIds == null ? Set.of() : new HashSet<>(buildingIds);
+            List<RoomSearchResponse> sample = new ArrayList<>(Math.min(limit, rooms.size()));
+            int eligibleCount = 0;
+            ThreadLocalRandom random = ThreadLocalRandom.current();
+
+            for (Room room : rooms) {
+                if (room == null || room.getFloor() == null || room.getFloor().getBuilding() == null) {
+                    continue;
+                }
+                if (!buildingFilter.isEmpty() && !buildingFilter.contains(room.getFloor().getBuilding().getId())) {
+                    continue;
+                }
+
+                RoomSearchResponse response = mapToRoomSearchResponse(room, startTime, endTime);
+                if (response.getStatus() != RoomStatus.AVAILABLE) {
+                    continue;
+                }
+
+                eligibleCount++;
+                if (sample.size() < limit) {
+                    sample.add(response);
+                } else {
+                    int replaceIndex = random.nextInt(eligibleCount);
+                    if (replaceIndex < limit) {
+                        sample.set(replaceIndex, response);
+                    }
+                }
+            }
+
+            return sample;
         } catch (CustomException e) {
             throw e;
         } catch (Exception e) {
