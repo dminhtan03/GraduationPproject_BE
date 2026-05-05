@@ -200,6 +200,28 @@ public class ReservationServiceImpl implements ReservationService {
                 throw new CustomException(ResponseCode.RESERVATION_TIME_OVERLAP);
             }
 
+            // Check academic schedule overlap for the extension window
+            if (academicScheduleService.isRoomBusyWithLearning(room.getId(), newStartTime, newEndTime)) {
+                // Find the specific schedule start time to inform the user
+                LocalDate extensionDate = newStartTime.toLocalDate();
+                String dayOfWeek = extensionDate.getDayOfWeek().name();
+                var schedules = academicScheduleService.getSchedulesByRoomId(room.getId());
+                String classTimeMsg = schedules.stream()
+                        .filter(s -> !s.getFromDate().isAfter(extensionDate) && !s.getToDate().isBefore(extensionDate))
+                        .filter(s -> {
+                            for (String d : s.getDaysOfWeek().split(",")) {
+                                if (d.trim().equalsIgnoreCase(dayOfWeek)) return true;
+                            }
+                            return false;
+                        })
+                        .filter(s -> newEndTime.toLocalTime().isAfter(s.getStartTime()))
+                        .map(s -> s.getStartTime().toString())
+                        .findFirst()
+                        .map(t -> "Cannot extend: there is a class scheduled at " + t + " in this room.")
+                        .orElse("Cannot extend: room is busy with a class schedule.");
+                throw new CustomException(ResponseCode.ROOM_IN_ACADEMIC_SCHEDULE, classTimeMsg);
+            }
+
             long totalMinutes = reservationRepository.getTotalReservedMinutesForUser(
                     user.getId(), newStartTime.toLocalDate());
 
@@ -225,6 +247,77 @@ public class ReservationServiceImpl implements ReservationService {
             log.error("Unexpected error during extending", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    @Override
+    public java.util.Map<String, Object> getMaxExtendHours(String reservationId, Authentication connectedUser) {
+        var reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+        var user = userRepository.findByEmail(connectedUser.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        if (!reservation.getUser().getId().equals(user.getId())) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        LocalDateTime currentEndTime = reservation.getEndTime();
+        String roomId = reservation.getRoom().getId();
+
+        // Find the next reservation for this room after current end time
+        var nextReservation = reservationRepository.findNextReservation(currentEndTime, roomId);
+
+        // Calculate how many minutes remain until midnight (cannot extend past midnight)
+        LocalDateTime midnight = currentEndTime.toLocalDate().atTime(23, 59, 59);
+        long minutesUntilMidnight = java.time.Duration.between(currentEndTime, midnight).toMinutes();
+
+        long maxMinutes = Math.min(minutesUntilMidnight, 8 * 60);
+        String nextBookingStartTime = null;
+        boolean isAcademicConstraint = false;
+
+        if (nextReservation.isPresent()) {
+            var next = nextReservation.get();
+            long minutesUntilNext = java.time.Duration.between(currentEndTime, next.getStartTime()).toMinutes();
+            if (minutesUntilNext < maxMinutes) {
+                maxMinutes = minutesUntilNext;
+                nextBookingStartTime = next.getStartTime().toString();
+            }
+        }
+
+        // Check academic schedule constraints
+        LocalDate extensionDate = currentEndTime.toLocalDate();
+        String dayOfWeek = extensionDate.getDayOfWeek().name();
+        var schedules = academicScheduleService.getSchedulesByRoomId(roomId);
+        for (var schedule : schedules) {
+            if (schedule.getFromDate().isAfter(extensionDate) || schedule.getToDate().isBefore(extensionDate)) {
+                continue;
+            }
+            boolean dayMatches = false;
+            for (String d : schedule.getDaysOfWeek().split(",")) {
+                if (d.trim().equalsIgnoreCase(dayOfWeek)) { dayMatches = true; break; }
+            }
+            if (!dayMatches) continue;
+
+            // Schedule must start AFTER currentEndTime to be a future constraint
+            LocalDateTime scheduleStartDT = extensionDate.atTime(schedule.getStartTime());
+            if (!scheduleStartDT.isAfter(currentEndTime)) continue;
+
+            long minutesUntilSchedule = java.time.Duration.between(currentEndTime, scheduleStartDT).toMinutes();
+            if (minutesUntilSchedule < maxMinutes) {
+                maxMinutes = minutesUntilSchedule;
+                nextBookingStartTime = schedule.getStartTime().toString() + " (class)";
+                isAcademicConstraint = true;
+            }
+        }
+
+        double maxHours = Math.floor(maxMinutes) / 60.0;
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("maxHours", Math.max(0, maxHours));
+        result.put("nextBookingStartTime", nextBookingStartTime);
+        result.put("currentEndTime", currentEndTime.toString());
+        result.put("isAcademicConstraint", isAcademicConstraint);
+        return result;
     }
 
     /**
@@ -556,8 +649,9 @@ public class ReservationServiceImpl implements ReservationService {
 
             // start add cancellation limit logic
             LocalDate today = LocalDate.now();
+            int currentCount = user.getCancellationCount() != null ? user.getCancellationCount() : 0;
             if (user.getLastCancellationDate() != null && user.getLastCancellationDate().isEqual(today)) {
-                user.setCancellationCount(user.getCancellationCount() + 1);
+                user.setCancellationCount(currentCount + 1);
             } else {
                 user.setCancellationCount(1);
                 user.setLastCancellationDate(today);
@@ -796,6 +890,7 @@ public class ReservationServiceImpl implements ReservationService {
                             .quantity(line.getQuantity())
                             .note(line.getNote())
                             .status(line.getStatus() != null ? line.getStatus().name() : ServiceItemStatus.PENDING.name())
+                            .createdAt(line.getCreatedAt() != null ? line.getCreatedAt().toString() : null)
                             .build())
                     .toList();
             // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng
@@ -842,6 +937,7 @@ public class ReservationServiceImpl implements ReservationService {
                         .quantity(line.getQuantity())
                         .note(line.getNote())
                         .status(line.getStatus() != null ? line.getStatus().name() : ServiceItemStatus.PENDING.name())
+                        .createdAt(line.getCreatedAt() == null ? null : line.getCreatedAt().toString())
                         .build())
                 .toList();
     }

@@ -41,6 +41,8 @@ public interface ReservationService {
 
         void extendReservation(String reservationId, double hour, Authentication connectedUser);
 
+        java.util.Map<String, Object> getMaxExtendHours(String reservationId, Authentication connectedUser);
+
         void returnRoom(String reservationId, Authentication authentication);
 
         ReservationDetailResponse getReservationDetail(String reservationId, Authentication authentication);

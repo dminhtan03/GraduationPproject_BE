@@ -46,6 +46,13 @@ public class ReservationController {
         return ResponseEntity.ok(Response.ofSucceeded("Reservation extend successfully"));
     }
 
+    @GetMapping("/extend/{id}/max")
+    public ResponseEntity<?> getMaxExtendHours(@PathVariable("id") String reservationId,
+                                               Authentication connectedUser) {
+        var result = reservationService.getMaxExtendHours(reservationId, connectedUser);
+        return ResponseEntity.ok(Response.ofSucceeded(result));
+    }
+
     @PutMapping("/return-room/{reservationId}")
     public ResponseEntity<?> returnRoom(@PathVariable String reservationId,
                                         Authentication authentication) {

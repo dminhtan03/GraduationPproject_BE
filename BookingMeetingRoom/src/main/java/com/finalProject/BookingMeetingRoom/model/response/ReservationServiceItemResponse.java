@@ -23,5 +23,6 @@ public class ReservationServiceItemResponse {
     // start+ chức năng service item status
     private String status;
     // end+ chức năng service item status
+    private String createdAt;
 }
 // end+ chức năng đặt thêm dịch vụ đi kèm khi đặt phòng (response)
