@@ -11,6 +11,7 @@ import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
+import com.finalProject.BookingMeetingRoom.model.response.RoomContextResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
 
 import com.finalProject.BookingMeetingRoom.model.entity.FloorDecoration;
@@ -22,6 +23,12 @@ public interface RoomService {
     Page<RoomSearchResponse> getRoomStatus(RoomSearchRequest request, int page, int size);
 
     RoomDetailResponse getRoomDetail(String roomId);
+
+    RoomSearchResponse findRoomByLocationCode(String locationCode);
+
+    RoomContextResponse getRoomContextByLocationCode(String locationCode);
+
+    RoomContextResponse getRoomContextByRoomId(String roomId);
 
     List<Amenity> getAllAmenities();
 

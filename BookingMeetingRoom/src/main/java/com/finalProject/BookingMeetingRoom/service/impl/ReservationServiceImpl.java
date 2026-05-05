@@ -148,6 +148,30 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
+    @Transactional
+    public void returnRoomByLocationCode(String locationCode, Authentication authentication) {
+        try {
+            var user = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            List<Reservation> reservations = reservationRepository.findActiveReservationsOfUserByRoomCode(
+                    user.getId(),
+                    locationCode,
+                    List.of(ReservationStatus.IN_USE));
+
+            if (reservations.isEmpty()) {
+                throw new CustomException(ResponseCode.RESERVATION_NOT_FOUND);
+            }
+
+            returnRoom(reservations.get(0).getId(), authentication);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during return by location code", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     /**
      * Extend a reservation for a specified number of hours.
      *
@@ -223,6 +247,30 @@ public class ReservationServiceImpl implements ReservationService {
             throw e;
         } catch (Exception e) {
             log.error("Unexpected error during extending", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Transactional
+    public void extendReservationByLocationCode(String locationCode, double hour, Authentication connectedUser) {
+        try {
+            var user = userRepository.findByEmail(connectedUser.getName())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            List<Reservation> reservations = reservationRepository.findActiveReservationsOfUserByRoomCode(
+                    user.getId(),
+                    locationCode,
+                    List.of(ReservationStatus.RESERVED, ReservationStatus.IN_USE));
+
+            if (reservations.isEmpty()) {
+                throw new CustomException(ResponseCode.RESERVATION_NOT_FOUND);
+            }
+
+            extendReservation(reservations.get(0).getId(), hour, connectedUser);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during extending by location code", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }
@@ -557,6 +605,30 @@ public class ReservationServiceImpl implements ReservationService {
             throw e;
         } catch (Exception e) {
             log.error("Unexpected error during cancelling", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Transactional
+    public void cancelReservationByLocationCode(String locationCode, String reason, Authentication connectedUser) {
+        try {
+            var user = userRepository.findByEmail(connectedUser.getName())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+            List<Reservation> reservations = reservationRepository.findActiveReservationsOfUserByRoomCode(
+                    user.getId(),
+                    locationCode,
+                    List.of(ReservationStatus.RESERVED));
+
+            if (reservations.isEmpty()) {
+                throw new CustomException(ResponseCode.RESERVATION_NOT_FOUND);
+            }
+
+            cancelReservation(reservations.get(0).getId(), reason, connectedUser);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during cancelling by location code", e);
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
         }
     }

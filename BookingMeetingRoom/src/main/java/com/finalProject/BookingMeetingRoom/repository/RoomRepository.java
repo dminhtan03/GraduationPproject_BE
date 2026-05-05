@@ -62,6 +62,9 @@ public interface RoomRepository extends JpaRepository<Room, String> {
         @EntityGraph(attributePaths = {"floor", "floor.building", "amenities"})
     Optional<Room> findByLocationCodeIgnoreCase(String locationCode);
 
+        @EntityGraph(attributePaths = {"floor", "floor.building"})
+        Optional<Room> findWithFloorAndBuildingById(String id);
+
     boolean existsByFloorIdAndLocationCode(String floorId, String locationCode);
     Optional<Room> findByLocationCode(String locationCode);
 

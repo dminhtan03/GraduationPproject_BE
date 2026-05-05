@@ -62,14 +62,7 @@ application:
   file:
     uploads:
       photos-output-path: ./uploads
-  ai:
-    llm:
-      enabled: true
-      base-url: https://api.openai.com/v1
-      model: gpt-4o-mini
-      api-key: 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
-      timeout-ms: 10000
-      quota-cooldown-ms: 5000
+
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -77,3 +70,12 @@ springdoc:
 redis:
   host: localhost
   port: 6379
+
+ai:
+  openai:
+    api-key: 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
+    model: gpt-4o-mini
+    base-url: https://api.openai.com/v1
+    timeout-ms: 30000
+    max-tokens: 200
+    response-max-tokens: 100

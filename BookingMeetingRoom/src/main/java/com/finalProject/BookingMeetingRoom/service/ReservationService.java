@@ -26,6 +26,8 @@ public interface ReservationService {
 
         void cancelReservation(String reservationId, String reason, Authentication connectedUser);
 
+        void cancelReservationByLocationCode(String locationCode, String reason, Authentication connectedUser);
+
         ReservationResponse reserveRoom(ReservationRequest request, Authentication connectedUser);
 
         Page<ReservationResponse> getAllReservations(int page, int size);
@@ -41,7 +43,11 @@ public interface ReservationService {
 
         void extendReservation(String reservationId, double hour, Authentication connectedUser);
 
+        void extendReservationByLocationCode(String locationCode, double hour, Authentication connectedUser);
+
         void returnRoom(String reservationId, Authentication authentication);
+
+        void returnRoomByLocationCode(String locationCode, Authentication authentication);
 
         ReservationDetailResponse getReservationDetail(String reservationId, Authentication authentication);
         

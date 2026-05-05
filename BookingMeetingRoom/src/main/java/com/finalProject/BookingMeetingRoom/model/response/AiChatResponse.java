@@ -1,6 +1,7 @@
 package com.finalProject.BookingMeetingRoom.model.response;
 
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
+import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,5 +19,6 @@ public class AiChatResponse {
     private List<RoomSearchResponse> suggestions; // suggested rooms if any
     private boolean reservationCreated;   // whether a reservation was created
     private ReservationResponse reservation; // info about created reservation
+    private RoomDetailResponse roomDetail; // structured room detail response
 }
 

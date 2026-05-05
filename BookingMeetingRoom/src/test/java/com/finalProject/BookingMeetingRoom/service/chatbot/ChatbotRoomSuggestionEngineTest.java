@@ -2,7 +2,6 @@ package com.finalProject.BookingMeetingRoom.service.chatbot;
 
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
-import com.finalProject.BookingMeetingRoom.service.impl.ChatbotRoomSuggestionEngine;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
