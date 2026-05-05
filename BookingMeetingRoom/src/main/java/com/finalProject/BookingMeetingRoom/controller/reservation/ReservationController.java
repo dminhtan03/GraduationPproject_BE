@@ -27,7 +27,7 @@ public class ReservationController {
     public ResponseEntity<?> checkIn(@PathVariable String reservationId,
             Authentication authentication) {
         reservationService.checkIn(reservationId, authentication);
-        return ResponseEntity.ok(Response.ofSucceeded("Check-in successful for reservation ID: " + reservationId));
+        return ResponseEntity.ok(Response.ofSucceeded("Check-in successful for reservation"));
     }
 
     @PutMapping("/cancel/{id}")
@@ -50,7 +50,7 @@ public class ReservationController {
     public ResponseEntity<?> returnRoom(@PathVariable String reservationId,
                                         Authentication authentication) {
         reservationService.returnRoom(reservationId, authentication);
-        return ResponseEntity.ok(Response.ofSucceeded("Room returned successfully for reservation ID: " + reservationId));
+        return ResponseEntity.ok(Response.ofSucceeded("Room returned successfully for reservation"));
     }
 
 

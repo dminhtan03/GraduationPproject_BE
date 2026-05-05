@@ -54,9 +54,11 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
     private final AcademicScheduleService academicScheduleService;
     private final ReservationHistoryService reservationHistoryService;
     private final RealTimeService realTimeService;
+    private final com.finalProject.BookingMeetingRoom.service.NotificationService notificationService;
 
     private boolean isAdmin(Authentication authentication) {
-        if (authentication == null || authentication.getAuthorities() == null) return false;
+        if (authentication == null || authentication.getAuthorities() == null)
+            return false;
         return authentication.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority()));
     }
@@ -68,7 +70,8 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         if (authentication == null || authentication.getName() == null) {
             throw new CustomException(ResponseCode.ACCESS_DENIED);
         }
-        if (isAdmin(authentication)) return;
+        if (isAdmin(authentication))
+            return;
         if (!series.getUser().getUsername().equalsIgnoreCase(authentication.getName())) {
             throw new CustomException(ResponseCode.PERMISSION_DENIED);
         }
@@ -98,7 +101,8 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
     }
 
     private Set<DayOfWeek> parseDaysOfWeek(String daysOfWeek) {
-        if (daysOfWeek == null || daysOfWeek.isBlank()) return Set.of();
+        if (daysOfWeek == null || daysOfWeek.isBlank())
+            return Set.of();
         return java.util.Arrays.stream(daysOfWeek.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
@@ -108,7 +112,8 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
     }
 
     private LocalDate resolveMaxSyncUntil(ReservationSeries series) {
-        int rollingWeeks = series.getRollingWindowWeeks() == null ? DEFAULT_ROLLING_WINDOW_WEEKS : series.getRollingWindowWeeks();
+        int rollingWeeks = series.getRollingWindowWeeks() == null ? DEFAULT_ROLLING_WINDOW_WEEKS
+                : series.getRollingWindowWeeks();
         LocalDate maxUntil = LocalDate.now().plusWeeks(Math.max(1, rollingWeeks));
         if (series.getUntilDate() != null && series.getUntilDate().isBefore(maxUntil)) {
             maxUntil = series.getUntilDate();
@@ -129,7 +134,8 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
 
     @Override
     @Transactional
-    public ReservationSeriesResponse createSeries(ReservationSeriesCreateRequest request, Authentication authentication) {
+    public ReservationSeriesResponse createSeries(ReservationSeriesCreateRequest request,
+            Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
         Room room = roomRepository.findById(request.getRoomId())
@@ -155,7 +161,17 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
             throw new CustomException(ResponseCode.VALIDATION_FAILED, "fromDate must be <= untilDate");
         }
 
-        // start+ validate conflict trước khi tạo series — nếu bất kỳ slot nào bị trùng thì reject toàn bộ
+        // start+ giới hạn 1 recurring series active per user
+        boolean hasActiveSeries = reservationSeriesRepository.findByStatus(ReservationSeriesStatus.ACTIVE).stream()
+                .anyMatch(s -> s.getUser() != null && s.getUser().getId().equals(user.getId()));
+        if (hasActiveSeries) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED,
+                    "You already have an active recurring booking series. Please cancel it before creating a new one.");
+        }
+        // end+ giới hạn 1 recurring series active per user
+
+        // start+ validate conflict trước khi tạo series — nếu bất kỳ slot nào bị trùng
+        // thì reject toàn bộ
         validateNoConflictsBeforeCreate(request, user, room);
         // end+ validate conflict
 
@@ -170,7 +186,8 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         series.setNote(request.getNote());
         series.setFromDate(request.getFromDate());
         series.setUntilDate(request.getUntilDate());
-        series.setRollingWindowWeeks(request.getRollingWindowWeeks() == null ? DEFAULT_ROLLING_WINDOW_WEEKS : request.getRollingWindowWeeks());
+        series.setRollingWindowWeeks(request.getRollingWindowWeeks() == null ? DEFAULT_ROLLING_WINDOW_WEEKS
+                : request.getRollingWindowWeeks());
         series.setStatus(ReservationSeriesStatus.ACTIVE);
         series.setLastSyncUntil(null);
         series.setCreatedAt(LocalDateTime.now());
@@ -196,25 +213,62 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
 
     @Override
     @Transactional
-    public void cancelSeries(String seriesId, Authentication authentication) {
+    public void cancelSeries(String seriesId, String reason, Authentication authentication) {
         ReservationSeries series = reservationSeriesRepository.findById(seriesId)
                 .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Series not found"));
         assertOwnerOrAdmin(series, authentication);
 
-        series.setStatus(ReservationSeriesStatus.CANCELLED);
+        boolean isAdm = isAdmin(authentication);
+        if (isAdm && (reason == null || reason.isBlank())) {
+            throw new CustomException(ResponseCode.VALIDATION_FAILED, "Admin must provide a reason for cancellation");
+        }
+
+        if (reason != null && !reason.isBlank()) {
+            if (reason.length() < 5 || reason.length() > 255) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED,
+                        "Reason must be between 5 and 255 characters");
+            }
+        }
+
+        if (!isAdm) {
+            var user = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+            LocalDate today = LocalDate.now();
+            if (user.getLastCancellationDate() != null && user.getLastCancellationDate().isEqual(today)) {
+                user.setCancellationCount(user.getCancellationCount() + 1);
+            } else {
+                user.setCancellationCount(1);
+                user.setLastCancellationDate(today);
+            }
+            if (user.getCancellationCount() >= 3) {
+                user.setBookingLockedUntil(LocalDateTime.now().plusHours(24));
+                notificationService.noticeUserLocked(user, user.getBookingLockedUntil());
+            }
+            userRepository.save(user);
+        }
+
+        series.setStatus(isAdm ? ReservationSeriesStatus.FORCE_CANCELLED : ReservationSeriesStatus.CANCELLED);
         series.setUpdatedAt(LocalDateTime.now());
         reservationSeriesRepository.save(series);
 
-        List<Reservation> futureReservations = reservationRepository.findBySeriesIdAndStartTimeAfter(seriesId, LocalDateTime.now());
+        List<Reservation> futureReservations = reservationRepository.findBySeriesIdAndStartTimeAfter(seriesId,
+                LocalDateTime.now());
         for (Reservation reservation : futureReservations) {
-            if (reservation.getStatus() == ReservationStatus.RESERVED || reservation.getStatus() == ReservationStatus.PENDING) {
-                reservation.setStatus(ReservationStatus.CANCELLED);
-                reservation.setReason("Cancelled due to recurring series cancellation.");
+            if (reservation.getStatus() == ReservationStatus.RESERVED
+                    || reservation.getStatus() == ReservationStatus.PENDING) {
+                reservation.setStatus(isAdm ? ReservationStatus.FORCE_CANCELLED : ReservationStatus.CANCELLED);
+                reservation.setReason((reason != null && !reason.isBlank()) ? reason
+                        : "Cancelled due to recurring series cancellation.");
                 reservation.setCancelBy(authentication != null ? authentication.getName() : null);
                 reservation.setUpdatedAt(LocalDateTime.now());
                 reservationRepository.save(reservation);
                 realTimeService.deleteReservation(reservation);
             }
+        }
+
+        // If admin is cancelling, send notification to the user
+        if (isAdmin(authentication)) {
+            notificationService.noticeCancelSeries(series, reason);
         }
     }
 
@@ -241,17 +295,21 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
     }
 
     private void syncSeries(ReservationSeries series) {
-        if (series.getStatus() != ReservationSeriesStatus.ACTIVE) return;
+        if (series.getStatus() != ReservationSeriesStatus.ACTIVE)
+            return;
 
         Set<DayOfWeek> targetDays = parseDaysOfWeek(series.getDaysOfWeek());
-        if (targetDays.isEmpty()) return;
+        if (targetDays.isEmpty())
+            return;
 
         LocalDate maxUntil = resolveMaxSyncUntil(series);
-        LocalDate cursor = series.getLastSyncUntil() != null ? series.getLastSyncUntil().plusDays(1) : series.getFromDate();
+        LocalDate cursor = series.getLastSyncUntil() != null ? series.getLastSyncUntil().plusDays(1)
+                : series.getFromDate();
         if (cursor.isBefore(series.getFromDate())) {
             cursor = series.getFromDate();
         }
-        if (cursor.isAfter(maxUntil)) return;
+        if (cursor.isAfter(maxUntil))
+            return;
 
         while (!cursor.isAfter(maxUntil)) {
             if (targetDays.contains(cursor.getDayOfWeek())) {
@@ -267,7 +325,8 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         reservationSeriesRepository.save(series);
     }
 
-    // start+ validate conflict trước khi tạo series (room reservations + academic schedule)
+    // start+ validate conflict trước khi tạo series (room reservations + academic
+    // schedule)
     private void validateNoConflictsBeforeCreate(ReservationSeriesCreateRequest request, User user, Room room) {
         Set<DayOfWeek> targetDays = request.getDaysOfWeek().stream()
                 .map(String::trim).map(String::toUpperCase)
@@ -291,17 +350,18 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         while (!cursor.isAfter(maxUntil)) {
             if (targetDays.contains(cursor.getDayOfWeek())) {
                 LocalDateTime startTime = cursor.atTime(request.getStartTimeOfDay());
-                LocalDateTime endTime = buildEndDateTime(cursor, request.getStartTimeOfDay(), request.getEndTimeOfDay());
+                LocalDateTime endTime = buildEndDateTime(cursor, request.getStartTimeOfDay(),
+                        request.getEndTimeOfDay());
 
                 // start+ check lịch học cố định (academic schedule)
                 if (academicScheduleService.isRoomBusyWithLearning(room.getId(), startTime, endTime)) {
                     throw new CustomException(ResponseCode.ROOM_IN_ACADEMIC_SCHEDULE,
                             "Phòng " + room.getLocationCode()
-                            + " có lịch học cố định vào " + cursor.getDayOfWeek().toString()
-                            + " ngày " + cursor.format(dateFmt)
-                            + " lúc " + request.getStartTimeOfDay().format(timeFmt)
-                            + " - " + request.getEndTimeOfDay().format(timeFmt)
-                            + ". Không thể tạo lịch định kỳ trùng với lịch học cố định.");
+                                    + " có lịch học cố định vào " + cursor.getDayOfWeek().toString()
+                                    + " ngày " + cursor.format(dateFmt)
+                                    + " lúc " + request.getStartTimeOfDay().format(timeFmt)
+                                    + " - " + request.getEndTimeOfDay().format(timeFmt)
+                                    + ". Không thể tạo lịch định kỳ trùng với lịch học cố định.");
                 }
                 // end+ check lịch học cố định
 
@@ -314,11 +374,11 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
                             + " - " + existing.getEndTime().format(timeFmt);
                     throw new CustomException(ResponseCode.CANNOT_RESERVE_ROOM,
                             "Phòng " + room.getLocationCode()
-                            + " đã có lịch đặt vào " + cursor.getDayOfWeek().toString()
-                            + " ngày " + cursor.format(dateFmt)
-                            + " lúc " + existingTime
-                            + ". Không thể tạo lịch định kỳ " + request.getStartTimeOfDay().format(timeFmt)
-                            + " - " + request.getEndTimeOfDay().format(timeFmt) + " bị trùng.");
+                                    + " đã có lịch đặt vào " + cursor.getDayOfWeek().toString()
+                                    + " ngày " + cursor.format(dateFmt)
+                                    + " lúc " + existingTime
+                                    + ". Không thể tạo lịch định kỳ " + request.getStartTimeOfDay().format(timeFmt)
+                                    + " - " + request.getEndTimeOfDay().format(timeFmt) + " bị trùng.");
                 }
 
                 // Kiểm tra user đã có lịch trùng giờ chưa
@@ -330,9 +390,9 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
                 if (!userConflicts.isEmpty()) {
                     throw new CustomException(ResponseCode.USER_TIME_OVERLAP,
                             "Bạn đã có lịch đặt phòng khác vào ngày " + cursor.format(dateFmt)
-                            + " lúc " + request.getStartTimeOfDay().format(timeFmt)
-                            + " - " + request.getEndTimeOfDay().format(timeFmt)
-                            + ". Vui lòng chọn khung giờ khác.");
+                                    + " lúc " + request.getStartTimeOfDay().format(timeFmt)
+                                    + " - " + request.getEndTimeOfDay().format(timeFmt)
+                                    + ". Vui lòng chọn khung giờ khác.");
                 }
             }
             cursor = cursor.plusDays(1);
@@ -353,8 +413,10 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
     // start+ chức năng xem trước lịch đặt định kỳ (preview trước khi tạo series)
     @Override
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public List<ReservationSeriesPreviewItem> previewSeries(ReservationSeriesCreateRequest request, Authentication authentication) {
-        com.finalProject.BookingMeetingRoom.model.entity.User user = userRepository.findByEmail(authentication.getName())
+    public List<ReservationSeriesPreviewItem> previewSeries(ReservationSeriesCreateRequest request,
+            Authentication authentication) {
+        com.finalProject.BookingMeetingRoom.model.entity.User user = userRepository
+                .findByEmail(authentication.getName())
                 .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
         com.finalProject.BookingMeetingRoom.model.entity.Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new CustomException(ResponseCode.ROOM_NOT_FOUND));
@@ -368,7 +430,8 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
                 .map(DayOfWeek::valueOf)
                 .collect(Collectors.toSet());
 
-        int rollingWeeks = request.getRollingWindowWeeks() == null ? DEFAULT_ROLLING_WINDOW_WEEKS : request.getRollingWindowWeeks();
+        int rollingWeeks = request.getRollingWindowWeeks() == null ? DEFAULT_ROLLING_WINDOW_WEEKS
+                : request.getRollingWindowWeeks();
         LocalDate maxUntil = LocalDate.now().plusWeeks(Math.max(1, rollingWeeks));
         if (request.getUntilDate() != null && request.getUntilDate().isBefore(maxUntil)) {
             maxUntil = request.getUntilDate();
@@ -388,9 +451,10 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
                 boolean canBook = true;
                 String conflictReason = null;
 
-                List<com.finalProject.BookingMeetingRoom.model.entity.Reservation> userOverlap =
-                        reservationRepository.checkOverlapByUser(user.getId(), startTime, endTime,
-                                List.of(ReservationStatus.IN_USE.name(), ReservationStatus.RESERVED.name(), ReservationStatus.PENDING.name()));
+                List<com.finalProject.BookingMeetingRoom.model.entity.Reservation> userOverlap = reservationRepository
+                        .checkOverlapByUser(user.getId(), startTime, endTime,
+                                List.of(ReservationStatus.IN_USE.name(), ReservationStatus.RESERVED.name(),
+                                        ReservationStatus.PENDING.name()));
                 if (!userOverlap.isEmpty()) {
                     canBook = false;
                     conflictReason = "USER_CONFLICT";
@@ -400,7 +464,9 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
                     boolean roomConflict = reservationRepository
                             .checkOverlappingReservationsByRoom(room.getId(), startTime, endTime)
                             .stream()
-                            .anyMatch(r -> Set.of(ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING).contains(r.getStatus()));
+                            .anyMatch(r -> Set
+                                    .of(ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING)
+                                    .contains(r.getStatus()));
                     if (roomConflict) {
                         canBook = false;
                         conflictReason = "ROOM_CONFLICT";
@@ -443,11 +509,13 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
         }
 
         // start+ fix overlap check: dùng JPQL thay native query
-        // Lý do: native query KHÔNG trigger Hibernate auto-flush → bỏ sót reservation vừa save trong cùng transaction
+        // Lý do: native query KHÔNG trigger Hibernate auto-flush → bỏ sót reservation
+        // vừa save trong cùng transaction
         final Set<ReservationStatus> activeStatuses = Set.of(
                 ReservationStatus.IN_USE, ReservationStatus.RESERVED, ReservationStatus.PENDING);
 
-        // Kiểm tra user trùng giờ (native query vẫn dùng được vì chỉ cần thấy data đã commit)
+        // Kiểm tra user trùng giờ (native query vẫn dùng được vì chỉ cần thấy data đã
+        // commit)
         List<Reservation> overlapByUser = reservationRepository.checkOverlapByUser(
                 user.getId(), startTime, endTime,
                 List.of(ReservationStatus.IN_USE.name(),
@@ -457,7 +525,8 @@ public class ReservationSeriesServiceImpl implements ReservationSeriesService {
             return;
         }
 
-        // Kiểm tra phòng trùng giờ — dùng JPQL để Hibernate auto-flush pending saves trước khi query
+        // Kiểm tra phòng trùng giờ — dùng JPQL để Hibernate auto-flush pending saves
+        // trước khi query
         // → đảm bảo thấy cả các reservation vừa saveAndFlush trong cùng syncSeries call
         boolean conflict = !reservationRepository.findActiveOverlappingReservationsByRoom(
                 room.getId(), startTime, endTime, activeStatuses).isEmpty();

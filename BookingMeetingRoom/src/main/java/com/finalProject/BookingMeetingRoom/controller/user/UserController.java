@@ -1,8 +1,13 @@
 package com.finalProject.BookingMeetingRoom.controller.user;
 
+import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.model.entity.UserInfo;
 import com.finalProject.BookingMeetingRoom.model.request.*;
 import com.finalProject.BookingMeetingRoom.model.request.UpdateUserInfoRequest;
+import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.UserService;
 // start add multipart import
 import org.springframework.web.multipart.MultipartFile;
@@ -12,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/user")
@@ -19,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final UserRepository userRepository;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegistrationRequest request) {
@@ -87,5 +94,19 @@ public class UserController {
 //    public ResponseEntity<?> getAllUser() {
 //        return ResponseEntity.ok(userService.getAllUser());
 //    }
+
+    // start+ check email exists (dùng khi invite participant trước khi tạo event)
+    @GetMapping("/check-email")
+    public ResponseEntity<?> checkEmailExists(@RequestParam String email) {
+        User user = userRepository.findByEmail(email.trim())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND,
+                        "No account found with email: " + email.trim()));
+        UserInfo info = user.getUserInfo();
+        return ResponseEntity.ok(Response.ofSucceeded(Map.of(
+                "email",    info != null && info.getEmail() != null ? info.getEmail() : email.trim(),
+                "fullName", info != null && info.getFullName() != null ? info.getFullName() : ""
+        )));
+    }
+    // end+ check email exists
 
 }

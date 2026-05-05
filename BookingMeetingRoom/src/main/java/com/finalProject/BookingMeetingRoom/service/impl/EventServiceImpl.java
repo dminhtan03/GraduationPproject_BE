@@ -40,6 +40,7 @@ import org.springframework.data.domain.Sort;
 // start+ chức năng đặt phòng theo sự kiện (invite-only participants + check-in list)
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class EventServiceImpl implements EventService {
 
     private final EventRepository eventRepository;
@@ -332,18 +333,41 @@ public class EventServiceImpl implements EventService {
     public void removeParticipant(String participantId, Authentication authentication) {
         EventParticipant participant = eventParticipantRepository.findById(participantId)
                 .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Participant not found"));
-        assertOwnerOrAdmin(participant.getEvent().getReservation(), authentication);
-        recordHistory(
-                participant,
-                "REMOVED",
-                participant.getInviteStatus(),
-                null,
-                participant.getCheckInStatus(),
-                null,
-                "Removed participant from event",
-                authentication
-        );
+
+        Event event = participant.getEvent();
+        Reservation reservation = event != null ? event.getReservation() : null;
+        assertOwnerOrAdmin(reservation, authentication);
+
+        // Block removal if event is COMPLETED (reservation finished)
+        if (reservation != null && reservation.getStatus() != null) {
+            com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus rs = reservation.getStatus();
+            if (rs == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.COMPLETED
+                    || rs == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.FORCE_CANCELLED
+                    || rs == com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus.NO_SHOW) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED,
+                        "Cannot remove participant after the event has ended.");
+            }
+        }
+
+        // Collect info before deletion for notification
+        String removedUserId  = participant.getUser() != null ? participant.getUser().getId() : null;
+        String eventTitle     = event != null ? event.getTitle() : "Event";
+        String reservationId  = reservation != null ? reservation.getId() : null;
+
+        // Fix: delete history records first to avoid FK constraint (TransientObjectException)
+        eventParticipantStatusHistoryRepository.deleteAllByParticipant_Id(participantId);
+
+        // Now safely delete the participant
         eventParticipantRepository.delete(participant);
+
+        // Notify removed participant
+        if (removedUserId != null) {
+            try {
+                notificationService.notifyUserRemovedFromEvent(removedUserId, eventTitle, reservationId);
+            } catch (Exception e) {
+                log.warn("Failed to notify removed participant: {}", e.getMessage());
+            }
+        }
     }
 
     // start+ chức năng đặt phòng theo sự kiện (người tham gia chấp nhận / từ chối)

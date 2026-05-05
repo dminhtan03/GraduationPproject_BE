@@ -354,6 +354,31 @@ public class ReservationServiceImpl implements ReservationService {
             }
             // end add check for booking lock
 
+            // start+ giới hạn 1 booking active per user per DAY
+            // Rule: trong cùng 1 ngày, mỗi user chỉ được có 1 booking đang hoạt động.
+            // Nếu booking ngày khác thì vẫn cho phép đặt bình thường.
+            java.time.LocalDate requestedDate = request.getStartTime().toLocalDate();
+            List<Reservation> activeBookingsSameDay = reservationRepository.findActiveReservationsOfUser(
+                    user.getId(),
+                    List.of(ReservationStatus.RESERVED, ReservationStatus.IN_USE, ReservationStatus.PENDING))
+                    .stream()
+                    .filter(r -> r.getSeriesId() == null) // bỏ qua recurring — có rule riêng
+                    .filter(r -> r.getStartTime() != null
+                            && r.getStartTime().toLocalDate().equals(requestedDate))
+                    .toList();
+            if (!activeBookingsSameDay.isEmpty()) {
+                Reservation existing = activeBookingsSameDay.get(0);
+                String roomCode = existing.getRoom() != null ? existing.getRoom().getLocationCode() : "unknown";
+                String timeSlot = existing.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm"))
+                        + " - " + existing.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+                throw new CustomException(ResponseCode.VALIDATION_FAILED,
+                        "You already have an active booking for room " + roomCode
+                        + " on " + requestedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                        + " (" + timeSlot + "). "
+                        + "Please complete or cancel it before booking another room on the same day.");
+            }
+            // end+ giới hạn 1 booking active per user per day
+
             var startTime = request.getStartTime();
             var endTime = request.getEndTime();
 
@@ -588,6 +613,7 @@ public class ReservationServiceImpl implements ReservationService {
 
             if (user.getCancellationCount() >= 3) {
                 user.setBookingLockedUntil(LocalDateTime.now().plusHours(24));
+                notificationService.noticeUserLocked(user, user.getBookingLockedUntil());
             }
             userRepository.save(user);
             // end add cancellation limit logic
@@ -663,7 +689,7 @@ public class ReservationServiceImpl implements ReservationService {
             List<Reservation> listReservationForceReturned = new ArrayList<>();
 
             // Update reservation status to cancelled
-            reservation.setStatus(ReservationStatus.CANCELLED);
+            reservation.setStatus(ReservationStatus.FORCE_CANCELLED);
             reservation.setReason(reason);
             reservation.setCancelBy(admin.getEmail()); // Save admin email
             reservation.setUpdatedAt(LocalDateTime.now());

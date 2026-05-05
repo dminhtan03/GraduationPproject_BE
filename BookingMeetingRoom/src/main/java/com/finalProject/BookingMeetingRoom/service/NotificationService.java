@@ -47,6 +47,12 @@ public interface NotificationService {
     /** Notify the reservation owner when admin changes a service item status. */
     void notifyUserServiceStatusChanged(String userId, String serviceName,
                                         String newStatus, String reason, String reservationId);
-    // end+ service item notifications
 
+    /** Notify a participant that they have been removed from an event. */
+    void notifyUserRemovedFromEvent(String userId, String eventTitle, String reservationId);
+    // end+ service item notifications
+    
+    void noticeCancelSeries(com.finalProject.BookingMeetingRoom.model.entity.ReservationSeries series, String reason);
+
+    void noticeUserLocked(com.finalProject.BookingMeetingRoom.model.entity.User user, java.time.LocalDateTime lockedUntil);
 }

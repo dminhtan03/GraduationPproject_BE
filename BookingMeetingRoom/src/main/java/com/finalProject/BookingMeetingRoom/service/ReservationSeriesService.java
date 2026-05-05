@@ -12,7 +12,7 @@ import com.finalProject.BookingMeetingRoom.model.response.ReservationSeriesRespo
 public interface ReservationSeriesService {
     ReservationSeriesResponse createSeries(ReservationSeriesCreateRequest request, Authentication authentication);
     List<ReservationSeriesResponse> getMySeries(Authentication authentication);
-    void cancelSeries(String seriesId, Authentication authentication);
+    void cancelSeries(String seriesId, String reason, Authentication authentication);
     void syncSeriesNow(String seriesId, Authentication authentication);
     // start+ chức năng xem trước lịch đặt định kỳ
     List<ReservationSeriesPreviewItem> previewSeries(ReservationSeriesCreateRequest request, Authentication authentication);
