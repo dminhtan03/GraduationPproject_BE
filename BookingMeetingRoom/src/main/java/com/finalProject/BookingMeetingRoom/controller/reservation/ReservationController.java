@@ -53,6 +53,13 @@ public class ReservationController {
         return ResponseEntity.ok(Response.ofSucceeded(result));
     }
 
+    @PutMapping("/confirm-pay/{reservationId}")
+    public ResponseEntity<?> confirmPay(@PathVariable String reservationId,
+                                        Authentication authentication) {
+        reservationService.confirmPay(reservationId, authentication);
+        return ResponseEntity.ok(Response.ofSucceeded("Payment confirmed successfully"));
+    }
+
     @PutMapping("/return-room/{reservationId}")
     public ResponseEntity<?> returnRoom(@PathVariable String reservationId,
                                         Authentication authentication) {

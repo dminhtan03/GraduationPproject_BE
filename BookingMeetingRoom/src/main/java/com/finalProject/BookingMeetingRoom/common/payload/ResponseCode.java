@@ -75,6 +75,10 @@ public enum ResponseCode {
 
     USER_TIME_OVERLAP("USR_409", "User has already reserved a ROOM at this time", HttpStatus.CONFLICT),
 
+    // ======= Payment Errors =======
+    SERVICE_LOCKED_UNPAID("PAY_403", "You have an unpaid service bill. Please complete payment before ordering new services.", HttpStatus.FORBIDDEN),
+    RESERVATION_NOT_PAYING("PAY_400", "This reservation is not in PAYING status", HttpStatus.BAD_REQUEST),
+
     // ======= Notification Errors =======
     NOTIFICATION_NOT_FOUND("NOTI_404", "Notification not found", HttpStatus.NOT_FOUND),
 

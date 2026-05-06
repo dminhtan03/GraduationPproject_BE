@@ -378,4 +378,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
   // end+ fix overlap check cho recurring series
   // end+ chức năng đặt phòng lặp lại (Reservation Series)
 
+  // Payment reminder: find PAYING reservations whose returnTime is older than given time
+  @Query("SELECT r FROM Reservation r WHERE r.status = 'PAYING' AND r.returnTime <= :before")
+  List<Reservation> findPayingReservationsOlderThan(@Param("before") LocalDateTime before);
+
 }

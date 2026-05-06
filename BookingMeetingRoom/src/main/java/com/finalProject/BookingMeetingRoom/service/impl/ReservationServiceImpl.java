@@ -126,10 +126,36 @@ public class ReservationServiceImpl implements ReservationService {
             }
             List<Reservation> listReservationReturnRoom = new ArrayList<>();
 
-            reservation.setStatus(ReservationStatus.COMPLETED);
-            reservation.setReturnTime(LocalDateTime.now());
-            reservation.setUpdatedAt(LocalDateTime.now());
-            reservationRepository.save(reservation);
+            // Check if this is an event booking with DONE service items that have a price
+            boolean isEventBooking = eventRepository.findByReservation_Id(reservationId).isPresent();
+            boolean hasPendingBill = false;
+            if (isEventBooking) {
+                hasPendingBill = reservationServiceItemRepository
+                        .findByReservation_Id(reservationId)
+                        .stream()
+                        .anyMatch(item ->
+                                item.getStatus() == com.finalProject.BookingMeetingRoom.common.enums.ServiceItemStatus.DONE
+                                && item.getPriceSnapshot() != null
+                                && item.getPriceSnapshot() > 0);
+            }
+
+            if (isEventBooking && hasPendingBill) {
+                // Set PAYING status instead of COMPLETED
+                reservation.setStatus(ReservationStatus.PAYING);
+                reservation.setReturnTime(LocalDateTime.now());
+                reservation.setUpdatedAt(LocalDateTime.now());
+                reservationRepository.save(reservation);
+
+                // Mark user as NO_PAY
+                var user = reservation.getUser();
+                user.setStatusPay(com.finalProject.BookingMeetingRoom.common.enums.PaymentStatus.NO_PAY);
+                userRepository.save(user);
+            } else {
+                reservation.setStatus(ReservationStatus.COMPLETED);
+                reservation.setReturnTime(LocalDateTime.now());
+                reservation.setUpdatedAt(LocalDateTime.now());
+                reservationRepository.save(reservation);
+            }
 
             room.setStatus(RoomStatus.AVAILABLE);
             roomRepository.save(room);
@@ -738,6 +764,43 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
+    @Override
+    @Transactional
+    public void confirmPay(String reservationId, Authentication adminUser) {
+        var reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new CustomException(ResponseCode.RESERVATION_NOT_FOUND));
+
+        if (reservation.getStatus() != ReservationStatus.PAYING) {
+            throw new CustomException(ResponseCode.RESERVATION_NOT_PAYING);
+        }
+
+        reservation.setStatus(ReservationStatus.COMPLETED);
+        reservation.setUpdatedAt(LocalDateTime.now());
+        reservationRepository.save(reservation);
+
+        // Unlock user's service ordering
+        var user = reservation.getUser();
+        if (user != null) {
+            user.setStatusPay(com.finalProject.BookingMeetingRoom.common.enums.PaymentStatus.PAID);
+            userRepository.save(user);
+        }
+
+        // Notify user payment confirmed
+        try {
+            if (user != null && user.getUserInfo() != null && user.getUserInfo().getEmail() != null) {
+                String fullName = ((user.getUserInfo().getFirstName() != null ? user.getUserInfo().getFirstName() : "") +
+                        " " + (user.getUserInfo().getLastName() != null ? user.getUserInfo().getLastName() : "")).trim();
+                var notifReq = new com.finalProject.BookingMeetingRoom.model.request.NotificationRequest();
+                notifReq.setUserId(user.getId());
+                notifReq.setTitle("Payment Confirmed");
+                notifReq.setContent("Your payment for reservation has been confirmed. Service ordering is now unlocked. Thank you!");
+                emailService.sendEmailStatusReservation(notifReq);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send payment confirmation email: {}", e.getMessage());
+        }
+    }
+
      /**
      * Get the reservation timeline for a specific reservation ID.
      *
@@ -953,6 +1016,12 @@ public class ReservationServiceImpl implements ReservationService {
 
         if (!isAdmin(authentication) && !reservation.getUser().getId().equals(currentUser.getId())) {
             throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+
+        // Block service ordering if user has unpaid bill
+        if (!isAdmin(authentication)
+                && currentUser.getStatusPay() == com.finalProject.BookingMeetingRoom.common.enums.PaymentStatus.NO_PAY) {
+            throw new CustomException(ResponseCode.SERVICE_LOCKED_UNPAID);
         }
 
         // start+ chức năng bảo toàn lịch sử: chỉ xóa dòng chưa hoàn thành, giữ lại DONE/CANCELLED

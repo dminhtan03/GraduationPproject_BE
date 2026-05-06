@@ -71,6 +71,12 @@ public class User implements UserDetails {
     @JsonManagedReference
     private List<Reservation> reservations;
 
+    // start add payment status
+    @Column(name = "STATUS_PAY")
+    @Enumerated(EnumType.STRING)
+    private com.finalProject.BookingMeetingRoom.common.enums.PaymentStatus statusPay;
+    // end add payment status
+
     // start add cancellation tracking fields
     @Column(name = "booking_locked_until")
     private LocalDateTime bookingLockedUntil;

@@ -38,6 +38,7 @@ public class BatchServiceImpl {
     private final NotificationService notificationService;
     private final RealTimeService realTimeService;
     private final ReservationHistoryService reservationHistoryService;
+    private final com.finalProject.BookingMeetingRoom.service.EmailService emailService;
 
     /**
      * Scheduled job to update user statuses and process reservations.
@@ -235,7 +236,6 @@ public class BatchServiceImpl {
 
     /**
      * Count the number of reservations made by each user today.
-     *
      * @param pendingReservations A list of pending reservations to check.
      * @return A map where the key is the user ID and the value is the count of reservations made today.
      */
@@ -264,7 +264,6 @@ public class BatchServiceImpl {
     /**
      * Get existing reservations by user IDs.
      * This method retrieves all reservations for the given user IDs that are either RESERVED or IN_USE.
-     *
      * @param userIds Set of user IDs to check for existing reservations.
      * @return A map where the key is the user ID and the value is a list of reservations for that user.
      */
@@ -290,7 +289,6 @@ public class BatchServiceImpl {
     /**
      * Get existing reservations by room IDs.
      * This method retrieves all reservations for the given room IDs that are either RESERVED or IN_USE.
-     *
      * @param roomIds Set of room IDs to check for existing reservations.
      * @return A map where the key is the room ID and the value is a list of reservations for that room.
      */
@@ -344,5 +342,38 @@ public class BatchServiceImpl {
     private boolean isOverlapping(LocalDateTime start1, LocalDateTime end1,
                                   LocalDateTime start2, LocalDateTime end2) {
         return start1.isBefore(end2) && end1.isAfter(start2);
+    }
+
+    // ── Payment reminder: runs every minute, sends email if PAYING > 5 minutes ──
+    @Scheduled(cron = "0 */1 * * * *")
+    @jakarta.transaction.Transactional
+    public void remindUnpaidCheckouts() {
+        try {
+            LocalDateTime fiveMinutesAgo = LocalDateTime.now().minusMinutes(5);
+            var payingReservations = reservationRepository.findPayingReservationsOlderThan(fiveMinutesAgo);
+            for (var reservation : payingReservations) {
+                var user = reservation.getUser();
+                if (user == null || user.getUserInfo() == null || user.getUserInfo().getEmail() == null) continue;
+
+                if (reservation.getUpdatedAt() != null
+                        && reservation.getUpdatedAt().isAfter(LocalDateTime.now().minusMinutes(4))) {
+                    continue;
+                }
+                var notifReq = new com.finalProject.BookingMeetingRoom.model.request.NotificationRequest();
+                notifReq.setUserId(user.getId());
+                notifReq.setTitle("Payment Reminder");
+                notifReq.setContent("You have an outstanding payment for your event room booking. Please proceed to the lobby to complete your payment.");
+                try {
+                    emailService.sendEmailStatusReservation(notifReq);
+                    // Update updatedAt to prevent re-sending every minute
+                    reservation.setUpdatedAt(LocalDateTime.now());
+                    reservationRepository.save(reservation);
+                } catch (Exception e) {
+                    log.warn("Failed to send payment reminder email to user {}: {}", user.getId(), e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error in payment reminder job: {}", e.getMessage(), e);
+        }
     }
 }

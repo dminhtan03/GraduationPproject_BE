@@ -49,6 +49,8 @@ public interface ReservationService {
         
         void forceCancelReservation(String reservationId, String reason, Authentication adminUser);
 
+        void confirmPay(String reservationId, Authentication adminUser);
+
         // start+ chức năng sự kiện (gọi thêm dịch vụ/tiện ích trong lúc diễn ra)
         List<ReservationServiceItemResponse> getReservationServiceItems(String reservationId, Authentication authentication);
         void updateReservationServiceItems(String reservationId, ReservationServiceItemsUpdateRequest request, Authentication authentication);
