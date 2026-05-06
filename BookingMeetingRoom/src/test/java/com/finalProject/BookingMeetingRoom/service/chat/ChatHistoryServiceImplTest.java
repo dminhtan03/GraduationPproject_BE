@@ -1,6 +1,5 @@
 package com.finalProject.BookingMeetingRoom.service.chat;
 
-import com.finalProject.BookingMeetingRoom.service.impl.ChatHistoryServiceImpl;
 import com.finalProject.BookingMeetingRoom.common.enums.SenderType;
 import com.finalProject.BookingMeetingRoom.common.exception.CustomException;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
@@ -29,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
