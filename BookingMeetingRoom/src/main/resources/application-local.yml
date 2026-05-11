@@ -1,9 +1,11 @@
 cloudinary:
   cloud-name: ds8upcxgo
-  api-key: 612812197984693
-  api-secret: GpJ8xqq_Hw1m4PHaq3MlfaWiI4s
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
 
 spring:
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     url: jdbc:mysql://localhost:3307/finalproject
     username: appuser
@@ -67,7 +69,7 @@ application:
       enabled: true
       base-url: https://api.openai.com/v1
       model: gpt-4o-mini
-      api-key: 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
+      api-key: ${AI_LLM_API_KEY}
       timeout-ms: 10000
       quota-cooldown-ms: 5000
 springdoc:
