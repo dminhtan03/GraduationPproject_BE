@@ -5,6 +5,7 @@ import com.finalProject.BookingMeetingRoom.model.response.AiChatResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.ChatHistoryService;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
 import org.junit.jupiter.api.Test;
