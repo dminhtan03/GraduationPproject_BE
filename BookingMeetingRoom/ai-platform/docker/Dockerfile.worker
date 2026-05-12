@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# ffmpeg required for audio preprocessing
+# RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# TODO: Replace with Celery worker command when queue is implemented
+CMD ["python", "-m", "scripts.run_meeting_pipeline", "--help"]

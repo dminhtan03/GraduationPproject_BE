@@ -15,7 +15,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.finalProject.BookingMeetingRoom.common.payload.FieldViolation;
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -28,6 +30,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Response<Void>> handleGenericException(Exception ex, WebRequest request) {
+        log.error("Unhandled exception [{}]: {}", ex.getClass().getName(), ex.getMessage(), ex);
         return buildErrorResponse(ResponseCode.SYSTEM, request.getDescription(false));
     }
 

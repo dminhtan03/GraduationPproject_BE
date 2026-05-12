@@ -1,0 +1,31 @@
+# ── Web Framework ─────────────────────────────────────────────────────────────
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+
+# ── Config & Validation ───────────────────────────────────────────────────────
+pydantic==2.10.3
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+
+# ── LLM ───────────────────────────────────────────────────────────────────────
+openai==1.58.1
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+httpx==0.27.2
+
+# ── AI/ML — install separately after core deps work ──────────────────────────
+# These require PyTorch and can take 10-30 min to install.
+# Uncomment when ready:
+#
+# torch==2.5.1          # Base for all ML models
+# torchaudio==2.5.1
+#
+# faster-whisper==1.1.0  # STT (much faster than openai-whisper)
+# openai-whisper==20240930  # Alternative if faster-whisper has issues
+#
+# pyannote.audio==3.3.2  # Speaker diarization (requires HuggingFace token)
+#
+# pydub==0.25.1          # Audio format conversion (requires ffmpeg binary)
+# soundfile==0.12.1      # WAV read/write + duration detection
+# librosa==0.10.2        # Audio analysis utilities

@@ -79,6 +79,13 @@ public enum ResponseCode {
     SERVICE_LOCKED_UNPAID("PAY_403", "You have an unpaid service bill. Please complete payment before ordering new services.", HttpStatus.FORBIDDEN),
     RESERVATION_NOT_PAYING("PAY_400", "This reservation is not in PAYING status", HttpStatus.BAD_REQUEST),
 
+    // ======= Task Errors =======
+    TASK_NOT_FOUND("TSK_404", "Task not found", HttpStatus.NOT_FOUND),
+    TASK_FORBIDDEN("TSK_403", "You do not have permission to modify this task", HttpStatus.FORBIDDEN),
+
+    // ======= Meeting Errors =======
+    MEETING_NOT_FOUND("MTG_404", "Meeting not found", HttpStatus.NOT_FOUND),
+
     // ======= Notification Errors =======
     NOTIFICATION_NOT_FOUND("NOTI_404", "Notification not found", HttpStatus.NOT_FOUND),
 
