@@ -19,10 +19,16 @@ public class MyReservationResponse {
     private String floorName;
     private String buildingName;
     private String reservationStatus;
+    private String purpose;
+    private String note;
     private LocalDate selectedDate;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private Double duration;
     private Boolean isFeedback;
+    // start+ booking type: NORMAL | RECURRING | EVENT
+    private String seriesId;
+    private String bookingType;
+    // end+ booking type
 }
 

@@ -13,6 +13,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class AiChatRequest {
     private String message;
+
+    // Optional: group messages into a chat session
+    private String sessionId;
+
     // optional: if user already picked a timeslot
     private LocalDateTime startTime;
     private LocalDateTime endTime;

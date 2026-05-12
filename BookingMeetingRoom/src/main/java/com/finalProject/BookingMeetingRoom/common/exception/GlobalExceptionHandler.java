@@ -1,8 +1,8 @@
 package com.finalProject.BookingMeetingRoom.common.exception;
 
-import com.finalProject.BookingMeetingRoom.common.payload.FieldViolation;
-import com.finalProject.BookingMeetingRoom.common.payload.Response;
-import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
@@ -10,9 +10,11 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.finalProject.BookingMeetingRoom.common.payload.FieldViolation;
+import com.finalProject.BookingMeetingRoom.common.payload.Response;
+import com.finalProject.BookingMeetingRoom.common.payload.ResponseCode;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -39,13 +41,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<Response<Void>> handleAccessDeniedException(
             org.springframework.security.access.AccessDeniedException e, WebRequest request) {
-        return buildErrorResponse(e.getMessage(), HttpStatus.FORBIDDEN, request.getDescription(false));
+        return buildErrorResponse(e.getMessage(), HttpStatus.FORBIDDEN, request.getDescription(false), "403");
     }
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<Response<Void>> handleCustomException(CustomException ex, WebRequest request) {
         ResponseCode code = ex.getResponseCode();
-        return buildErrorResponse(code, request.getDescription(false));
+        String message = (ex.getData() instanceof String) ? (String) ex.getData() : code.getMessage();
+        return buildErrorResponse(message, code.getHttpStatus(), request.getDescription(false), code.getCode());
     }
 
     /**
@@ -57,7 +60,20 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Response<Void>> handleRuntimeException(RuntimeException e, WebRequest request) {
-        return buildErrorResponse(e.getMessage(), HttpStatus.BAD_REQUEST, request.getDescription(false));
+        return buildErrorResponse(e.getMessage(), HttpStatus.BAD_REQUEST, request.getDescription(false), "400");
+    }
+
+    /**
+     * Handle NoResourceFoundException (404 Not Found for static resources).
+     * This suppresses the common "No static resource ." warning in Spring Boot 3.
+     *
+     * @param e       the exception
+     * @param request the web request
+     * @return a standardized 404 response
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Response<Void>> handleNoResourceFoundException(NoResourceFoundException e, WebRequest request) {
+        return buildErrorResponse("Resource not found: " + e.getResourcePath(), HttpStatus.NOT_FOUND, request.getDescription(false), "404");
     }
 
     /**
@@ -89,33 +105,21 @@ public class GlobalExceptionHandler {
      * @param message the error message
      * @param status  the HTTP status
      * @param path    the request path
+     * @param code    the internal error code
      * @return a ResponseEntity containing the error response
      */
-    private ResponseEntity<Response<Void>> buildErrorResponse(String message, HttpStatus status, String path) {
+    private ResponseEntity<Response<Void>> buildErrorResponse(String message, HttpStatus status, String path, String code) {
         Response<Void> response = new Response<>();
         Response.Metadata metadata = new Response.Metadata();
-        metadata.setCode(String.valueOf(status.value()));
+        metadata.setCode(code);
         metadata.setMessage(message);
         response.setMeta(metadata);
 
         return ResponseEntity.status(status).body(response);
     }
 
-    /**
-     * Build an error response.
-     *
-
-     * @param path    the request path
-     * @return a ResponseEntity containing the error response
-     */
     private ResponseEntity<Response<Void>> buildErrorResponse(ResponseCode code, String path) {
-        Response<Void> response = new Response<>();
-        Response.Metadata metadata = new Response.Metadata();
-        metadata.setCode(code.getCode());
-        metadata.setMessage(code.getMessage());
-        response.setMeta(metadata);
-
-        return ResponseEntity.status(code.getHttpStatus()).body(response);
+        return buildErrorResponse(code.getMessage(), code.getHttpStatus(), path, code.getCode());
     }
 
     /**

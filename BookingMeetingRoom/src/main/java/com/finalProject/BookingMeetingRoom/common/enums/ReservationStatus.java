@@ -8,5 +8,6 @@ public enum ReservationStatus {
     CANCELLED,
     COMPLETED,
     FORCE_CANCELLED,
-    FAILED
+    FAILED,
+    PAYING,
 }

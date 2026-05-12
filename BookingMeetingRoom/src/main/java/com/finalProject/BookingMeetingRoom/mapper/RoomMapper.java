@@ -7,6 +7,5 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface RoomMapper {
-    @Mapping(source = "id", target = "roomId")
-    RoomDto toDto( Room seat);
+    RoomDto toDto( Room room);
 }

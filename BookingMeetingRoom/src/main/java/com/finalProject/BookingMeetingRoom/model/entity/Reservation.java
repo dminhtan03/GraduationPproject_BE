@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -26,9 +27,15 @@ public class Reservation {
     @Column(name = "END_TIME")
     private LocalDateTime endTime;
 
-    @Column(name = "STATUS")
+    @Column(name = "STATUS", length = 20)
     @Enumerated(EnumType.STRING)
     private ReservationStatus status;
+
+    @Column(name = "PURPOSE")
+    private String purpose; // Mục đích sử dụng
+
+    @Column(name = "NOTE")
+    private String note;    // Ghi chú (không bắt buộc)
 
     @Column(name = "CHECKIN_TIME")
     private LocalDateTime checkinTime;
@@ -39,11 +46,25 @@ public class Reservation {
     @Version
     private Integer version;
 
+    @Column(name = "Reason")
+    private String reason;
+
+    @Column(name = "Cancel_By")
+    private String cancelBy;
+
     @Column(name = "CREATED_AT")
     private LocalDateTime createAt;
 
     @Column(name = "UPDATED_AT")
     private LocalDateTime updatedAt;
+
+    // start+ chức năng đặt phòng lặp lại (Reservation Series)
+    @Column(name = "SERIES_ID")
+    private String seriesId;
+
+    @Column(name = "SERIES_DATE")
+    private LocalDate seriesDate;
+    // end+ chức năng đặt phòng lặp lại (Reservation Series)
 
     @ManyToOne
     @JoinColumn(name = "room_id")

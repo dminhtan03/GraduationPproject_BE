@@ -48,6 +48,9 @@ public class User implements UserDetails {
     @Column(name = "UPDATED_AT")
     private LocalDateTime updatedAt;
 
+    @Column(name = "Reason")
+    private String reason;
+
     @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(name = "USER_INFO_ID", referencedColumnName = "ID")
     private UserInfo userInfo;
@@ -67,6 +70,23 @@ public class User implements UserDetails {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<Reservation> reservations;
+
+    // start add payment status
+    @Column(name = "STATUS_PAY")
+    @Enumerated(EnumType.STRING)
+    private com.finalProject.BookingMeetingRoom.common.enums.PaymentStatus statusPay;
+    // end add payment status
+
+    // start add cancellation tracking fields
+    @Column(name = "booking_locked_until")
+    private LocalDateTime bookingLockedUntil;
+
+    @Column(name = "cancellation_count")
+    private Integer cancellationCount = 0;
+
+    @Column(name = "last_cancellation_date")
+    private java.time.LocalDate lastCancellationDate;
+    // end add cancellation tracking fields
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -10,9 +10,15 @@ public interface MyReservationProjection {
     String getFloorName();
     String getAddress();
     String getReservationStatus();
+    String getPurpose();
+    String getNote();
     LocalDate getSelectedDate();
     LocalDateTime getStartTime();
     LocalDateTime getEndTime();
     Double getDuration();
     Long getIsFeedback();
+    // start+ booking type fields
+    String getSeriesId();
+    Long getHasEvent();
+    // end+ booking type fields
 }

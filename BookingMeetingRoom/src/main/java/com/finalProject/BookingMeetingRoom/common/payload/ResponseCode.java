@@ -23,6 +23,9 @@ public enum ResponseCode {
     ACCOUNT_LOCKED("USR_401", "Account locked" , HttpStatus.UNAUTHORIZED),
     ALREADY_ACTIVATED("USR_409", "Account already activated", HttpStatus.CONFLICT),
     PERMISSION_DENIED("USR_403", "Have permission to action", HttpStatus.FORBIDDEN),
+    // start add booking locked error
+    BOOKING_FUNCTION_LOCKED("USR_423", "Booking function is locked", HttpStatus.LOCKED),
+    // end add booking locked error
 
     // ======= Validation Errors =======
     VALIDATION_FAILED("VAL_422", "Validation failed", HttpStatus.UNPROCESSABLE_ENTITY),
@@ -47,7 +50,10 @@ public enum ResponseCode {
     ROOM_NOT_AVAILABLE("ROOM_400", "ROOM is not available" , HttpStatus.BAD_REQUEST),
     CANNOT_CHANGE_ROOM_STATUS("ROOM_409", "ROOM can be changed only if it is broken", HttpStatus.CONFLICT),
     ROOM_BROKEN("ROOM_409", "ROOM is broken and cannot be used", HttpStatus.CONFLICT),
-    CANNOT_RESERVE_ROOM("ROOM_410","ROOM cannot be reserve at selected period",HttpStatus.BAD_REQUEST),
+    ROOM_ALREADY_EXISTS("ROOM_409", "Room with this location code already exists on this floor", HttpStatus.CONFLICT),
+    CANNOT_RESERVE_ROOM("ROOM_410","Someone has already booked a room during your chosen time slot.",HttpStatus.BAD_REQUEST),
+    ROOM_IN_ACADEMIC_SCHEDULE("ROOM_411", "Phòng đang trong thời gian học cố định", HttpStatus.BAD_REQUEST),
+    ACADEMIC_SCHEDULE_OVERLAP("ACD_409", "Lịch học cố định bị trùng khung thời gian cho phòng này", HttpStatus.CONFLICT),
 
     // ======= Reservation Errors =======
     RESERVATION_NOT_FOUND("RES_404", "Reservation not found" , HttpStatus.NOT_FOUND),
@@ -60,10 +66,18 @@ public enum ResponseCode {
     RESERVATION_TIME_OVERLAP("RES_409", "Overlap with other reservations", HttpStatus.CONFLICT),
     RESERVATION_NOT_RESERVED("RES_400", "This Reservation is not reserved" , HttpStatus.BAD_REQUEST),
     RESERVATION_NOT_TIME_CHECK_IN("RES_400", "You cannot check in before start time." , HttpStatus.BAD_REQUEST),
+    // start add reservation check-in expired error
+    RESERVATION_CHECK_IN_EXPIRED("RES_400", "Check-in time has expired (15 minutes limit).", HttpStatus.BAD_REQUEST),
+    // end add reservation check-in expired error
     RESERVATION_INVALID_HOUR("RES_400", "Hour is invalid", HttpStatus.BAD_REQUEST),
     RESERVATION_HISTORY_NOT_FOUND("RES_HIS_404", "Reservation history not found", HttpStatus.NOT_FOUND),
+    FEEDBACK_ONLY_FOR_COMPLETED_RESERVATION("FBD_400", "Feedback can only be submitted for completed reservations", HttpStatus.BAD_REQUEST),
 
     USER_TIME_OVERLAP("USR_409", "User has already reserved a ROOM at this time", HttpStatus.CONFLICT),
+
+    // ======= Payment Errors =======
+    SERVICE_LOCKED_UNPAID("PAY_403", "You have an unpaid service bill. Please complete payment before ordering new services.", HttpStatus.FORBIDDEN),
+    RESERVATION_NOT_PAYING("PAY_400", "This reservation is not in PAYING status", HttpStatus.BAD_REQUEST),
 
     // ======= Notification Errors =======
     NOTIFICATION_NOT_FOUND("NOTI_404", "Notification not found", HttpStatus.NOT_FOUND),
@@ -80,8 +94,13 @@ public enum ResponseCode {
     // ======= Other Errors =======
     AUTH_HEADER_NOT_FOUND("AUTH_401", "Authorization header not found", HttpStatus.UNAUTHORIZED),
     FEEDBACK_ALREADY_EXISTS("FBD_409", "Feedback already exists for this reservation", HttpStatus.CONFLICT),
+    FEEDBACK_NOT_FOUND("FBD_404", "Feedback not found", HttpStatus.NOT_FOUND),
     CANNOT_FORCE_RETURN("RTN_401","ROOM cannot be force returned",HttpStatus.CONFLICT),
-    INVALID_DATE_FORMAT("DATE_400", "Invalid date format", HttpStatus.BAD_REQUEST);
+    INVALID_DATE_FORMAT("DATE_400", "Invalid date format", HttpStatus.BAD_REQUEST),
+
+    // ======= Amenity Errors =======
+    AMENITY_ALREADY_EXISTS("AMN_409", "Amenity with this name already exists", HttpStatus.CONFLICT),
+    AMENITY_NOT_FOUND("AMN_404", "Amenity not found", HttpStatus.NOT_FOUND);
 
     private final String code;
     private final String message;

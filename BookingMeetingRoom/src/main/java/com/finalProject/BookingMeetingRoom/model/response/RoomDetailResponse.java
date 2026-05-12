@@ -1,8 +1,6 @@
 package com.finalProject.BookingMeetingRoom.model.response;
 
-import com.finalProject.BookingMeetingRoom.common.enums.RoomStatus;
 import com.finalProject.BookingMeetingRoom.model.entity.Amenity;
-import com.finalProject.BookingMeetingRoom.model.entity.RoomImage;
 import com.finalProject.BookingMeetingRoom.model.request.FeedbackInfoRequest;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,13 +16,12 @@ import java.util.List;
 @AllArgsConstructor
 public class RoomDetailResponse {
 
-    private String roomId;
+    private String id;
     private String locationCode;
-    private RoomStatus status;
     private Integer capacity;
 
     private List<Amenity> amenities;
-    private List<RoomImage> images;
+    private List<RoomImageResponse> images;
 
     private Double score;
 

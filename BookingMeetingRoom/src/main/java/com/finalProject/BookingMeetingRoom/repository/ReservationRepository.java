@@ -1,45 +1,90 @@
 package com.finalProject.BookingMeetingRoom.repository;
 
-import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
-import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
-import com.finalProject.BookingMeetingRoom.model.entity.User;
-import com.finalProject.BookingMeetingRoom.model.projection.MyReservationProjection;
-import io.lettuce.core.dynamic.annotation.Param;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.finalProject.BookingMeetingRoom.common.enums.ReservationStatus;
+import com.finalProject.BookingMeetingRoom.model.entity.Reservation;
+import com.finalProject.BookingMeetingRoom.model.entity.User;
+import com.finalProject.BookingMeetingRoom.model.projection.MyReservationProjection;
+
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, String> {
 
+    @Query("""
+            SELECT DISTINCT r.room.id
+            FROM Reservation r
+            WHERE r.status IN :statuses
+                AND :startTime < r.endTime
+                AND :endTime > r.startTime
+            """)
+    List<String> findConflictingRoomIds(
+            @Param("statuses") List<ReservationStatus> statuses,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime);
 
+    @Query("""
+            SELECT r
+            FROM Reservation r
+            WHERE r.room.id IN :roomIds
+                AND r.status IN :statuses
+                AND :startTime < r.endTime
+                AND :endTime > r.startTime
+            """)
+    List<Reservation> findOverlappingReservationsForRooms(
+            @Param("roomIds") List<String> roomIds,
+            @Param("statuses") List<ReservationStatus> statuses,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime);
 
-    @Query(value = """
-            SELECT * FROM tbl_reservation r
-            WHERE r.room_id = :roomId
-            AND NOT (:endTime <= r.start_time OR :startTime >= r.end_time)
-            """, nativeQuery = true)
-    List<Reservation> checkOverlappingReservationsByRoom(@Param("roomId") String roomId,
-                                                         @Param("startTime") LocalDateTime startTime,
-                                                         @Param("endTime") LocalDateTime endTime);
+  Optional<Reservation> findByIdAndStatus(String id, ReservationStatus status);
 
-    @Query(value = "SELECT * FROM tbl_reservation r " +
-            " WHERE r.user_id = :userId " +
-            " AND r.status in :status " +
-            "AND NOT (:endTime <= r.start_time OR :startTime >= r.end_time)",
-            nativeQuery = true)
-    List<Reservation> checkOverlapByUser(@Param("userId") String userId,
-                                         @Param("startTime") LocalDateTime startTime,
-                                         @Param("endTime") LocalDateTime endTime,
-                                         @Param("status") List<String> status);
+  @Query("SELECT COUNT(r) > 0 FROM Reservation r " +
+      "WHERE r.room.id = :roomId " +
+      "AND r.status IN :status " +
+      "AND :startTime < r.endTime AND :endTime > r.startTime " + // overlap logic
+      "AND (:currentReservationId IS NULL OR r.id <> :currentReservationId)")
+  boolean checkOverlapReservation(@Param("roomId") String roomId,
+      @Param("status") List<ReservationStatus> status,
+      @Param("startTime") LocalDateTime startTime,
+      @Param("endTime") LocalDateTime endTime,
+      @Param("currentReservationId") String currentReservationId);
+
+  @Query(value = "SELECT COALESCE(SUM(TIMESTAMPDIFF(MINUTE, r.start_time, r.end_time)), 0) " +
+      "FROM tbl_reservation r " +
+      "WHERE r.user_id = :userId " +
+      "AND DATE(r.start_time) = :date " +
+      "AND r.status IN ('RESERVED', 'IN_USE', 'COMPLETED')", nativeQuery = true)
+  long getTotalReservedMinutesForUser(@Param("userId") String userId,
+      @Param("date") LocalDate date);
+
+  @Query(value = """
+      SELECT * FROM tbl_reservation r
+      WHERE r.room_id = :roomId
+      AND NOT (:endTime <= r.start_time OR :startTime >= r.end_time)
+      """, nativeQuery = true)
+  List<Reservation> checkOverlappingReservationsByRoom(@Param("roomId") String roomId,
+      @Param("startTime") LocalDateTime startTime,
+      @Param("endTime") LocalDateTime endTime);
+
+  @Query(value = "SELECT * FROM tbl_reservation r " +
+      " WHERE r.user_id = :userId " +
+      " AND r.status in :status " +
+      "AND NOT (:endTime <= r.start_time OR :startTime >= r.end_time)", nativeQuery = true)
+  List<Reservation> checkOverlapByUser(@Param("userId") String userId,
+      @Param("startTime") LocalDateTime startTime,
+      @Param("endTime") LocalDateTime endTime,
+      @Param("status") List<String> status);
 
     @Query(value = """
                 SELECT * FROM tbl_reservation r
@@ -54,86 +99,287 @@ public interface ReservationRepository extends JpaRepository<Reservation, String
                                                   @Param("startTime") LocalDateTime startTime,
                                                   @Param("endTime") LocalDateTime endTime);
 
+  @Query(nativeQuery = true, value = """
+      SELECT
+          tr.id AS reservationId,
+          ts.location_code AS locationCode,
+          tb.address AS address,
+          tf.floor_name AS floorName,
+          tb.building_name AS buildingName,
+          tr.status AS reservationStatus,
+          tr.purpose AS purpose,
+          tr.note AS note,
+          DATE(tr.start_time) AS selectedDate,
+          tr.start_time AS startTime,
+          tr.end_time AS endTime,
 
-    @Query(nativeQuery = true, value = """
-    SELECT
-        tr.id AS reservationId,
-        ts.location_code AS locationCode,
-        tb.address AS address,
-        tf.floor_name AS floorName,
-        tb.building_name AS buildingName,
-        tr.status AS reservationStatus,
-        DATE(tr.start_time) AS selectedDate,
-        tr.start_time AS startTime,
-        tr.end_time AS endTime,
+          TIMESTAMPDIFF(MINUTE, tr.start_time, tr.end_time) AS duration,
 
-        TIMESTAMPDIFF(MINUTE, tr.start_time, tr.end_time) AS duration,
+          CASE
+            WHEN tr.status = 'COMPLETED'
+                                      AND NOT EXISTS (
+                                          SELECT 1
+                                          FROM tbl_feedback tf
+                                          WHERE tf.reservation_id = tr.id
+                                      )
+                                 THEN FALSE
+                                 ELSE TRUE
+                                 END AS isFeedback,
 
-        CASE
-          WHEN tr.status = 'COMPLETED'
-                                    AND NOT EXISTS (
-                                        SELECT 1
-                                        FROM tbl_feedback tf
-                                        WHERE tf.reservation_id = tr.id
-                                    )
-                               THEN FALSE
-                               ELSE TRUE
-                               END AS isFeedback
+          tr.series_id AS seriesId,
+          CASE WHEN EXISTS (
+              SELECT 1 FROM tbl_event te WHERE te.reservation_id = tr.id
+          ) THEN 1 ELSE 0 END AS hasEvent
 
-    FROM tbl_reservation tr
-    JOIN tbl_user tu ON tu.id = tr.user_id
-    JOIN tbl_room ts ON ts.id = tr.room_id
-    JOIN tbl_floor tf ON tf.id = ts.floor_id
-    JOIN tbl_building tb ON tb.id = tf.building_id
+      FROM tbl_reservation tr
+      JOIN tbl_user tu ON tu.id = tr.user_id
+      JOIN tbl_room ts ON ts.id = tr.room_id
+      JOIN tbl_floor tf ON tf.id = ts.floor_id
+      JOIN tbl_building tb ON tb.id = tf.building_id
 
-    WHERE tu.id = :userId
-      AND (:locationCode IS NULL OR ts.location_code LIKE CONCAT('%', :locationCode, '%'))
-      AND (:address IS NULL OR tb.address LIKE CONCAT('%', :address, '%'))
-      AND (:buildingId IS NULL OR tb.id = :buildingId)
-      AND (:statuses IS NULL OR tr.status IN (:statuses))
+      WHERE tu.id = :userId
+        AND (:locationCode IS NULL OR ts.location_code LIKE CONCAT('%', :locationCode, '%'))
+        AND (:address IS NULL OR tb.address LIKE CONCAT('%', :address, '%'))
+        AND (:buildingId IS NULL OR tb.id = :buildingId)
+        AND (tr.status IN (:statuses))
 
-      AND (
-            :startTime IS NULL
-            OR (
-                tr.start_time >= :startTime
-                AND (:endTime IS NULL OR tr.end_time <= :endTime)
-            )
-          )
-
-    ORDER BY tr.updated_at DESC
-    """,
-            countQuery = """
-        SELECT COUNT(*)
-        FROM tbl_reservation tr
-        JOIN tbl_user tu ON tu.id = tr.user_id
-        JOIN tbl_room ts ON ts.id = tr.room_id
-        JOIN tbl_floor tf ON tf.id = ts.floor_id
-        JOIN tbl_building tb ON tb.id = tf.building_id
-
-        WHERE tu.id = :userId
-          AND (:locationCode IS NULL OR ts.location_code LIKE CONCAT('%', :locationCode, '%'))
-          AND (:address IS NULL OR tb.address LIKE CONCAT('%', :address, '%'))
-          AND (:buildingId IS NULL OR tb.id = :buildingId)
-          AND (:statuses IS NULL OR tr.status IN (:statuses))
-
-          AND (
-                :startTime IS NULL
-                OR (
-                    tr.start_time >= :startTime
-                    AND (:endTime IS NULL OR tr.end_time <= :endTime)
-                )
+        AND (
+              :startTime IS NULL
+              OR (
+                  tr.start_time >= :startTime
+                  AND (:endTime IS NULL OR tr.end_time <= :endTime)
               )
-    """
-    )
-    Page<MyReservationProjection> findMyReservations(
+            )
+
+      ORDER BY tr.updated_at DESC
+      """, countQuery = """
+          SELECT COUNT(*)
+          FROM tbl_reservation tr
+          JOIN tbl_user tu ON tu.id = tr.user_id
+          JOIN tbl_room ts ON ts.id = tr.room_id
+          JOIN tbl_floor tf ON tf.id = ts.floor_id
+          JOIN tbl_building tb ON tb.id = tf.building_id
+
+          WHERE tu.id = :userId
+            AND (:locationCode IS NULL OR ts.location_code LIKE CONCAT('%', :locationCode, '%'))
+            AND (:address IS NULL OR tb.address LIKE CONCAT('%', :address, '%'))
+            AND (:buildingId IS NULL OR tb.id = :buildingId)
+            AND (tr.status IN (:statuses))
+
+            AND (
+                  :startTime IS NULL
+                  OR (
+                      tr.start_time >= :startTime
+                      AND (:endTime IS NULL OR tr.end_time <= :endTime)
+                  )
+                )
+      """)
+  Page<MyReservationProjection> findMyReservations(
+      @Param("userId") String userId,
+      @Param("locationCode") String locationCode,
+      @Param("address") String address,
+      @Param("statuses") List<String> statuses,
+      @Param("buildingId") String buildingId,
+      @Param("startTime") String startTime,
+      @Param("endTime") String endTime,
+      Pageable pageable);
+
+  // [ADDED] Find all reservations with user and room details for admin
+  @Query("SELECT r FROM Reservation r " +
+          "JOIN FETCH r.user u " +
+          "JOIN FETCH r.room ro " +
+          "JOIN FETCH ro.floor f " +
+          "JOIN FETCH f.building b " +
+          "LEFT JOIN u.userInfo ui " + // [SỬA] Thêm LEFT JOIN tới UserInfo để có thể tìm theo tên
+          "WHERE (:status IS NULL OR r.status = :status) " +
+          "AND (:userName IS NULL OR CONCAT(ui.firstName, ' ', ui.lastName) LIKE %:userName%) " + // [SỬA] Tìm theo tên đầy đủ từ UserInfo
+          "AND (:userEmail IS NULL OR ui.email LIKE %:userEmail%) " + // [SỬA] Tìm theo email từ UserInfo
+          "AND (:roomName IS NULL OR ro.locationCode LIKE %:roomName%) " +
+          "AND (:floorName IS NULL OR f.name LIKE %:floorName%) " + // [SỬA] Sửa từ f.floorName thành f.name
+          "AND (:buildingName IS NULL OR b.name LIKE %:buildingName%) " + // [SỬA] Sửa từ b.buildingName thành b.name
+          "AND (cast(:startDate as timestamp) IS NULL OR r.startTime >= :startDate) " +
+          "AND (cast(:endDate as timestamp) IS NULL OR r.endTime <= :endDate)")
+  Page<Reservation> findAllWithDetailsForAdmin(Pageable pageable,
+                                               @Param("status") ReservationStatus status,
+                                               @Param("userName") String userName,
+                                               @Param("userEmail") String userEmail,
+                                               @Param("roomName") String roomName,
+                                               @Param("floorName") String floorName,
+                                               @Param("buildingName") String buildingName,
+                                               @Param("startDate") LocalDateTime startDate,
+                                               @Param("endDate") LocalDateTime endDate);
+
+  // start update findReservationsOverStartTime to use parameter
+  @Query(value = """
+      SELECT *
+      FROM tbl_reservation r
+      WHERE DATE_ADD(r.start_time, INTERVAL 15 MINUTE) < :currentTime
+        AND r.status = 'RESERVED'
+      """, nativeQuery = true)
+  List<Reservation> findReservationsOverStartTime(@Param("currentTime") LocalDateTime currentTime);
+  // end update findReservationsOverStartTime to use parameter
+
+
+  // start update findReservationsOverEndTime to use parameter
+  @Query(value = "SELECT * from tbl_reservation r WHERE r.end_time < :currentTime " +
+      " and r.status = 'IN_USE' ", nativeQuery = true)
+  List<Reservation> findReservationsOverEndTime(@Param("currentTime") LocalDateTime currentTime);
+  // end update findReservationsOverEndTime to use parameter
+
+    @Query("""
+            SELECT r
+            FROM Reservation r
+            JOIN FETCH r.room ro
+            WHERE r.user.id = :userId
+                AND r.status IN :statuses
+            ORDER BY r.updatedAt DESC
+            """)
+    List<Reservation> findActiveReservationsOfUser(
+            @Param("userId") String userId,
+            @Param("statuses") List<ReservationStatus> statuses);
+
+    @Query("""
+            SELECT r
+            FROM Reservation r
+            JOIN FETCH r.room ro
+            WHERE r.user.id = :userId
+                AND r.status IN :statuses
+                AND LOWER(ro.locationCode) = LOWER(:locationCode)
+            ORDER BY r.updatedAt DESC
+            """)
+    List<Reservation> findActiveReservationsOfUserByRoomCode(
             @Param("userId") String userId,
             @Param("locationCode") String locationCode,
-            @Param("address") String address,
-            @Param("statuses") List<String> statuses,
-            @Param("buildingId") String buildingId,
-            @Param("startTime") String startTime,
-            @Param("endTime") String endTime,
-            Pageable pageable
-    );
+            @Param("statuses") List<ReservationStatus> statuses);
+
+  List<Reservation> findByStatus(ReservationStatus status);
+
+  // [ADDED] Count reservations within a time range
+  long countByCreateAtBetween(LocalDateTime start, LocalDateTime end);
+
+  // start+ dashboard analytics
+  @Query("SELECT COUNT(r) FROM Reservation r WHERE r.status IN :statuses AND r.createAt BETWEEN :start AND :end")
+  long countByStatusesAndCreateAtBetween(
+      @Param("statuses") List<ReservationStatus> statuses,
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
+
+  @Query(value = """
+      SELECT DATE(r.created_at) AS day, COUNT(*) AS cnt
+      FROM tbl_reservation r
+      WHERE r.created_at >= :start
+      GROUP BY DATE(r.created_at)
+      ORDER BY day ASC
+      """, nativeQuery = true)
+  List<Object[]> countByDaySince(@Param("start") LocalDateTime start);
+
+  @Query(value = """
+      SELECT r.status, COUNT(*) AS cnt
+      FROM tbl_reservation r
+      WHERE r.created_at BETWEEN :start AND :end
+      GROUP BY r.status
+      """, nativeQuery = true)
+  List<Object[]> countGroupByStatus(
+      @Param("start") LocalDateTime start,
+      @Param("end") LocalDateTime end);
+  // end+ dashboard analytics
+
+  // [ADDED] Count distinct users with reservations within a time range
+  @Query("SELECT COUNT(DISTINCT r.user.id) FROM Reservation r WHERE r.createAt BETWEEN :start AND :end")
+  long countDistinctUsersByCreateAtBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+  // [ADDED] Count reservations for today
+  @Query("SELECT COUNT(r) FROM Reservation r WHERE r.createAt >= :startOfDay")
+  long countTodaysReservations(@Param("startOfDay") LocalDateTime startOfDay);
+
+  @Query("SELECT r FROM Reservation r WHERE r.user.id IN :userIds AND r.status IN :statuses")
+  List<Reservation> findByUserIdsAndStatusIn(Set<String> userIds, List<ReservationStatus> statuses);
+
+  @Query("SELECT r FROM Reservation r " +
+      "WHERE r.room.id IN :roomIds " +
+      "AND r.status IN :statuses")
+  List<Reservation> findByRoomIdsAndStatusIn(@Param("roomIds") Set<String> roomIds,
+      @Param("statuses") List<ReservationStatus> statuses);
+
+      Page<Reservation> findByUserAndStatusInAndStartTimeBetween(User user,
+                                                               List<ReservationStatus> statuses,
+                                                               LocalDateTime start, LocalDateTime end,
+                                                               Pageable pageable);
+
+  @Query("""
+      SELECT u.id,
+             COUNT(r)
+      FROM User u
+      LEFT JOIN u.reservations r
+             ON r.startTime >= :startOfDay
+             AND r.startTime < :endOfDay
+             AND r.status <> 'FAIL'
+      WHERE u.id IN :userIds
+      GROUP BY u.id
+      """)
+  List<Object[]> countReservationsTodayByUserIds(@Param("userIds") Set<String> userIds,
+      @Param("startOfDay") LocalDateTime startOfDay,
+      @Param("endOfDay") LocalDateTime endOfDay);
+
+  // start update findReservationsToRemindCheckIn to use parameter
+  @Query(value = """
+      SELECT *
+      FROM tbl_reservation r
+      WHERE r.start_time BETWEEN
+            DATE_ADD(:currentTime, INTERVAL 15 MINUTE)
+            AND DATE_ADD(:currentTime, INTERVAL 16 MINUTE)
+        AND r.status = 'RESERVED'
+      """, nativeQuery = true)
+  List<Reservation> findReservationsToRemindCheckIn(@Param("currentTime") LocalDateTime currentTime);
+  // end update findReservationsToRemindCheckIn to use parameter
+
+  @Query(value = """
+      SELECT *
+      FROM tbl_reservation
+      WHERE end_time <= :time
+        AND room_id = :roomId
+        AND status IN ('RESERVED', 'IN_USE')
+      ORDER BY end_time DESC
+      LIMIT 1
+      """, nativeQuery = true)
+  Optional<Reservation> findLastReservation(
+      @Param("time") LocalDateTime time,
+      @Param("roomId") String roomId);
+
+  @Query(value = """
+      SELECT *
+      FROM tbl_reservation
+      WHERE start_time >= :time
+        AND room_id = :roomId
+        AND status IN ('RESERVED', 'IN_USE')
+      ORDER BY start_time ASC
+      LIMIT 1
+      """, nativeQuery = true)
+  Optional<Reservation> findNextReservation(
+      @Param("time") LocalDateTime time,
+      @Param("roomId") String roomId);
+
+  // start+ chức năng đặt phòng lặp lại (Reservation Series)
+  boolean existsBySeriesIdAndSeriesDate(String seriesId, LocalDate seriesDate);
+  List<Reservation> findBySeriesIdAndStartTimeAfter(String seriesId, LocalDateTime startTime);
+
+  // start+ fix overlap check cho recurring series (JPQL thay native query để Hibernate auto-flush trước khi query)
+  @Query("""
+      SELECT r FROM Reservation r
+      WHERE r.room.id = :roomId
+        AND r.status IN :statuses
+        AND NOT (:endTime <= r.startTime OR :startTime >= r.endTime)
+      """)
+  List<Reservation> findActiveOverlappingReservationsByRoom(
+      @Param("roomId") String roomId,
+      @Param("startTime") LocalDateTime startTime,
+      @Param("endTime") LocalDateTime endTime,
+      @Param("statuses") Set<ReservationStatus> statuses);
+  // end+ fix overlap check cho recurring series
+  // end+ chức năng đặt phòng lặp lại (Reservation Series)
+
+  // Payment reminder: find PAYING reservations whose returnTime is older than given time
+  @Query("SELECT r FROM Reservation r WHERE r.status = 'PAYING' AND r.returnTime <= :before")
+  List<Reservation> findPayingReservationsOlderThan(@Param("before") LocalDateTime before);
 
 }

@@ -259,20 +259,23 @@ public class AuthServiceImpl implements AuthService {
             String accessToken = authHeader.substring(7);
 
             String userEmail = jwtUtils.extractUsername(accessToken);
+            var user = userRepository.findByEmail(userEmail)
+                    .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+            var userInfo = user.getUserInfo();
 
-            var user = userRepository.findByEmail(userEmail);
-
-            if (user.isEmpty()) {
-                throw new CustomException(ResponseCode.USER_NOT_FOUND);
-            }
-
-            var userResponse = userMapper.toUserResponse(user.get().getUserInfo());
-            userResponse.setId(user.get().getId());
-            userResponse.setReset(user.get().isReset());
-
-            return userResponse;
-        } catch (CustomException e) {
-            throw e;
+            return UserResponse.builder()
+                    .id(user.getId())
+                    .firstName(userInfo.getFirstName())
+                    .lastName(userInfo.getLastName())
+                    .email(userInfo.getEmail())
+                    .phoneNumber(userInfo.getPhoneNumber())
+                    .address(userInfo.getAddress())
+                    .department(userInfo.getDepartment())
+                    .gender(userInfo.getGender())
+                    .bookingLockedUntil(user.getBookingLockedUntil()) //start add lock funtion booking
+                    .cancellationCount(user.getCancellationCount())// end add lock funtion booking
+                    .isReset(user.isReset())
+                    .build();
         } catch (Exception e) {
             logger.error(e.getMessage());
             throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);

@@ -22,6 +22,10 @@ public class ReservationResponse {
 
     private ReservationStatus status;
 
+    private String purpose;
+
+    private String note;
+
     private LocalDateTime checkinTime;
 
     private LocalDateTime returnTime;
@@ -29,6 +33,12 @@ public class ReservationResponse {
     private LocalDateTime createAt;
 
     private LocalDateTime updatedAt;
+
+    private String reason;
+
+    private String cancelBy;
+
+    private String userId;
 
     private RoomDto room;
 

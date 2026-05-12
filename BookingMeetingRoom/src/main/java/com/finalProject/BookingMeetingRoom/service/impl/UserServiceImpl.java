@@ -17,6 +17,14 @@ import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.EmailService;
 import com.finalProject.BookingMeetingRoom.service.RedisService;
 import com.finalProject.BookingMeetingRoom.service.UserService;
+// start add excel and registration imports
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.util.*;
+// end add excel and registration imports
 import jakarta.mail.MessagingException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +39,6 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -405,4 +412,130 @@ public class UserServiceImpl implements UserService {
 
         return codeBuilder.toString();
     }
+
+    // start add adminAddUser and importUsersFromExcel implementation
+    @Override
+    @Transactional
+    public RegistrationResponse adminAddUser(RegistrationRequest request) {
+        try {
+            var user = userRepository.findByEmail(request.getEmail());
+            if (user.isPresent()) {
+                throw new CustomException(ResponseCode.EMAIL_ALREADY_EXISTS);
+            }
+
+            var role = roleRepository.findRoleByName(request.getRole());
+            if (role.isEmpty()) {
+                throw new CustomException(ResponseCode.ROLE_NOT_FOUND);
+            }
+
+            var userInfo = userMapper.toUserInfo(request);
+            if (userInfo == null) {
+                log.error("Failed to map registration request to UserInfo");
+                throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+            }
+            userInfo.setId(UUID.randomUUID().toString());
+            userInfo.setCreatedAt(LocalDateTime.now());
+            userInfoRepository.save(userInfo);
+
+            var newUser = userMapper.toUser(request);
+            if (newUser == null) {
+                log.error("Failed to map registration request to User");
+                throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+            }
+            newUser.setId(UUID.randomUUID().toString());
+            newUser.setPassword(passwordEncoder.encode(request.getPassword()));
+            newUser.setEnabled(true); // Directly enabled by admin
+            newUser.setLoginCount(0);
+            newUser.setLocked(false);
+            newUser.setReset(false);
+            newUser.setRoles(Set.of(role.get()));
+            newUser.setUserInfo(userInfo);
+            newUser.setCreatedAt(LocalDateTime.now());
+            newUser.setUpdatedAt(LocalDateTime.now());
+
+            userRepository.save(newUser);
+            return userMapper.toRegistrationResponse(userInfo);
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during admin adding user", e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void importUsersFromExcel(MultipartFile file) {
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = new XSSFWorkbook(is)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            List<String> errors = new ArrayList<>();
+            for (Row row : sheet) {
+                // Skip header row
+                if (row.getRowNum() == 0) continue;
+
+                try {
+                    String firstName = getCellValue(row.getCell(0));
+                    String lastName = getCellValue(row.getCell(1));
+                    String phoneNumber = getCellValue(row.getCell(2));
+                    String address = getCellValue(row.getCell(3));
+                    String department = getCellValue(row.getCell(4));
+                    String email = getCellValue(row.getCell(5));
+                    String gender = getCellValue(row.getCell(6));
+                    String password = getCellValue(row.getCell(7));
+                    String role = getCellValue(row.getCell(8));
+
+                    if (email.isEmpty()) continue;
+
+                    RegistrationRequest request = new RegistrationRequest();
+                    request.setFirstName(firstName);
+                    request.setLastName(lastName);
+                    request.setPhoneNumber(phoneNumber);
+                    request.setAddress(address);
+                    request.setDepartment(department);
+                    request.setEmail(email);
+                    request.setGender(gender);
+                    request.setPassword(password);
+                    request.setRole(role);
+
+                    adminAddUser(request); // Use adminAddUser to enable immediately
+                } catch (CustomException e) {
+                    errors.add(String.format("Dòng %d: %s", row.getRowNum() + 1, e.getMessage()));
+                } catch (Exception e) {
+                    errors.add(String.format("Dòng %d: Lỗi không xác định (%s)", row.getRowNum() + 1, e.getMessage()));
+                    log.error("Error processing user row " + row.getRowNum() + ": " + e.getMessage());
+                }
+            }
+
+            if (!errors.isEmpty()) {
+                throw new CustomException(ResponseCode.VALIDATION_FAILED, String.join("\n", errors));
+            }
+        } catch (CustomException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error importing users from excel: " + e.getMessage(), e);
+            throw new CustomException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private String getCellValue(Cell cell) {
+        if (cell == null) return "";
+        switch (cell.getCellType()) {
+            case STRING: return cell.getStringCellValue();
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getLocalDateTimeCellValue().toString();
+                }
+                double numericValue = cell.getNumericCellValue();
+                // Kiểm tra nếu là số nguyên thì loại bỏ phần thập phân .0
+                if (numericValue == (long) numericValue) {
+                    return String.valueOf((long) numericValue);
+                }
+                return String.valueOf(numericValue);
+            case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
+            default: return "";
+        }
+    }
+    // end add adminAddUser and importUsersFromExcel implementation
 }
