@@ -95,6 +95,18 @@ public class UserController {
 //        return ResponseEntity.ok(userService.getAllUser());
 //    }
 
+    @GetMapping("/me")
+    public ResponseEntity<?> getMe(Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+        UserInfo info = user.getUserInfo();
+        return ResponseEntity.ok(Response.ofSucceeded(Map.of(
+                "id",       user.getId(),
+                "email",    info != null && info.getEmail() != null ? info.getEmail() : authentication.getName(),
+                "fullName", info != null && info.getFullName() != null ? info.getFullName() : ""
+        )));
+    }
+
     // start+ check email exists (dùng khi invite participant trước khi tạo event)
     @GetMapping("/check-email")
     public ResponseEntity<?> checkEmailExists(@RequestParam String email) {
