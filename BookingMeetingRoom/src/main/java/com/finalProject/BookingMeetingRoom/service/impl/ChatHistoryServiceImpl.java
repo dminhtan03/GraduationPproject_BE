@@ -163,7 +163,7 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
         LocalDateTime lastMessageAt = rows.get(rows.size() - 1).getCreatedAt();
 
         List<ChatbotDetailResponse.ChatMessageItem> messages = rows.stream()
-            .map(r -> ChatbotDetailResponse.ChatMessageItem.builder()
+                .map(r -> ChatbotDetailResponse.ChatMessageItem.builder()
                         .id(r.getId())
                         .sender(r.getSender())
                         .message(r.getMessage())

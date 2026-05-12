@@ -20,39 +20,39 @@ public class ChatbotMessageParser {
     private static final Pattern ROOM_CODE_PATTERN = Pattern.compile("(?i)\\b([a-z]{1,5}\\d{0,3})\\s*[-_]\\s*(\\d{1,4})\\b");
     private static final Pattern ROOM_CODE_WITH_KEYWORD_PATTERN = Pattern.compile("(?i)(?:room|phòng|phong)\\s*([a-z]{1,5}\\d{0,3})\\s*(\\d{1,4})\\b");
 
-        private static final Set<String> ROOM_PREFIX_STOPWORDS = Set.of(
+    private static final Set<String> ROOM_PREFIX_STOPWORDS = Set.of(
             "of", "in", "on", "at", "to", "from", "for", "with", "as"
     );
 
-        private static final Pattern CAPACITY_KEYWORD_NUMBER_PATTERN = Pattern.compile(
+    private static final Pattern CAPACITY_KEYWORD_NUMBER_PATTERN = Pattern.compile(
             "(?i)(?:capacity|accommodate|accomodate|seats|seat|sức chứa|suc chua)\\D{0,15}(\\d{1,3})\\b"
-        );
+    );
 
-        private static final Pattern CAPACITY_NUMBER_SUFFIX_PATTERN = Pattern.compile(
+    private static final Pattern CAPACITY_NUMBER_SUFFIX_PATTERN = Pattern.compile(
             "(?i)\\b(\\d{1,3})\\s*(?:\\+|or more|plus)?\\s*(?:people|persons|seats|người|nguoi)\\b"
-        );
+    );
 
-        private static final Pattern CAPACITY_RANGE_SUFFIX_PATTERN = Pattern.compile(
+    private static final Pattern CAPACITY_RANGE_SUFFIX_PATTERN = Pattern.compile(
             "(?i)\\b(\\d{1,3})\\s*[-–]\\s*(\\d{1,3})\\s*(?:people|persons|seats|người|nguoi)\\b"
-        );
+    );
 
-        private static final Pattern CAPACITY_APPROX_PATTERN = Pattern.compile(
+    private static final Pattern CAPACITY_APPROX_PATTERN = Pattern.compile(
             "(?i)\\b(?:khoảng|khoang|tầm|tam|about|around)\\s*(\\d{1,3})\\s*(?:người|nguoi|people|persons)?\\b"
-        );
+    );
 
     private static final Pattern RANGE_TIME_PATTERN = Pattern.compile(
             "(?i)(?:from|từ|tu)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?\\s*(?:to|đến|den|tới|toi|-)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?");
 
-        // Range expressed as: "at 6PM to 8PM" / "lúc 18h đến 20h"
+    // Range expressed as: "at 6PM to 8PM" / "lúc 18h đến 20h"
     private static final Pattern AT_RANGE_TIME_PATTERN = Pattern.compile(
             "(?i)(?:at|lúc|luc|vào|vao)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?\\s*(?:to|đến|den|tới|toi|-)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?");
 
     private static final Pattern SINGLE_TIME_PATTERN = Pattern.compile(
             "(?i)(?:at|lúc|luc|as of|after|from|sau|vào|vao)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?");
 
-        private static final Pattern BARE_TIME_PATTERN = Pattern.compile("(?i)\\b(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?\\b");
-        private static final Pattern DURATION_HOURS_PATTERN = Pattern.compile("(?i)(?:for|trong|khoảng|khoang)?\\s*(\\d{1,2})\\s*(?:tiếng|tieng|gio|giờ|hours?|hrs?)\\b");
-        private static final Pattern DURATION_MINUTES_PATTERN = Pattern.compile("(?i)(?:for|trong|khoảng|khoang)?\\s*(\\d{1,3})\\s*(?:phút|phut|minutes?|mins?)\\b");
+    private static final Pattern BARE_TIME_PATTERN = Pattern.compile("(?i)\\b(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?\\b");
+    private static final Pattern DURATION_HOURS_PATTERN = Pattern.compile("(?i)(?:for|trong|khoảng|khoang)?\\s*(\\d{1,2})\\s*(?:tiếng|tieng|gio|giờ|hours?|hrs?)\\b");
+    private static final Pattern DURATION_MINUTES_PATTERN = Pattern.compile("(?i)(?:for|trong|khoảng|khoang)?\\s*(\\d{1,3})\\s*(?:phút|phut|minutes?|mins?)\\b");
 
     public record ParseResult(
             ChatbotIntent intent,
@@ -113,44 +113,44 @@ public class ChatbotMessageParser {
         boolean hasDate = date != null;
 
         boolean hasDetailHint = containsAnyEither(normalized, folded,
-            "chi tiết",
-            "chi tiet",
-            "thông tin",
-            "thong tin",
-            "detail",
-            "details",
-            "info",
-            "xem",
-            "show",
-            "describe");
+                "chi tiết",
+                "chi tiet",
+                "thông tin",
+                "thong tin",
+                "detail",
+                "details",
+                "info",
+                "xem",
+                "show",
+                "describe");
 
         boolean hasFacilityNoun = containsAnyEither(normalized, folded,
-            "tòa",
-            "toà",
-            "toa",
-            "building",
-            "tầng",
-            "tang",
-            "floor",
-            "phòng",
-            "phong",
-            "room");
+                "tòa",
+                "toà",
+                "toa",
+                "building",
+                "tầng",
+                "tang",
+                "floor",
+                "phòng",
+                "phong",
+                "room");
 
         boolean hasBookingHint = containsAnyEither(normalized, folded,
-            "book",
-            "reserve",
-            "đặt",
-            "dat ",
-            "mượn",
-            "muon",
-            "đặt giúp",
-            "dat giup",
-            "giữ",
-            "giu ",
-            "schedule",
-            "arrange",
-            "chốt",
-            "chot");
+                "book",
+                "reserve",
+                "đặt",
+                "dat ",
+                "mượn",
+                "muon",
+                "đặt giúp",
+                "dat giup",
+                "giữ",
+                "giu ",
+                "schedule",
+                "arrange",
+                "chốt",
+                "chot");
 
         if (hasDetailHint && hasFacilityNoun && !hasTime && minCapacity == null) {
             return ChatbotIntent.VIEW_FACILITY_DETAILS;
@@ -160,7 +160,7 @@ public class ChatbotMessageParser {
                 "today available rooms",
                 "available rooms today",
                 "rooms available today",
-            "available room",
+                "available room",
                 "rooms are available",
                 "available as of",
                 "hôm nay còn phòng",
@@ -181,7 +181,7 @@ public class ChatbotMessageParser {
                 "ranh",
                 "trống") ;
 
-            boolean hasAvailabilityKeyword = containsAnyEither(normalized, folded,
+        boolean hasAvailabilityKeyword = containsAnyEither(normalized, folded,
                 "available",
                 "free",
                 "trống",
@@ -191,9 +191,9 @@ public class ChatbotMessageParser {
                 "còn",
                 "con");
 
-            if (!hasBookingHint && minCapacity == null && (hasAvailabilityHint || (hasAvailabilityKeyword && hasFacilityNoun))) {
-                return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
-            }
+        if (!hasBookingHint && minCapacity == null && (hasAvailabilityHint || (hasAvailabilityKeyword && hasFacilityNoun))) {
+            return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
+        }
 
         boolean hasSuggestHint = containsAnyEither(normalized, folded,
                 "suggest",
@@ -208,60 +208,60 @@ public class ChatbotMessageParser {
         }
 
         boolean hasReturnHint = containsAnyEither(normalized, folded,
-            "return",
-            "trả phòng",
-            "tra phong",
-            "trả",
-            "tra",
-            "check out");
+                "return",
+                "trả phòng",
+                "tra phong",
+                "trả",
+                "tra",
+                "check out");
 
         if (hasReturnHint && containsAnyEither(normalized, folded, "phòng", "phong", "room", "reservation", "booking")) {
             return ChatbotIntent.RETURN_ROOM;
         }
 
         boolean hasCancelHint = containsAnyEither(normalized, folded,
-            "cancel",
-            "abort",
-            "hủy",
-            "huy",
-            "huỷ",
-            "bỏ đặt",
-            "bo dat",
-            "hủy đặt",
-            "huy dat");
+                "cancel",
+                "abort",
+                "hủy",
+                "huy",
+                "huỷ",
+                "bỏ đặt",
+                "bo dat",
+                "hủy đặt",
+                "huy dat");
 
         if (hasCancelHint && (hasRoom || hasFacilityNoun || containsAnyEither(normalized, folded, "reservation", "booking", "đặt phòng", "dat phong"))) {
             return ChatbotIntent.CANCEL_RESERVATION;
         }
 
         boolean hasExtendHint = containsAnyEither(normalized, folded,
-            "extend",
-            "extension",
-            "gia hạn",
-            "gia han",
-            "thêm",
-            "them",
-            "lên",
-            "len",
-            "kéo dài",
-            "keo dai",
-            "more hour",
-            "extra hour",
-            "add hour",
-            "up to");
+                "extend",
+                "extension",
+                "gia hạn",
+                "gia han",
+                "thêm",
+                "them",
+                "lên",
+                "len",
+                "kéo dài",
+                "keo dai",
+                "more hour",
+                "extra hour",
+                "add hour",
+                "up to");
 
         if (hasExtendHint && containsAnyEither(normalized, folded,
-            "reservation",
-            "booking",
-            "phòng",
-            "phong",
-            "room",
-            "giờ",
-            "gio",
-            "tiếng",
-            "tien",
-            "hour",
-            "hours")) {
+                "reservation",
+                "booking",
+                "phòng",
+                "phong",
+                "room",
+                "giờ",
+                "gio",
+                "tiếng",
+                "tien",
+                "hour",
+                "hours")) {
             return ChatbotIntent.EXTEND_RESERVATION;
         }
 

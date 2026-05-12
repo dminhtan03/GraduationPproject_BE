@@ -8,7 +8,6 @@ import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.ChatHistoryService;
 import com.finalProject.BookingMeetingRoom.service.ReservationService;
 import com.finalProject.BookingMeetingRoom.service.RoomService;
-import com.finalProject.BookingMeetingRoom.service.impl.AiServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

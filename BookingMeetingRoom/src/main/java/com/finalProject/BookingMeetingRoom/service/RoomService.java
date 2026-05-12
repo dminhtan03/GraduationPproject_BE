@@ -11,7 +11,9 @@ import com.finalProject.BookingMeetingRoom.model.request.RoomCreateRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomSearchRequest;
 import com.finalProject.BookingMeetingRoom.model.request.RoomUpdateRequest;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
+import com.finalProject.BookingMeetingRoom.model.response.RoomContextResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomSearchResponse;
+import java.time.LocalDateTime;
 
 import com.finalProject.BookingMeetingRoom.model.entity.FloorDecoration;
 
@@ -19,9 +21,17 @@ public interface RoomService {
 
     List<RoomSearchResponse> searchRooms(RoomSearchRequest request);
 
+    List<RoomSearchResponse> searchRandomAvailableRooms(List<String> buildingIds, LocalDateTime startTime, LocalDateTime endTime, int limit);
+
     Page<RoomSearchResponse> getRoomStatus(RoomSearchRequest request, int page, int size);
 
     RoomDetailResponse getRoomDetail(String roomId);
+
+    RoomSearchResponse findRoomByLocationCode(String locationCode);
+
+    RoomContextResponse getRoomContextByLocationCode(String locationCode);
+
+    RoomContextResponse getRoomContextByRoomId(String roomId);
 
     List<Amenity> getAllAmenities();
 

@@ -1,7 +1,6 @@
 package com.finalProject.BookingMeetingRoom.service.chatbot;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.finalProject.BookingMeetingRoom.service.impl.OpenAiChatbotLlmService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 

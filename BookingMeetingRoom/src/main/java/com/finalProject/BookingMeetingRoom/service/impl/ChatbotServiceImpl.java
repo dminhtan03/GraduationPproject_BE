@@ -78,20 +78,20 @@ public class ChatbotServiceImpl implements ChatbotService {
             List<String> recentUserMessages = chatHistoryService.getRecentMessages(sessionId, SenderType.USER, 5);
 
             var user = (authentication != null)
-                ? userRepository.findByEmail(authentication.getName()).orElse(null)
-                : null;
+                    ? userRepository.findByEmail(authentication.getName()).orElse(null)
+                    : null;
 
             // Log USER message (best-effort)
             chatHistoryService.log(user, sessionId, SenderType.USER, message);
 
             if (message == null || message.isBlank()) {
-            ChatbotMessageResponse res = ChatbotMessageResponse.builder()
-                .sessionId(sessionId)
+                ChatbotMessageResponse res = ChatbotMessageResponse.builder()
+                        .sessionId(sessionId)
                         .intent(ChatbotIntent.FALLBACK)
                         .reply("Please type a message. For example: 'Today available rooms?' or 'Book V5-020 at 10AM today'.")
                         .build();
-            chatHistoryService.log(user, sessionId, SenderType.BOT, res.getReply());
-            return res;
+                chatHistoryService.log(user, sessionId, SenderType.BOT, res.getReply());
+                return res;
             }
 
             ChatbotMessageParser.ParseResult parsed = parser.parse(message);
@@ -284,15 +284,15 @@ public class ChatbotServiceImpl implements ChatbotService {
     private ChatbotMessageResponse handleFallback(String message) {
         boolean vi = isVietnameseMessage(message);
         String reply = pickByHash(message,
-            vi
-                ? "Mình có thể giúp bạn kiểm tra phòng trống, đặt phòng, hủy đặt phòng, gia hạn thời gian và xem chi tiết tòa/tầng/phòng."
-                : "I can help you check available rooms, book a room, cancel/extend a reservation, or view building/floor/room details.",
-            vi
-                ? "Bạn muốn: (1) kiểm tra phòng trống, (2) đặt phòng, (3) hủy phòng, (4) thêm giờ, hay (5) xem chi tiết tòa/tầng/phòng?"
-                : "Tell me what you need: (1) check availability, (2) book, (3) cancel, (4) extend, or (5) view facility details.",
-            vi
-                ? "Mình có thể tìm phòng trống, đặt phòng, hủy đặt phòng, gia hạn thời gian và cung cấp thông tin cơ sở vật chất. Bạn muốn hỗ trợ phần nào?"
-                : "I can check room availability, create bookings, cancel/extend reservations, and show facility details. What would you like to do?"
+                vi
+                        ? "Mình có thể giúp bạn kiểm tra phòng trống, đặt phòng, hủy đặt phòng, gia hạn thời gian và xem chi tiết tòa/tầng/phòng."
+                        : "I can help you check available rooms, book a room, cancel/extend a reservation, or view building/floor/room details.",
+                vi
+                        ? "Bạn muốn: (1) kiểm tra phòng trống, (2) đặt phòng, (3) hủy phòng, (4) thêm giờ, hay (5) xem chi tiết tòa/tầng/phòng?"
+                        : "Tell me what you need: (1) check availability, (2) book, (3) cancel, (4) extend, or (5) view facility details.",
+                vi
+                        ? "Mình có thể tìm phòng trống, đặt phòng, hủy đặt phòng, gia hạn thời gian và cung cấp thông tin cơ sở vật chất. Bạn muốn hỗ trợ phần nào?"
+                        : "I can check room availability, create bookings, cancel/extend reservations, and show facility details. What would you like to do?"
         );
 
         return ChatbotMessageResponse.builder()
@@ -325,22 +325,22 @@ public class ChatbotServiceImpl implements ChatbotService {
                 .build();
     }
 
-        private ChatbotMessageResponse toBusinessErrorResponse(String message, ChatbotIntent intent, CustomException e) {
+    private ChatbotMessageResponse toBusinessErrorResponse(String message, ChatbotIntent intent, CustomException e) {
         String businessMessage = (e.getData() instanceof String s && !s.isBlank())
-            ? s
-            : (e.getResponseCode() != null ? e.getResponseCode().getMessage() : e.getMessage());
+                ? s
+                : (e.getResponseCode() != null ? e.getResponseCode().getMessage() : e.getMessage());
 
         if (businessMessage == null || businessMessage.isBlank()) {
             businessMessage = isVietnameseMessage(message)
-                ? "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại."
-                : "An error occurred while processing your request. Please try again.";
+                    ? "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại."
+                    : "An error occurred while processing your request. Please try again.";
         }
 
         return ChatbotMessageResponse.builder()
-            .intent(intent != null ? intent : ChatbotIntent.FALLBACK)
-            .reply(businessMessage)
-            .build();
-        }
+                .intent(intent != null ? intent : ChatbotIntent.FALLBACK)
+                .reply(businessMessage)
+                .build();
+    }
 
     private ChatbotMessageResponse handleCancelReservation(
             String message,
@@ -418,9 +418,9 @@ public class ChatbotServiceImpl implements ChatbotService {
         String updatedWindow = formatReservationWindow(updated);
         String reply = vi
                 ? "Đã gia hạn thêm " + hourText + " giờ cho phòng " + roomCode + " thành công."
-                    + (updatedWindow.isBlank() ? "" : " Khung giờ mới: " + updatedWindow + ".")
+                + (updatedWindow.isBlank() ? "" : " Khung giờ mới: " + updatedWindow + ".")
                 : "Successfully extended room " + roomCode + " by " + hourText + " hour(s)."
-                    + (updatedWindow.isBlank() ? "" : " New time window: " + updatedWindow + ".");
+                + (updatedWindow.isBlank() ? "" : " New time window: " + updatedWindow + ".");
 
         return ChatbotMessageResponse.builder()
                 .intent(ChatbotIntent.EXTEND_RESERVATION)
@@ -568,80 +568,80 @@ public class ChatbotServiceImpl implements ChatbotService {
         return vi ? "Hủy qua chatbot" : "Cancelled via chatbot";
     }
 
-            @Transactional(readOnly = true)
-            private ChatbotMessageResponse handleFacilityDetails(String message, ChatbotMessageParser.ParseResult parsed) {
-                boolean vi = isVietnameseMessage(message);
-            String normalized = parsed != null && parsed.normalizedMessage() != null
+    @Transactional(readOnly = true)
+    private ChatbotMessageResponse handleFacilityDetails(String message, ChatbotMessageParser.ParseResult parsed) {
+        boolean vi = isVietnameseMessage(message);
+        String normalized = parsed != null && parsed.normalizedMessage() != null
                 ? parsed.normalizedMessage()
                 : (message == null ? "" : message.trim().toLowerCase(Locale.ROOT));
-                String folded = foldText(normalized);
+        String folded = foldText(normalized);
 
-                List<Building> buildings = buildingRepository.findAll().stream()
-                    .filter(b -> b != null && !b.isDeleted())
-                    .toList();
-                List<Floor> floors = floorRepository.findAll().stream()
-                    .filter(f -> f != null && !f.isDeleted())
-                    .toList();
-                List<Room> rooms = roomRepository.findAllWithDetails().stream()
+        List<Building> buildings = buildingRepository.findAll().stream()
+                .filter(b -> b != null && !b.isDeleted())
+                .toList();
+        List<Floor> floors = floorRepository.findAll().stream()
+                .filter(f -> f != null && !f.isDeleted())
+                .toList();
+        List<Room> rooms = roomRepository.findAllWithDetails().stream()
+                .filter(Objects::nonNull)
+                .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
+                .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
+                .toList();
+
+        Room room = resolveRoom(parsed, normalized, folded, rooms);
+        Floor floor = resolveFloor(normalized, folded, floors);
+        Building building = resolveBuilding(normalized, folded, buildings);
+
+        if (room != null) {
+            String amenities = room.getAmenities() == null || room.getAmenities().isEmpty()
+                    ? (vi ? "không có" : "none")
+                    : room.getAmenities().stream()
+                    .map(Amenity::getName)
                     .filter(Objects::nonNull)
-                    .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
-                    .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
-                    .toList();
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .limit(8)
+                    .collect(Collectors.joining(", "));
 
-                Room room = resolveRoom(parsed, normalized, folded, rooms);
-                Floor floor = resolveFloor(normalized, folded, floors);
-                Building building = resolveBuilding(normalized, folded, buildings);
+            String buildingName = room.getFloor() != null && room.getFloor().getBuilding() != null
+                    ? room.getFloor().getBuilding().getName()
+                    : (vi ? "không xác định" : "unknown");
+            String floorName = room.getFloor() != null
+                    ? room.getFloor().getName()
+                    : (vi ? "không xác định" : "unknown");
+            String status = room.getStatus() != null ? room.getStatus().name() : "UNKNOWN";
+            String capacity = room.getCapacity() != null
+                    ? String.valueOf(room.getCapacity())
+                    : (vi ? "không xác định" : "unknown");
 
-                if (room != null) {
-                    String amenities = room.getAmenities() == null || room.getAmenities().isEmpty()
-                        ? (vi ? "không có" : "none")
-                        : room.getAmenities().stream()
-                        .map(Amenity::getName)
-                        .filter(Objects::nonNull)
-                        .map(String::trim)
-                        .filter(s -> !s.isBlank())
-                        .limit(8)
-                        .collect(Collectors.joining(", "));
+            String reply = vi
+                    ? "Chi tiết phòng " + room.getLocationCode() + ": tòa " + buildingName + ", tầng " + floorName
+                    + ", trạng thái " + status + ", sức chứa " + capacity + ", tiện ích: " + amenities + "."
+                    : "Room " + room.getLocationCode() + " details: building " + buildingName + ", floor " + floorName
+                    + ", status " + status + ", capacity " + capacity + ", amenities: " + amenities + ".";
 
-                    String buildingName = room.getFloor() != null && room.getFloor().getBuilding() != null
-                        ? room.getFloor().getBuilding().getName()
-                        : (vi ? "không xác định" : "unknown");
-                    String floorName = room.getFloor() != null
-                        ? room.getFloor().getName()
-                        : (vi ? "không xác định" : "unknown");
-                    String status = room.getStatus() != null ? room.getStatus().name() : "UNKNOWN";
-                    String capacity = room.getCapacity() != null
-                        ? String.valueOf(room.getCapacity())
-                        : (vi ? "không xác định" : "unknown");
+            return ChatbotMessageResponse.builder()
+                    .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                    .reply(reply)
+                    .roomDetail(toRoomDetailSafely(room))
+                    .build();
+        }
 
-                    String reply = vi
-                        ? "Chi tiết phòng " + room.getLocationCode() + ": tòa " + buildingName + ", tầng " + floorName
-                        + ", trạng thái " + status + ", sức chứa " + capacity + ", tiện ích: " + amenities + "."
-                        : "Room " + room.getLocationCode() + " details: building " + buildingName + ", floor " + floorName
-                        + ", status " + status + ", capacity " + capacity + ", amenities: " + amenities + ".";
-
-                    return ChatbotMessageResponse.builder()
-                        .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
-                        .reply(reply)
-                        .roomDetail(toRoomDetailSafely(room))
-                        .build();
-                }
-
-                boolean floorRequested = containsAnyEither(normalized, folded, "tầng", "tang", "floor") || floor != null;
-                if (floorRequested) {
-                    if (floor != null) {
-                    List<Room> floorRooms = rooms.stream()
+        boolean floorRequested = containsAnyEither(normalized, folded, "tầng", "tang", "floor") || floor != null;
+        if (floorRequested) {
+            if (floor != null) {
+                List<Room> floorRooms = rooms.stream()
                         .filter(r -> r.getFloor() != null && Objects.equals(r.getFloor().getId(), floor.getId()))
                         .toList();
-                    long totalRooms = floorRooms.size();
-                    long availableRooms = floorRooms.stream().filter(r -> r.getStatus() == RoomStatus.AVAILABLE).count();
-                    long unavailableRooms = floorRooms.stream().filter(r -> r.getStatus() == RoomStatus.UNAVAILABLE).count();
-                    long brokenRooms = floorRooms.stream().filter(r -> r.getStatus() == RoomStatus.BROKEN).count();
-                    String buildingName = floor.getBuilding() != null
+                long totalRooms = floorRooms.size();
+                long availableRooms = floorRooms.stream().filter(r -> r.getStatus() == RoomStatus.AVAILABLE).count();
+                long unavailableRooms = floorRooms.stream().filter(r -> r.getStatus() == RoomStatus.UNAVAILABLE).count();
+                long brokenRooms = floorRooms.stream().filter(r -> r.getStatus() == RoomStatus.BROKEN).count();
+                String buildingName = floor.getBuilding() != null
                         ? floor.getBuilding().getName()
                         : (vi ? "không xác định" : "unknown");
 
-                    String reply = vi
+                String reply = vi
                         ? "Chi tiết tầng " + floor.getName() + ": thuộc tòa " + buildingName
                         + ", tổng số phòng " + totalRooms
                         + ", đang trống " + availableRooms
@@ -653,199 +653,199 @@ public class ChatbotServiceImpl implements ChatbotService {
                         + ", unavailable " + unavailableRooms
                         + ", broken " + brokenRooms + ".";
 
-                    return ChatbotMessageResponse.builder()
+                return ChatbotMessageResponse.builder()
                         .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
                         .reply(reply)
                         .build();
-                    }
+            }
 
-                    String availableFloors = floors.stream()
-                        .map(Floor::getName)
-                        .filter(Objects::nonNull)
-                        .filter(s -> !s.isBlank())
-                        .limit(8)
-                        .collect(Collectors.joining(", "));
+            String availableFloors = floors.stream()
+                    .map(Floor::getName)
+                    .filter(Objects::nonNull)
+                    .filter(s -> !s.isBlank())
+                    .limit(8)
+                    .collect(Collectors.joining(", "));
 
-                    return ChatbotMessageResponse.builder()
-                        .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
-                        .reply(vi
+            return ChatbotMessageResponse.builder()
+                    .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                    .reply(vi
                             ? (availableFloors.isBlank()
                             ? "Mình không tìm thấy thông tin tầng trong hệ thống."
                             : "Mình chưa xác định được bạn muốn xem tầng nào. Một số tầng hiện có: " + availableFloors + ".")
                             : (availableFloors.isBlank()
                             ? "I couldn't find floor information in the database."
                             : "I couldn't determine which floor you mean. Available floors include: " + availableFloors + "."))
-                        .build();
-                }
+                    .build();
+        }
 
-                boolean buildingRequested = containsAnyEither(normalized, folded, "tòa", "toà", "toa", "building") || building != null;
-                if (buildingRequested) {
-                    if (building != null) {
-                    List<Floor> buildingFloors = floors.stream()
+        boolean buildingRequested = containsAnyEither(normalized, folded, "tòa", "toà", "toa", "building") || building != null;
+        if (buildingRequested) {
+            if (building != null) {
+                List<Floor> buildingFloors = floors.stream()
                         .filter(f -> f.getBuilding() != null && Objects.equals(f.getBuilding().getId(), building.getId()))
                         .toList();
-                    Set<String> floorIds = buildingFloors.stream().map(Floor::getId).filter(Objects::nonNull).collect(Collectors.toSet());
-                    long totalRooms = rooms.stream()
+                Set<String> floorIds = buildingFloors.stream().map(Floor::getId).filter(Objects::nonNull).collect(Collectors.toSet());
+                long totalRooms = rooms.stream()
                         .filter(r -> r.getFloor() != null && floorIds.contains(r.getFloor().getId()))
                         .count();
 
-                    String reply = vi
+                String reply = vi
                         ? "Chi tiết tòa " + building.getName() + ": địa chỉ " + Objects.toString(building.getAddress(), "không xác định")
                         + ", tổng số tầng " + buildingFloors.size() + ", tổng số phòng " + totalRooms + "."
                         : "Building " + building.getName() + " details: address " + Objects.toString(building.getAddress(), "unknown")
                         + ", total floors " + buildingFloors.size() + ", total rooms " + totalRooms + ".";
 
-                    return ChatbotMessageResponse.builder()
+                return ChatbotMessageResponse.builder()
                         .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
                         .reply(reply)
                         .build();
-                    }
+            }
 
-                    String topBuildings = buildings.stream()
-                        .map(Building::getName)
-                        .filter(Objects::nonNull)
-                        .filter(s -> !s.isBlank())
-                        .limit(8)
-                        .collect(Collectors.joining(", "));
+            String topBuildings = buildings.stream()
+                    .map(Building::getName)
+                    .filter(Objects::nonNull)
+                    .filter(s -> !s.isBlank())
+                    .limit(8)
+                    .collect(Collectors.joining(", "));
 
-                    return ChatbotMessageResponse.builder()
-                        .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
-                        .reply(vi
+            return ChatbotMessageResponse.builder()
+                    .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                    .reply(vi
                             ? (topBuildings.isBlank()
                             ? "Mình không tìm thấy thông tin tòa nhà trong hệ thống."
                             : "Mình chưa xác định được bạn muốn xem tòa nào. Các tòa hiện có: " + topBuildings + ".")
                             : (topBuildings.isBlank()
                             ? "I couldn't find building details in the database."
                             : "I couldn't determine which building you mean. Available buildings include: " + topBuildings + "."))
-                        .build();
-                }
+                    .build();
+        }
 
-                String sample = vi
-                    ? "Ví dụ: 'Xem chi tiết phòng AL-102' hoặc 'Chi tiết tòa A'."
-                    : "For example: 'Show details of room AL-102' or 'Details of building A'.";
-                return ChatbotMessageResponse.builder()
-                    .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
-                    .reply(vi
+        String sample = vi
+                ? "Ví dụ: 'Xem chi tiết phòng AL-102' hoặc 'Chi tiết tòa A'."
+                : "For example: 'Show details of room AL-102' or 'Details of building A'.";
+        return ChatbotMessageResponse.builder()
+                .intent(ChatbotIntent.VIEW_FACILITY_DETAILS)
+                .reply(vi
                         ? "Vui lòng cho biết bạn muốn xem chi tiết tòa, tầng hay phòng. " + sample
                         : "Please specify whether you want building, floor, or room details. " + sample)
-                    .build();
-                }
+                .build();
+    }
 
-                private Room resolveRoom(ChatbotMessageParser.ParseResult parsed, String normalized, String folded, List<Room> rooms) {
-                if (parsed != null && parsed.roomCode() != null && !parsed.roomCode().isBlank()) {
-                    return rooms.stream()
-                        .filter(r -> r.getLocationCode() != null && r.getLocationCode().equalsIgnoreCase(parsed.roomCode()))
-                        .findFirst()
-                        .orElse(null);
-                }
-
-                return rooms.stream()
-                    .filter(r -> r.getLocationCode() != null)
-                    .filter(r -> {
-                        String code = r.getLocationCode().toLowerCase(Locale.ROOT);
-                        String codeFolded = foldText(code);
-                        return normalized.contains(code) || folded.contains(codeFolded) || normalized.contains(code.replace("-", " "));
-                    })
+    private Room resolveRoom(ChatbotMessageParser.ParseResult parsed, String normalized, String folded, List<Room> rooms) {
+        if (parsed != null && parsed.roomCode() != null && !parsed.roomCode().isBlank()) {
+            return rooms.stream()
+                    .filter(r -> r.getLocationCode() != null && r.getLocationCode().equalsIgnoreCase(parsed.roomCode()))
                     .findFirst()
                     .orElse(null);
-                }
+        }
 
-                private RoomDetailResponse toRoomDetailSafely(Room room) {
-                if (room == null || room.getId() == null) return null;
-                try {
-                    return roomService.getRoomDetail(room.getId());
-                } catch (Exception e) {
-                    log.warn("Failed to build room detail payload for chatbot room {}", room.getId(), e);
-                    return null;
-                }
-                }
+        return rooms.stream()
+                .filter(r -> r.getLocationCode() != null)
+                .filter(r -> {
+                    String code = r.getLocationCode().toLowerCase(Locale.ROOT);
+                    String codeFolded = foldText(code);
+                    return normalized.contains(code) || folded.contains(codeFolded) || normalized.contains(code.replace("-", " "));
+                })
+                .findFirst()
+                .orElse(null);
+    }
 
-                private Floor resolveFloor(String normalized, String folded, List<Floor> floors) {
-                return floors.stream()
-                    .filter(f -> f.getName() != null && !f.getName().isBlank())
-                    .filter(f -> {
-                        String name = f.getName().toLowerCase(Locale.ROOT);
-                        String foldedName = foldText(name);
-                        return normalized.contains(name) || folded.contains(foldedName);
-                    })
-                    .findFirst()
-                    .orElse(null);
-                }
+    private RoomDetailResponse toRoomDetailSafely(Room room) {
+        if (room == null || room.getId() == null) return null;
+        try {
+            return roomService.getRoomDetail(room.getId());
+        } catch (Exception e) {
+            log.warn("Failed to build room detail payload for chatbot room {}", room.getId(), e);
+            return null;
+        }
+    }
 
-                private Building resolveBuilding(String normalized, String folded, List<Building> buildings) {
-                return buildings.stream()
-                    .filter(b -> b.getName() != null && !b.getName().isBlank())
-                    .filter(b -> {
-                        String name = b.getName().toLowerCase(Locale.ROOT);
-                        String foldedName = foldText(name);
-                        String address = Objects.toString(b.getAddress(), "").toLowerCase(Locale.ROOT);
-                        String foldedAddress = foldText(address);
-                        return normalized.contains(name)
+    private Floor resolveFloor(String normalized, String folded, List<Floor> floors) {
+        return floors.stream()
+                .filter(f -> f.getName() != null && !f.getName().isBlank())
+                .filter(f -> {
+                    String name = f.getName().toLowerCase(Locale.ROOT);
+                    String foldedName = foldText(name);
+                    return normalized.contains(name) || folded.contains(foldedName);
+                })
+                .findFirst()
+                .orElse(null);
+    }
+
+    private Building resolveBuilding(String normalized, String folded, List<Building> buildings) {
+        return buildings.stream()
+                .filter(b -> b.getName() != null && !b.getName().isBlank())
+                .filter(b -> {
+                    String name = b.getName().toLowerCase(Locale.ROOT);
+                    String foldedName = foldText(name);
+                    String address = Objects.toString(b.getAddress(), "").toLowerCase(Locale.ROOT);
+                    String foldedAddress = foldText(address);
+                    return normalized.contains(name)
                             || folded.contains(foldedName)
                             || (!address.isBlank() && (normalized.contains(address) || folded.contains(foldedAddress)));
-                    })
-                    .findFirst()
-                    .orElse(null);
-                }
+                })
+                .findFirst()
+                .orElse(null);
+    }
 
-            @Transactional(readOnly = true)
-            private ChatbotMessageResponse handleSuggestRoomsByCapacity(String message, ChatbotMessageParser.ParseResult parsed) {
-            Integer min = parsed != null ? parsed.minCapacity() : null;
-            if (min == null || min <= 0) {
-                return ChatbotMessageResponse.builder()
+    @Transactional(readOnly = true)
+    private ChatbotMessageResponse handleSuggestRoomsByCapacity(String message, ChatbotMessageParser.ParseResult parsed) {
+        Integer min = parsed != null ? parsed.minCapacity() : null;
+        if (min == null || min <= 0) {
+            return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY)
                     .reply("What capacity do you need? For example: 'Suggest rooms for 20 people'.")
                     .availableRooms(List.of())
                     .build();
-            }
+        }
 
-            List<Room> rooms = roomRepository.findAllWithDetails().stream()
+        List<Room> rooms = roomRepository.findAllWithDetails().stream()
                 .filter(r -> r.getStatus() != RoomStatus.BROKEN)
                 .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
                 .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
                 .filter(r -> r.getCapacity() != null && r.getCapacity() >= min)
                 .sorted(Comparator.comparing(Room::getCapacity, Comparator.nullsLast(Comparator.naturalOrder()))
-                    .thenComparing(Room::getLocationCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                        .thenComparing(Room::getLocationCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
 
-            if (rooms.isEmpty()) {
-                return ChatbotMessageResponse.builder()
+        if (rooms.isEmpty()) {
+            return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY)
                     .reply("I couldn't find any rooms that can accommodate " + min + "+ people.")
                     .availableRooms(List.of())
                     .build();
-            }
+        }
 
-            List<String> roomIds = rooms.stream().map(Room::getId).filter(Objects::nonNull).toList();
-            Map<String, String> roomIdToImageUrl = roomIds.isEmpty()
+        List<String> roomIds = rooms.stream().map(Room::getId).filter(Objects::nonNull).toList();
+        Map<String, String> roomIdToImageUrl = roomIds.isEmpty()
                 ? Map.of()
                 : roomImageRepository.findByRoom_IdIn(roomIds).stream()
                 .filter(ri -> ri.getRoom() != null && ri.getRoom().getId() != null)
                 .filter(ri -> ri.getImageUrl() != null && !ri.getImageUrl().isBlank())
                 .sorted(Comparator.comparing(RoomImage::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toMap(
-                    ri -> ri.getRoom().getId(),
-                    RoomImage::getImageUrl,
-                    (a, b) -> a
+                        ri -> ri.getRoom().getId(),
+                        RoomImage::getImageUrl,
+                        (a, b) -> a
                 ));
 
-            List<ChatbotRoomItemResponse> suggested = rooms.stream()
+        List<ChatbotRoomItemResponse> suggested = rooms.stream()
                 .map(r -> toRoomItem(r, List.of(), roomIdToImageUrl.get(r.getId())))
                 .toList();
 
-            return ChatbotMessageResponse.builder()
+        return ChatbotMessageResponse.builder()
                 .intent(ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY)
                 .reply("Here are rooms that can accommodate " + min + "+ people:")
                 .availableRooms(suggested)
                 .build();
-            }
+    }
 
     @Transactional(readOnly = true)
     private ChatbotMessageResponse handleAvailableRoomsToday(String message, ChatbotMessageParser.ParseResult parsed) {
         boolean vi = isVietnameseMessage(message);
         String normalized = parsed != null && parsed.normalizedMessage() != null
-            ? parsed.normalizedMessage()
-            : Objects.toString(message, "").trim().toLowerCase(Locale.ROOT);
+                ? parsed.normalizedMessage()
+                : Objects.toString(message, "").trim().toLowerCase(Locale.ROOT);
         String folded = foldText(normalized);
 
         LocalDate day = parsed != null && parsed.date() != null ? parsed.date() : LocalDate.now();
@@ -874,63 +874,63 @@ public class ChatbotServiceImpl implements ChatbotService {
         if (!windowStart.isBefore(endOfDay)) {
             return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY)
-                .reply(vi
-                    ? ("Khoảng thời gian của " + dayPhraseVi + " đã qua, vui lòng thử ngày/giờ khác.")
-                    : ("The remaining time window for " + dayPhraseEn + " is over, please try a different date/time."))
+                    .reply(vi
+                            ? ("Khoảng thời gian của " + dayPhraseVi + " đã qua, vui lòng thử ngày/giờ khác.")
+                            : ("The remaining time window for " + dayPhraseEn + " is over, please try a different date/time."))
                     .availableRooms(List.of())
                     .build();
         }
 
         List<Building> buildings = buildingRepository.findAll().stream()
-            .filter(Objects::nonNull)
-            .filter(b -> !b.isDeleted())
-            .toList();
+                .filter(Objects::nonNull)
+                .filter(b -> !b.isDeleted())
+                .toList();
         Building matchedBuilding = resolveBuilding(normalized, folded, buildings);
         boolean buildingMentioned = containsAnyEither(normalized, folded, "tòa", "toà", "toa", "building");
 
         if (buildingMentioned && matchedBuilding == null) {
             String topBuildings = buildings.stream()
-                .map(Building::getName)
-                .filter(Objects::nonNull)
-                .filter(s -> !s.isBlank())
-                .limit(8)
-                .collect(Collectors.joining(", "));
+                    .map(Building::getName)
+                    .filter(Objects::nonNull)
+                    .filter(s -> !s.isBlank())
+                    .limit(8)
+                    .collect(Collectors.joining(", "));
             return ChatbotMessageResponse.builder()
-                .intent(ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY)
-                .reply(vi
-                    ? (topBuildings.isBlank()
-                    ? "Mình không tìm thấy dữ liệu tòa nhà trong hệ thống."
-                    : "Mình chưa xác định được tòa bạn muốn xem. Các tòa hiện có: " + topBuildings + ".")
-                    : (topBuildings.isBlank()
-                    ? "I couldn't find building data in the database."
-                    : "I couldn't determine which building you mean. Available buildings include: " + topBuildings + "."))
-                .availableRooms(List.of())
-                .build();
+                    .intent(ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY)
+                    .reply(vi
+                            ? (topBuildings.isBlank()
+                            ? "Mình không tìm thấy dữ liệu tòa nhà trong hệ thống."
+                            : "Mình chưa xác định được tòa bạn muốn xem. Các tòa hiện có: " + topBuildings + ".")
+                            : (topBuildings.isBlank()
+                            ? "I couldn't find building data in the database."
+                            : "I couldn't determine which building you mean. Available buildings include: " + topBuildings + "."))
+                    .availableRooms(List.of())
+                    .build();
         }
 
         List<Room> rooms = roomRepository.findAllWithDetails().stream()
                 .filter(r -> r.getStatus() != RoomStatus.BROKEN)
                 .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
                 .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
-            .filter(r -> matchedBuilding == null
-                || (r.getFloor() != null
-                && r.getFloor().getBuilding() != null
-                && Objects.equals(r.getFloor().getBuilding().getId(), matchedBuilding.getId())))
+                .filter(r -> matchedBuilding == null
+                        || (r.getFloor() != null
+                        && r.getFloor().getBuilding() != null
+                        && Objects.equals(r.getFloor().getBuilding().getId(), matchedBuilding.getId())))
                 .collect(Collectors.toList());
 
         List<String> roomIds = rooms.stream().map(Room::getId).filter(Objects::nonNull).toList();
 
         Map<String, String> roomIdToImageUrl = roomIds.isEmpty()
-            ? Map.of()
-            : roomImageRepository.findByRoom_IdIn(roomIds).stream()
-            .filter(ri -> ri.getRoom() != null && ri.getRoom().getId() != null)
-            .filter(ri -> ri.getImageUrl() != null && !ri.getImageUrl().isBlank())
-            .sorted(Comparator.comparing(RoomImage::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
-            .collect(Collectors.toMap(
-                ri -> ri.getRoom().getId(),
-                RoomImage::getImageUrl,
-                (a, b) -> a
-            ));
+                ? Map.of()
+                : roomImageRepository.findByRoom_IdIn(roomIds).stream()
+                .filter(ri -> ri.getRoom() != null && ri.getRoom().getId() != null)
+                .filter(ri -> ri.getImageUrl() != null && !ri.getImageUrl().isBlank())
+                .sorted(Comparator.comparing(RoomImage::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.toMap(
+                        ri -> ri.getRoom().getId(),
+                        RoomImage::getImageUrl,
+                        (a, b) -> a
+                ));
 
         List<ReservationStatus> blocking = List.of(ReservationStatus.PENDING, ReservationStatus.RESERVED, ReservationStatus.IN_USE);
         List<Reservation> overlaps = roomIds.isEmpty()
@@ -939,19 +939,19 @@ public class ChatbotServiceImpl implements ChatbotService {
 
         LocalDateTime pointEnd = requestedStart.plusMinutes(1);
         List<Reservation> overlapsAtPoint = roomIds.isEmpty()
-            ? List.of()
-            : reservationRepository.findOverlappingReservationsForRooms(roomIds, blocking, requestedStart, pointEnd);
+                ? List.of()
+                : reservationRepository.findOverlappingReservationsForRooms(roomIds, blocking, requestedStart, pointEnd);
         Set<String> busyAtPoint = overlapsAtPoint.stream()
-            .map(Reservation::getRoom)
-            .filter(Objects::nonNull)
-            .map(Room::getId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+                .map(Reservation::getRoom)
+                .filter(Objects::nonNull)
+                .map(Room::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
-            List<Reservation> overlapsRequestedWindow = roomIds.isEmpty() || instantMode
+        List<Reservation> overlapsRequestedWindow = roomIds.isEmpty() || instantMode
                 ? List.of()
                 : reservationRepository.findOverlappingReservationsForRooms(roomIds, blocking, requestedStart, requestedEnd);
-            Set<String> busyInRequestedWindow = overlapsRequestedWindow.stream()
+        Set<String> busyInRequestedWindow = overlapsRequestedWindow.stream()
                 .map(Reservation::getRoom)
                 .filter(Objects::nonNull)
                 .map(Room::getId)
@@ -978,11 +978,11 @@ public class ChatbotServiceImpl implements ChatbotService {
                     ? freeRanges.stream().limit(3).map(TimeRange::format).toList()
                     : List.of(requestedStart.toLocalTime().format(TIME_FMT) + "–" + requestedEnd.toLocalTime().format(TIME_FMT));
 
-                available.add(toRoomItem(
+            available.add(toRoomItem(
                     room,
                     availableSlots,
                     roomIdToImageUrl.get(room.getId())
-                ));
+            ));
         }
 
         if (available.isEmpty()) {
@@ -991,23 +991,23 @@ public class ChatbotServiceImpl implements ChatbotService {
             if (instantMode) {
                 reply = vi
                         ? (scope == null
-                            ? "Hiện tại không có phòng trống. Bạn muốn thử mốc thời gian khác không?"
-                            : "Hiện tại tòa " + scope + " không có phòng trống.")
+                        ? "Hiện tại không có phòng trống. Bạn muốn thử mốc thời gian khác không?"
+                        : "Hiện tại tòa " + scope + " không có phòng trống.")
                         : (scope == null
-                            ? "There are no rooms available right now. Would you like to try another time?"
-                            : "There are no rooms available right now in building " + scope + ".");
+                        ? "There are no rooms available right now. Would you like to try another time?"
+                        : "There are no rooms available right now in building " + scope + ".");
             } else {
                 reply = vi
                         ? (scope == null
-                            ? "Mình không tìm thấy phòng trống trong khung giờ bạn hỏi (" + requestedStart.toLocalTime().format(TIME_FMT)
-                                + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseVi + "."
-                            : "Mình không tìm thấy phòng trống trong khung giờ bạn hỏi (" + requestedStart.toLocalTime().format(TIME_FMT)
-                                + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseVi + " ở tòa " + scope + ".")
+                        ? "Mình không tìm thấy phòng trống trong khung giờ bạn hỏi (" + requestedStart.toLocalTime().format(TIME_FMT)
+                        + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseVi + "."
+                        : "Mình không tìm thấy phòng trống trong khung giờ bạn hỏi (" + requestedStart.toLocalTime().format(TIME_FMT)
+                        + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseVi + " ở tòa " + scope + ".")
                         : (scope == null
-                            ? "I couldn't find rooms available in the requested time window (" + requestedStart.toLocalTime().format(TIME_FMT)
-                                + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseEn + "."
-                            : "I couldn't find rooms available in the requested time window (" + requestedStart.toLocalTime().format(TIME_FMT)
-                                + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseEn + " in building " + scope + ".");
+                        ? "I couldn't find rooms available in the requested time window (" + requestedStart.toLocalTime().format(TIME_FMT)
+                        + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseEn + "."
+                        : "I couldn't find rooms available in the requested time window (" + requestedStart.toLocalTime().format(TIME_FMT)
+                        + " - " + requestedEnd.toLocalTime().format(TIME_FMT) + ") " + dayPhraseEn + " in building " + scope + ".");
             }
 
             return ChatbotMessageResponse.builder()
@@ -1072,11 +1072,11 @@ public class ChatbotServiceImpl implements ChatbotService {
 
         if (start == null) {
             String roomHint = (parsed.roomCode() != null && !parsed.roomCode().isBlank())
-                ? parsed.roomCode()
-                : "a room";
+                    ? parsed.roomCode()
+                    : "a room";
             return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.BOOK_ROOM)
-                .reply("What time should I book it for? For example: 'Book " + roomHint + " at 10AM today' or 'from 14:00 to 15:00 today'.")
+                    .reply("What time should I book it for? For example: 'Book " + roomHint + " at 10AM today' or 'from 14:00 to 15:00 today'.")
                     .build();
         }
 
@@ -1133,13 +1133,13 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
 
         Room room = roomRepository.findByLocationCodeIgnoreCase(parsed.roomCode())
-            .orElse(null);
+                .orElse(null);
 
         if (room == null) {
             return ChatbotMessageResponse.builder()
-                .intent(ChatbotIntent.BOOK_ROOM)
-                .reply("I can't find a room with code '" + parsed.roomCode() + "'. Please double-check the room code (e.g. AL-102).")
-                .build();
+                    .intent(ChatbotIntent.BOOK_ROOM)
+                    .reply("I can't find a room with code '" + parsed.roomCode() + "'. Please double-check the room code (e.g. AL-102).")
+                    .build();
         }
 
         ReservationRequest reservationRequest = new ReservationRequest();
@@ -1156,12 +1156,12 @@ public class ChatbotServiceImpl implements ChatbotService {
 
             String reply = parsed.endTimeDefaulted()
                     ? pickByHash(message,
-                        "Done — I booked " + room.getLocationCode() + " at " + start.format(TIME_FMT) + " " + dayPhrase + " for 1 hour.",
-                        "All set. " + room.getLocationCode() + " is booked from " + start.format(TIME_FMT) + " to " + end.format(TIME_FMT) + " " + dayPhrase + ".")
+                    "Done — I booked " + room.getLocationCode() + " at " + start.format(TIME_FMT) + " " + dayPhrase + " for 1 hour.",
+                    "All set. " + room.getLocationCode() + " is booked from " + start.format(TIME_FMT) + " to " + end.format(TIME_FMT) + " " + dayPhrase + ".")
                     : pickByHash(message,
-                        "Booked successfully. You have " + room.getLocationCode() + " from " + start.format(TIME_FMT) + " to " + end.format(TIME_FMT) + " " + dayPhrase + ".",
-                        "Confirmed — " + room.getLocationCode() + " is reserved from " + start.format(TIME_FMT) + " to " + end.format(TIME_FMT) + " " + dayPhrase + ".",
-                        "Great — your booking for " + room.getLocationCode() + " is confirmed (" + start.format(TIME_FMT) + "–" + end.format(TIME_FMT) + ").")
+                    "Booked successfully. You have " + room.getLocationCode() + " from " + start.format(TIME_FMT) + " to " + end.format(TIME_FMT) + " " + dayPhrase + ".",
+                    "Confirmed — " + room.getLocationCode() + " is reserved from " + start.format(TIME_FMT) + " to " + end.format(TIME_FMT) + " " + dayPhrase + ".",
+                    "Great — your booking for " + room.getLocationCode() + " is confirmed (" + start.format(TIME_FMT) + "–" + end.format(TIME_FMT) + ").")
                     ;
 
             return ChatbotMessageResponse.builder()
@@ -1194,7 +1194,7 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
     }
 
-        private ChatbotMessageResponse autoReserveByCapacity(
+    private ChatbotMessageResponse autoReserveByCapacity(
             String message,
             LocalDate date,
             LocalTime start,
@@ -1202,37 +1202,37 @@ public class ChatbotServiceImpl implements ChatbotService {
             int minCapacity,
             Authentication authentication,
             boolean endTimeDefaulted
-        ) {
+    ) {
         LocalDateTime startTime = LocalDateTime.of(date, start);
         LocalDateTime endTime = LocalDateTime.of(date, end);
 
         List<Room> candidates = roomRepository.findAllWithDetails().stream()
-            .filter(r -> r.getStatus() != RoomStatus.BROKEN)
-            .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
-            .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
-            .filter(r -> r.getCapacity() != null && r.getCapacity() >= minCapacity)
-            .sorted(Comparator.comparing(Room::getCapacity, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(Room::getLocationCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
-            .toList();
+                .filter(r -> r.getStatus() != RoomStatus.BROKEN)
+                .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
+                .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
+                .filter(r -> r.getCapacity() != null && r.getCapacity() >= minCapacity)
+                .sorted(Comparator.comparing(Room::getCapacity, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(Room::getLocationCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
 
         if (candidates.isEmpty()) {
             return ChatbotMessageResponse.builder()
-                .intent(ChatbotIntent.BOOK_ROOM)
-                .reply("I couldn't find any rooms that can accommodate " + minCapacity + "+ people.")
-                .build();
+                    .intent(ChatbotIntent.BOOK_ROOM)
+                    .reply("I couldn't find any rooms that can accommodate " + minCapacity + "+ people.")
+                    .build();
         }
 
         List<String> roomIds = candidates.stream().map(Room::getId).filter(Objects::nonNull).toList();
 
         List<ReservationStatus> blocking = List.of(ReservationStatus.PENDING, ReservationStatus.RESERVED, ReservationStatus.IN_USE);
         List<Reservation> overlaps = roomIds.isEmpty()
-            ? List.of()
-            : reservationRepository.findOverlappingReservationsForRooms(roomIds, blocking, startTime, endTime);
+                ? List.of()
+                : reservationRepository.findOverlappingReservationsForRooms(roomIds, blocking, startTime, endTime);
 
         Set<String> busyRoomIds = overlaps.stream()
-            .map(r -> r.getRoom() != null ? r.getRoom().getId() : null)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+                .map(r -> r.getRoom() != null ? r.getRoom().getId() : null)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
         String dayPhrase = humanizeDate(date);
 
@@ -1248,33 +1248,33 @@ public class ChatbotServiceImpl implements ChatbotService {
             reservationRequest.setNote("Booked via chatbot (auto by capacity)");
 
             try {
-            ReservationResponse reservation = reservationService.reserveRoom(reservationRequest, authentication);
+                ReservationResponse reservation = reservationService.reserveRoom(reservationRequest, authentication);
 
-            String reply = endTimeDefaulted
-                ? "Done — I booked " + room.getLocationCode() + " at " + start.format(TIME_FMT) + " " + dayPhrase + " for 1 hour (capacity " + minCapacity + "+)."
-                : "Booked successfully. You have " + room.getLocationCode() + " from " + start.format(TIME_FMT) + " to " + end.format(TIME_FMT) + " " + dayPhrase + " (capacity " + minCapacity + "+).";
+                String reply = endTimeDefaulted
+                        ? "Done — I booked " + room.getLocationCode() + " at " + start.format(TIME_FMT) + " " + dayPhrase + " for 1 hour (capacity " + minCapacity + "+)."
+                        : "Booked successfully. You have " + room.getLocationCode() + " from " + start.format(TIME_FMT) + " to " + end.format(TIME_FMT) + " " + dayPhrase + " (capacity " + minCapacity + "+).";
 
-            return ChatbotMessageResponse.builder()
-                .intent(ChatbotIntent.BOOK_ROOM)
-                .reply(reply)
-                .reservation(reservation)
-                .build();
+                return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.BOOK_ROOM)
+                        .reply(reply)
+                        .reservation(reservation)
+                        .build();
             } catch (CustomException e) {
-            if (e.getResponseCode() == ResponseCode.CANNOT_RESERVE_ROOM
-                || e.getResponseCode() == ResponseCode.RESERVATION_TIME_OVERLAP
-                || e.getResponseCode() == ResponseCode.USER_TIME_OVERLAP) {
-                // Race condition: room got booked by someone else. Try the next candidate.
-                continue;
-            }
-            throw e;
+                if (e.getResponseCode() == ResponseCode.CANNOT_RESERVE_ROOM
+                        || e.getResponseCode() == ResponseCode.RESERVATION_TIME_OVERLAP
+                        || e.getResponseCode() == ResponseCode.USER_TIME_OVERLAP) {
+                    // Race condition: room got booked by someone else. Try the next candidate.
+                    continue;
+                }
+                throw e;
             }
         }
 
         return ChatbotMessageResponse.builder()
-            .intent(ChatbotIntent.BOOK_ROOM)
-            .reply("I couldn't find an available room for " + start.format(TIME_FMT) + "–" + end.format(TIME_FMT) + " " + dayPhrase + " with capacity " + minCapacity + "+.")
-            .build();
-        }
+                .intent(ChatbotIntent.BOOK_ROOM)
+                .reply("I couldn't find an available room for " + start.format(TIME_FMT) + "–" + end.format(TIME_FMT) + " " + dayPhrase + " with capacity " + minCapacity + "+.")
+                .build();
+    }
 
     private String humanizeDate(LocalDate date) {
         if (date == null) return "";

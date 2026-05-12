@@ -60,7 +60,14 @@ public interface RoomRepository extends JpaRepository<Room, String> {
     List<Room> findAllWithDetails();
 
         @EntityGraph(attributePaths = {"floor", "floor.building", "amenities"})
+    @Query("SELECT r FROM Room r WHERE r.floor.building.id IN :buildingIds")
+    List<Room> findAllWithDetailsByBuildingIds(@Param("buildingIds") List<String> buildingIds);
+
+        @EntityGraph(attributePaths = {"floor", "floor.building", "amenities"})
     Optional<Room> findByLocationCodeIgnoreCase(String locationCode);
+
+        @EntityGraph(attributePaths = {"floor", "floor.building"})
+        Optional<Room> findWithFloorAndBuildingById(String id);
 
     boolean existsByFloorIdAndLocationCode(String floorId, String locationCode);
     Optional<Room> findByLocationCode(String locationCode);

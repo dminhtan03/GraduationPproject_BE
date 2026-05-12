@@ -15,4 +15,7 @@ public class RoomSearchResponse {
     private String locationCode;
     private Double score;
     private RoomStatus status;
+    private String building;
+    private String floor;
+    private Integer capacity;
 }
