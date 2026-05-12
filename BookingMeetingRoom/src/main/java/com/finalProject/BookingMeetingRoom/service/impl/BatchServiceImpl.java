@@ -349,14 +349,14 @@ public class BatchServiceImpl {
     @jakarta.transaction.Transactional
     public void remindUnpaidCheckouts() {
         try {
-            LocalDateTime fiveMinutesAgo = LocalDateTime.now().minusMinutes(5);
+            LocalDateTime fiveMinutesAgo = LocalDateTime.now().minusMinutes(1);
             var payingReservations = reservationRepository.findPayingReservationsOlderThan(fiveMinutesAgo);
             for (var reservation : payingReservations) {
                 var user = reservation.getUser();
                 if (user == null || user.getUserInfo() == null || user.getUserInfo().getEmail() == null) continue;
 
                 if (reservation.getUpdatedAt() != null
-                        && reservation.getUpdatedAt().isAfter(LocalDateTime.now().minusMinutes(4))) {
+                        && reservation.getUpdatedAt().isAfter(LocalDateTime.now().minusMinutes(1))) {
                     continue;
                 }
                 var notifReq = new com.finalProject.BookingMeetingRoom.model.request.NotificationRequest();
