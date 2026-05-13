@@ -69,7 +69,8 @@ class ChatbotServiceImplTest {
         ChatbotMessageResponse response = service.handleMessage(request, null);
 
         assertEquals(ChatbotIntent.FALLBACK, response.getIntent());
-        assertTrue(response.getReply().contains("Please type a message"));
+        assertTrue(response.getReply().contains("Please choose a function"));
+        assertTrue(response.getMenuOptions() != null && response.getMenuOptions().size() == 4);
         assertEquals("s-1", response.getSessionId());
     }
 }

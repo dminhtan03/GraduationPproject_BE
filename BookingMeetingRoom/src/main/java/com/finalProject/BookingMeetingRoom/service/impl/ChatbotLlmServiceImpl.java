@@ -56,7 +56,7 @@ public class ChatbotLlmServiceImpl implements ChatbotLlmService {
                 You are a room-booking assistant. Extract booking intent from the Vietnamese or English message.
                 Return JSON ONLY, no explanation:
                 {
-                  "intent": "BOOK_ROOM|CHECK_AVAILABLE_ROOMS_TODAY|CANCEL_RESERVATION|EXTEND_RESERVATION|RETURN_ROOM|SUGGEST_ROOMS_BY_CAPACITY|VIEW_FACILITY_DETAILS|FALLBACK",
+                                    "intent": "BOOK_ROOM|CHECK_AVAILABLE_ROOMS_TODAY|CANCEL_RESERVATION|EXTEND_RESERVATION|RETURN_ROOM|SUGGEST_ROOMS_BY_CAPACITY|VIEW_FACILITY_DETAILS|LOOKUP|FALLBACK",
                   "roomCode": "string or null",
                   "date": "YYYY-MM-DD or null",
                   "startTime": "HH:mm or null",
