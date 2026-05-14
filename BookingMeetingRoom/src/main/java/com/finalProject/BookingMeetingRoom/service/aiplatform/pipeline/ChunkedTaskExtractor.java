@@ -16,9 +16,15 @@ public class ChunkedTaskExtractor {
     private static final double MIN_CONFIDENCE = 0.45;
 
     private final AiLlmService aiLlmService;
+    private final String language;
 
     public ChunkedTaskExtractor(AiLlmService aiLlmService) {
+        this(aiLlmService, "vi");
+    }
+
+    public ChunkedTaskExtractor(AiLlmService aiLlmService, String language) {
         this.aiLlmService = aiLlmService;
+        this.language = language != null ? language : "vi";
     }
 
     public List<ExtractedTaskItem> extract(String transcript) {
@@ -29,13 +35,18 @@ public class ChunkedTaskExtractor {
         List<ExtractedTaskItem> all = new ArrayList<>();
         Set<String> seen = new HashSet<>();
 
+        String systemPrompt = "Bạn là AI trích xuất nhiệm vụ từ transcript cuộc họp. " +
+                "QUAN TRỌNG: Trả lời bằng CÙNG ngôn ngữ với transcript. " +
+                "Nếu transcript tiếng Việt → trả lời tiếng Việt. " +
+                "Chỉ trả về JSON array, không giải thích.";
+
         for (int i = 0; i < chunks.size(); i++) {
-            String context = "[Part " + (i + 1) + "/" + chunks.size() + "]\n\n" + chunks.get(i);
-            String prompt = "Extract tasks from meeting transcript. Return JSON array only. " +
-                    "Fields: title, description, goal, expected_result, priority, due_at, " +
-                    "assigner_user_id, assignee_user_id, ai_confidence, ai_raw_text.\n\n" +
+            String context = "[Phần " + (i + 1) + "/" + chunks.size() + "]\n\n" + chunks.get(i);
+            String prompt = "Trích xuất các nhiệm vụ từ transcript. Trả về JSON array.\n" +
+                    "Các trường: title, description, goal, expected_result, priority (low/high/urgent), " +
+                    "due_at, assigner_user_id, assignee_user_id, ai_confidence (0-1), ai_raw_text.\n\n" +
                     "Transcript:\n" + context;
-            JsonNode node = aiLlmService.runJson("Return JSON array only.", prompt, 0.2);
+            JsonNode node = aiLlmService.runJson(systemPrompt, prompt, 0.2);
             if (node == null || !node.isArray()) {
                 continue;
             }

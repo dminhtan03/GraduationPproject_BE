@@ -327,45 +327,31 @@ public class MeetingServiceImpl implements MeetingService {
         Meeting meeting = createMeetingEntity(creator, reservationId, title, savedPath);
         log.info("Meeting created: {}", meeting.getId());
 
-        // 3. Call ai-platform (no transaction open)
+        // 3. STT once + 2 LLM calls (summary + tasks) — no duplicate STT
         String summary = "";
         String transcript = "";
         List<ProcessRecordingResponse.ExtractedTask> tasks = new ArrayList<>();
 
-        MeetingAnalyzeRequest analyzeReq = MeetingAnalyzeRequest.builder()
-                .meetingTitle(meeting.getTitle())
-                .audioPath(savedPath)
-                .build();
-
         try {
-            MeetingSummaryResponse sumResp = aiMeetingService.summarize(analyzeReq);
-            summary = sumResp.getSummary() != null ? sumResp.getSummary() : "";
-            transcript = sumResp.getTranscript() != null ? sumResp.getTranscript() : "";
-            log.info("AI summarize done, summary length={}", summary.length());
-        } catch (Exception ex) {
-            log.warn("AI summarize failed (non-fatal): {}", ex.getMessage());
-        }
-
-        try {
-            List<ExtractedTaskItem> items = aiMeetingService.analyze(analyzeReq);
-            for (ExtractedTaskItem item : items) {
-                if (item == null || item.getTitle() == null || item.getTitle().isBlank()) {
-                    continue;
-                }
-                String pri = item.getPriority() != null ? item.getPriority().toUpperCase() : "MEDIUM";
+            AiMeetingService.MeetingAnalysisResult result =
+                    aiMeetingService.processAudio(savedPath, meeting.getTitle());
+            summary = result.summary() != null ? result.summary() : "";
+            transcript = result.transcript() != null ? result.transcript() : "";
+            for (ExtractedTaskItem item : result.tasks()) {
+                if (item == null || item.getTitle() == null || item.getTitle().isBlank()) continue;
                 tasks.add(ProcessRecordingResponse.ExtractedTask.builder()
                         .title(item.getTitle())
                         .description(item.getDescription())
                         .goal(item.getGoal())
                         .expectedResult(item.getExpectedResult())
-                        .priority(pri)
+                        .priority(item.getPriority() != null ? item.getPriority().toUpperCase() : "MEDIUM")
                         .dueAt(item.getDueAt())
                         .aiConfidence(item.getAiConfidence())
                         .build());
             }
-            log.info("AI analyze done, {} tasks extracted", tasks.size());
+            log.info("AI done: {} tasks, summary {} chars", tasks.size(), summary.length());
         } catch (Exception ex) {
-            log.warn("AI analyze failed (non-fatal): {}", ex.getMessage());
+            log.warn("AI processing failed (non-fatal): {}", ex.getMessage());
         }
 
         // 4. Persist results in its own transaction

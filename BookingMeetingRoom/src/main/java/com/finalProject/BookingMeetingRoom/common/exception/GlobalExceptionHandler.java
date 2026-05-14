@@ -28,6 +28,12 @@ public class GlobalExceptionHandler {
      * @param request the web request
      * @return a standardized error response
      */
+    // Client disconnected mid-response — harmless, suppress noisy stack trace
+    @ExceptionHandler(org.springframework.web.context.request.async.AsyncRequestNotUsableException.class)
+    public void handleAsyncDisconnect(Exception ex) {
+        log.debug("Client disconnected: {}", ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Response<Void>> handleGenericException(Exception ex, WebRequest request) {
         log.error("Unhandled exception [{}]: {}", ex.getClass().getName(), ex.getMessage(), ex);

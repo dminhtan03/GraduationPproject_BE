@@ -21,11 +21,15 @@ public class MinutesGenerator {
             return emptyMinutes(meetingTitle);
         }
 
-        String prompt = "You are a meeting minutes generator. Use only transcript data. " +
-                "Return JSON with title, summary, key_decisions, discussion_points, risks, open_questions.\n\n" +
+        String systemPrompt = "Bạn là AI tạo biên bản cuộc họp. Chỉ dùng thông tin từ transcript. " +
+                "QUAN TRỌNG: Trả lời bằng CÙNG ngôn ngữ với transcript. " +
+                "Chỉ trả về JSON, không giải thích.";
+        String prompt = "Tạo biên bản cuộc họp từ transcript. " +
+                "Trả về JSON với các trường: title, summary, key_decisions (array), " +
+                "discussion_points (array), risks (array), open_questions (array).\n\n" +
                 "Transcript:\n" + transcript.getFullText();
 
-        JsonNode node = aiLlmService.runJson("Return JSON only.", prompt, 0.2);
+        JsonNode node = aiLlmService.runJson(systemPrompt, prompt, 0.2);
         if (node == null || !node.isObject()) {
             return emptyMinutes(meetingTitle);
         }

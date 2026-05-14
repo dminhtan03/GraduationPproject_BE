@@ -12,8 +12,8 @@ public class AiPlatformProperties {
     private String baseUrl = "https://api.openai.com/v1";
     private String model = "gpt-4o-mini";
     private String apiKey;
-    private int timeoutMs = 10000;
-    private int sttTimeoutMs = 60000;
+    private int timeoutMs = 120000;
+    private int sttTimeoutMs = 300000;
 
     public String getAppName() {
         return appName;
