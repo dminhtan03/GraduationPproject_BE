@@ -77,6 +77,9 @@ application:
 ai:
   platform:
     url: http://localhost:8001
+    dir: ./ai-platform
+    port: 8001
+    enabled: true
 
 audio:
   dir: ./audio

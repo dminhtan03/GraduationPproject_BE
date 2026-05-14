@@ -1,0 +1,221 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\mactu\\Downloads\\Project Final\\GraduationPproject_BE\\BookingMeetingRoom\\ai-platform']
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [11892] using WatchFiles
+2026-05-14 21:48:47 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:48:47 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:48:47 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:48:47 | INFO     | ai_platform | WhisperSTT ready (model=base, device=cpu)
+2026-05-14 21:48:47 | WARNING  | ai_platform | faster-whisper not installed — WhisperSTT will return stub output
+2026-05-14 21:48:47 | INFO     | ai_platform | SpeakerDiarizer ready (model=pyannote/speaker-diarization-3.1)
+2026-05-14 21:48:47 | WARNING  | ai_platform | HF_TOKEN not set — SpeakerDiarizer will return stub output
+2026-05-14 21:48:48 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:48:48 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:48:48 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:48:48 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:48:49 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+INFO:     Started server process [22512]
+INFO:     Waiting for application startup.
+2026-05-14 21:48:49 | INFO     | ai_platform | Starting AI Platform v0.1.0 on port 8001
+INFO:     Application startup complete.
+2026-05-14 21:57:19 | INFO     | ai_platform | Meeting summarize: title=aaa, has_audio=True
+2026-05-14 21:57:20 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:57:20 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:57:21 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:57:21 | INFO     | ai_platform | OpenAIClient ready (model=gpt-4o-mini)
+2026-05-14 21:57:21 | INFO     | ai_platform | FastMeetingPipeline START: audio=C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\audio\9aa777f0-8239-4569-892c-47309e7426a2.webm
+2026-05-14 21:57:21 | INFO     | ai_platform | [1/8] STT (whisper-1)
+2026-05-14 21:57:53 | INFO     | ai_platform | STT: 133 segments, duration=672.7s
+2026-05-14 21:57:53 | INFO     | ai_platform | [2/8] Diarization (GapBased)
+2026-05-14 21:57:53 | INFO     | ai_platform | GapBasedDiarizer: 133 segments, 6 speakers detected
+2026-05-14 21:57:53 | INFO     | ai_platform | [3/8] Alignment
+2026-05-14 21:57:53 | INFO     | ai_platform | Aligning 133 STT segments with 133 diarization segments
+2026-05-14 21:57:53 | INFO     | ai_platform | Alignment done: 0 UNKNOWN segments, 6 distinct speakers
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\logging\__init__.py", line 1153, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 49: character maps to <undefined>
+Call stack:
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1012, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1041, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1002, in run
+    result = context.run(func, *args)
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\api\routes\meeting.py", line 244, in summarize_meeting
+    result = _get_pipeline().run(
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\pipelines\fast_meeting_pipeline.py", line 597, in run
+    logger.info(f"  \u2192 {cleaned.speaker_count} speakers, {len(cleaned.segments)} segments")
+Message: '  \u2192 6 speakers, 133 segments'
+Arguments: ()
+2026-05-14 21:57:53 | INFO     | ai_platform | [4/8] Confidence scoring
+2026-05-14 21:57:53 | INFO     | ai_platform | Confidence: HIGH=122 MEDIUM=11 LOW=0 / 133 total
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\logging\__init__.py", line 1153, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 49: character maps to <undefined>
+Call stack:
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1012, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1041, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1002, in run
+    result = context.run(func, *args)
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\api\routes\meeting.py", line 244, in summarize_meeting
+    result = _get_pipeline().run(
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\pipelines\fast_meeting_pipeline.py", line 608, in run
+    logger.info(f"  \u2192 HIGH={n_high} MED={n_med} LOW={n_low} / {total}")
+Message: '  \u2192 HIGH=122 MED=11 LOW=0 / 133'
+Arguments: ()
+2026-05-14 21:57:53 | INFO     | ai_platform | [5/8] Rule-based cleanup
+2026-05-14 21:57:53 | INFO     | ai_platform | Rule cleanup: kept 102/133, dropped 31
+2026-05-14 21:57:53 | INFO     | ai_platform | [6/8] Local speaker repair
+2026-05-14 21:57:53 | INFO     | ai_platform | Local repair: 1 repaired, 0 still LOW
+2026-05-14 21:57:53 | INFO     | ai_platform | [7/8] LLM fallback: skipped (no LOW segments)
+2026-05-14 21:57:53 | INFO     | ai_platform | [8/8a] Topic filter
+2026-05-14 21:57:53 | INFO     | ai_platform | TranscriptFilter: kept 98/102 segments (3.9% filtered out)
+2026-05-14 21:57:53 | INFO     | ai_platform | [8/8b] Minutes generation
+2026-05-14 21:57:59 | INFO     | ai_platform | MeetingMinutesGenerator: generated minutes — 2 decisions, 0 risks
+2026-05-14 21:58:06 | INFO     | ai_platform | ActionExtractor: 7 action items extracted from 7 candidates
+2026-05-14 21:58:06 | INFO     | ai_platform | [8/8d] Chunked task extraction
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\logging\__init__.py", line 1153, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 79: character maps to <undefined>
+Call stack:
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1012, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1041, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1002, in run
+    result = context.run(func, *args)
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\api\routes\meeting.py", line 244, in summarize_meeting
+    result = _get_pipeline().run(
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\pipelines\fast_meeting_pipeline.py", line 704, in run
+    extracted_tasks = self._task_extractor.extract(filtered)
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\services\nlp\task_extractor_chunked.py", line 120, in extract
+    logger.info(
+Message: 'ChunkedTaskExtractor: 721 words \u2192 1 chunk(s) of ~2000 words'
+Arguments: ()
+2026-05-14 21:58:06 | INFO     | ai_platform |   Chunk 1/1: 721 words
+2026-05-14 21:58:16 | WARNING  | ai_platform | JSON parse failed — LLM did not return valid JSON
+2026-05-14 21:58:16 | WARNING  | ai_platform |   Chunk 1: LLM returned non-list — skip
+2026-05-14 21:58:16 | INFO     | ai_platform | ChunkedTaskExtractor: 0 unique task(s) extracted
+2026-05-14 21:58:16 | INFO     | ai_platform | FastMeetingPipeline DONE: speakers=6 tasks=0 duration=672.7s repair={'temporal_smooth': 0, 'backchannel': 1, 'short_utterance': 0, 'continuity': 0, 'llm_fallback': 0}
+2026-05-14 21:58:16 | INFO     | ai_platform | Meeting summarize: pipeline done, 6 speakers
+INFO:     127.0.0.1:50615 - "POST /api/v1/meeting/summarize HTTP/1.1" 200 OK
+2026-05-14 21:58:16 | INFO     | ai_platform | Meeting analyze: title=aaa, has_audio=True
+2026-05-14 21:58:16 | INFO     | ai_platform | FastMeetingPipeline START: audio=C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\audio\9aa777f0-8239-4569-892c-47309e7426a2.webm
+2026-05-14 21:58:16 | INFO     | ai_platform | [1/8] STT (whisper-1)
+2026-05-14 21:58:58 | INFO     | ai_platform | STT: 158 segments, duration=672.7s
+2026-05-14 21:58:58 | INFO     | ai_platform | [2/8] Diarization (GapBased)
+2026-05-14 21:58:58 | INFO     | ai_platform | GapBasedDiarizer: 158 segments, 6 speakers detected
+2026-05-14 21:58:58 | INFO     | ai_platform | [3/8] Alignment
+2026-05-14 21:58:58 | INFO     | ai_platform | Aligning 158 STT segments with 158 diarization segments
+2026-05-14 21:58:58 | INFO     | ai_platform | Alignment done: 0 UNKNOWN segments, 6 distinct speakers
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\logging\__init__.py", line 1153, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 49: character maps to <undefined>
+Call stack:
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1012, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1041, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1002, in run
+    result = context.run(func, *args)
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\api\routes\meeting.py", line 132, in analyze_meeting
+    result = _get_pipeline().run(
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\pipelines\fast_meeting_pipeline.py", line 597, in run
+    logger.info(f"  \u2192 {cleaned.speaker_count} speakers, {len(cleaned.segments)} segments")
+Message: '  \u2192 6 speakers, 158 segments'
+Arguments: ()
+2026-05-14 21:58:58 | INFO     | ai_platform | [4/8] Confidence scoring
+2026-05-14 21:58:58 | INFO     | ai_platform | Confidence: HIGH=145 MEDIUM=13 LOW=0 / 158 total
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\logging\__init__.py", line 1153, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 49: character maps to <undefined>
+Call stack:
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1012, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1041, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1002, in run
+    result = context.run(func, *args)
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\api\routes\meeting.py", line 132, in analyze_meeting
+    result = _get_pipeline().run(
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\pipelines\fast_meeting_pipeline.py", line 608, in run
+    logger.info(f"  \u2192 HIGH={n_high} MED={n_med} LOW={n_low} / {total}")
+Message: '  \u2192 HIGH=145 MED=13 LOW=0 / 158'
+Arguments: ()
+2026-05-14 21:58:58 | INFO     | ai_platform | [5/8] Rule-based cleanup
+2026-05-14 21:58:58 | INFO     | ai_platform | Rule cleanup: kept 152/158, dropped 6
+2026-05-14 21:58:58 | INFO     | ai_platform | [6/8] Local speaker repair
+2026-05-14 21:58:58 | INFO     | ai_platform | Local repair: 1 repaired, 0 still LOW
+2026-05-14 21:58:58 | INFO     | ai_platform | [7/8] LLM fallback: skipped (no LOW segments)
+2026-05-14 21:58:58 | INFO     | ai_platform | [8/8a] Topic filter
+2026-05-14 21:58:58 | INFO     | ai_platform | TranscriptFilter: kept 148/152 segments (2.6% filtered out)
+2026-05-14 21:58:58 | INFO     | ai_platform | [8/8b] Minutes generation
+2026-05-14 21:59:04 | INFO     | ai_platform | MeetingMinutesGenerator: generated minutes — 2 decisions, 0 risks
+2026-05-14 21:59:12 | WARNING  | ai_platform | ActionExtractor: description too long (32 vs 9) — clearing
+2026-05-14 21:59:12 | INFO     | ai_platform | ActionExtractor: 9 action items extracted from 9 candidates
+2026-05-14 21:59:12 | INFO     | ai_platform | [8/8d] Chunked task extraction
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\logging\__init__.py", line 1153, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 80: character maps to <undefined>
+Call stack:
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1012, in _bootstrap
+    self._bootstrap_inner()
+  File "C:\Users\mactu\AppData\Local\Programs\Python\Python313\Lib\threading.py", line 1041, in _bootstrap_inner
+    self.run()
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1002, in run
+    result = context.run(func, *args)
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\api\routes\meeting.py", line 132, in analyze_meeting
+    result = _get_pipeline().run(
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\pipelines\fast_meeting_pipeline.py", line 704, in run
+    extracted_tasks = self._task_extractor.extract(filtered)
+  File "C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\ai-platform\app\services\nlp\task_extractor_chunked.py", line 120, in extract
+    logger.info(
+Message: 'ChunkedTaskExtractor: 1250 words \u2192 1 chunk(s) of ~2000 words'
+Arguments: ()
+2026-05-14 21:59:12 | INFO     | ai_platform |   Chunk 1/1: 1250 words
+2026-05-14 21:59:25 | WARNING  | ai_platform | JSON parse failed — LLM did not return valid JSON
+2026-05-14 21:59:25 | WARNING  | ai_platform |   Chunk 1: LLM returned non-list — skip
+2026-05-14 21:59:25 | INFO     | ai_platform | ChunkedTaskExtractor: 0 unique task(s) extracted
+2026-05-14 21:59:25 | INFO     | ai_platform | FastMeetingPipeline DONE: speakers=6 tasks=0 duration=672.7s repair={'temporal_smooth': 0, 'backchannel': 1, 'short_utterance': 0, 'continuity': 0, 'llm_fallback': 0}
+2026-05-14 21:59:25 | INFO     | ai_platform | Using action_items fallback: 9 tasks
+INFO:     127.0.0.1:50615 - "POST /api/v1/meeting/analyze HTTP/1.1" 200 OK
+2026-05-14 22:01:52 | INFO     | ai_platform | Meeting summarize: title=aaa, has_audio=True
+2026-05-14 22:01:52 | INFO     | ai_platform | FastMeetingPipeline START: audio=C:\Users\mactu\Downloads\Project Final\GraduationPproject_BE\BookingMeetingRoom\audio\049a004b-be23-48ae-aed8-4523e82ddf09.webm
+2026-05-14 22:01:52 | INFO     | ai_platform | [1/8] STT (whisper-1)
