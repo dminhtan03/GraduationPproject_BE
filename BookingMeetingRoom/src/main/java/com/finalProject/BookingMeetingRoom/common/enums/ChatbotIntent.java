@@ -6,6 +6,7 @@ public enum ChatbotIntent {
     BOOK_ROOM,
     CANCEL_RESERVATION,
     EXTEND_RESERVATION,
+    LOOKUP,
     RETURN_ROOM,
     VIEW_FACILITY_DETAILS,
     FALLBACK

@@ -76,10 +76,14 @@ application:
 
 ai:
   platform:
-    url: http://localhost:8001
-    dir: ./ai-platform
-    port: 8001
-    enabled: true
+    url: http://localhost:8080
+    app-name: ${APP_NAME:AI Platform}
+    app-version: ${APP_VERSION:0.1.0}
+    base-url: https://api.openai.com/v1
+    model: ${OPENAI_MODEL:gpt-4o-mini}
+    api-key: ${OPENAI_API_KEY:}
+    timeout-ms: 120000
+    stt-timeout-ms: 300000
 
 audio:
   dir: ./audio

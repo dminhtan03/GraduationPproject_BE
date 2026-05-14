@@ -117,12 +117,21 @@ public class ChatbotMessageParser {
                 "chi tiet",
                 "thông tin",
                 "thong tin",
+            "tra cứu",
+            "tra cuu",
                 "detail",
                 "details",
                 "info",
                 "xem",
                 "show",
                 "describe");
+
+        boolean hasLookupHint = containsAnyEither(normalized, folded,
+            "tra cứu",
+            "tra cuu",
+            "lookup",
+            "search",
+            "find");
 
         boolean hasFacilityNoun = containsAnyEither(normalized, folded,
                 "tòa",
@@ -193,6 +202,18 @@ public class ChatbotMessageParser {
 
         if (!hasBookingHint && minCapacity == null && (hasAvailabilityHint || (hasAvailabilityKeyword && hasFacilityNoun))) {
             return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
+        }
+
+        if (hasLookupHint && minCapacity != null) {
+            return ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY;
+        }
+
+        if (hasLookupHint && (hasAvailabilityHint || hasAvailabilityKeyword)) {
+            return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
+        }
+
+        if (hasLookupHint && (hasRoom || hasFacilityNoun) && !hasTime) {
+            return ChatbotIntent.VIEW_FACILITY_DETAILS;
         }
 
         boolean hasSuggestHint = containsAnyEither(normalized, folded,

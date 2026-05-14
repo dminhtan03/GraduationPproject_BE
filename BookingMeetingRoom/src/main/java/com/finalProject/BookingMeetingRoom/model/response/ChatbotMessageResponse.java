@@ -17,6 +17,9 @@ public class ChatbotMessageResponse {
     private String reply;
     private ChatbotIntent intent;
 
+    // Menu options to guide user selection (optional)
+    private List<ChatbotMenuOptionResponse> menuOptions;
+
     // When intent is CHECK_AVAILABLE_ROOMS_TODAY
     private List<ChatbotRoomItemResponse> availableRooms;
 

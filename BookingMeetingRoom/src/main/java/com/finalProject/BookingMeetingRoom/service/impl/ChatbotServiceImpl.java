@@ -16,6 +16,7 @@ import com.finalProject.BookingMeetingRoom.model.entity.RoomImage;
 import com.finalProject.BookingMeetingRoom.model.request.ChatbotMessageRequest;
 import com.finalProject.BookingMeetingRoom.model.request.ReservationRequest;
 import com.finalProject.BookingMeetingRoom.model.response.ChatbotMessageResponse;
+import com.finalProject.BookingMeetingRoom.model.response.ChatbotMenuOptionResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ChatbotRoomItemResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ReservationResponse;
 import com.finalProject.BookingMeetingRoom.model.response.RoomDetailResponse;
@@ -74,29 +75,29 @@ public class ChatbotServiceImpl implements ChatbotService {
             String message = request != null ? request.getMessage() : null;
             String sessionId = chatHistoryService.ensureSessionId(request != null ? request.getSessionId() : null);
 
-            // Fetch recent USER messages before logging the current one (avoid echoing it as context).
-            List<String> recentUserMessages = chatHistoryService.getRecentMessages(sessionId, SenderType.USER, 5);
+            // History is disabled: do not load or store prior messages for context.
+            List<String> recentUserMessages = List.of();
 
             var user = (authentication != null)
                     ? userRepository.findByEmail(authentication.getName()).orElse(null)
                     : null;
 
-            // Log USER message (best-effort)
-            chatHistoryService.log(user, sessionId, SenderType.USER, message);
-
             if (message == null || message.isBlank()) {
-                ChatbotMessageResponse res = ChatbotMessageResponse.builder()
-                        .sessionId(sessionId)
-                        .intent(ChatbotIntent.FALLBACK)
-                        .reply("Please type a message. For example: 'Today available rooms?' or 'Book V5-020 at 10AM today'.")
-                        .build();
-                chatHistoryService.log(user, sessionId, SenderType.BOT, res.getReply());
+                ChatbotMessageResponse res = buildMenuResponse(message);
+                res.setSessionId(sessionId);
                 return res;
             }
 
             ChatbotMessageParser.ParseResult parsed = parser.parse(message);
-            ChatbotMessageParser.ParseResult llmParsed = chatbotLlmService.parse(message, recentUserMessages).orElse(null);
-            ChatbotMessageParser.ParseResult mergedCurrent = mergeRuleWithLlm(parsed, llmParsed);
+            ChatbotIntent menuIntent = detectMenuIntent(message);
+            if (menuIntent == null && parsed.intent() == ChatbotIntent.FALLBACK) {
+                menuIntent = detectMenuIntentFromHistory(recentUserMessages);
+            }
+
+            ChatbotMessageParser.ParseResult mergedCurrent = menuIntent != null
+                    ? overrideIntent(parsed, menuIntent)
+                    : parsed;
+
             ChatbotMessageParser.ParseResult effectiveParsed = mergeWithContext(mergedCurrent, recentUserMessages);
 
             ChatbotMessageResponse response;
@@ -109,6 +110,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                     case EXTEND_RESERVATION -> handleExtendReservation(message, effectiveParsed, recentUserMessages, authentication);
                     case RETURN_ROOM -> handleReturnRoom(message, effectiveParsed, recentUserMessages, authentication);
                     case VIEW_FACILITY_DETAILS -> handleFacilityDetails(message, effectiveParsed);
+                    case LOOKUP -> handleLookup(message, effectiveParsed);
                     default -> handleFallback(message);
                 };
             } catch (CustomException e) {
@@ -121,7 +123,6 @@ public class ChatbotServiceImpl implements ChatbotService {
 
             if (response != null) {
                 response.setSessionId(sessionId);
-                chatHistoryService.log(user, sessionId, SenderType.BOT, response.getReply());
             }
             return response;
         } catch (CustomException e) {
@@ -282,23 +283,121 @@ public class ChatbotServiceImpl implements ChatbotService {
     }
 
     private ChatbotMessageResponse handleFallback(String message) {
+        return buildMenuResponse(message);
+    }
+
+    private ChatbotMessageResponse buildMenuResponse(String message) {
         boolean vi = isVietnameseMessage(message);
-        String reply = pickByHash(message,
-                vi
-                        ? "Mình có thể giúp bạn kiểm tra phòng trống, đặt phòng, hủy đặt phòng, gia hạn thời gian và xem chi tiết tòa/tầng/phòng."
-                        : "I can help you check available rooms, book a room, cancel/extend a reservation, or view building/floor/room details.",
-                vi
-                        ? "Bạn muốn: (1) kiểm tra phòng trống, (2) đặt phòng, (3) hủy phòng, (4) thêm giờ, hay (5) xem chi tiết tòa/tầng/phòng?"
-                        : "Tell me what you need: (1) check availability, (2) book, (3) cancel, (4) extend, or (5) view facility details.",
-                vi
-                        ? "Mình có thể tìm phòng trống, đặt phòng, hủy đặt phòng, gia hạn thời gian và cung cấp thông tin cơ sở vật chất. Bạn muốn hỗ trợ phần nào?"
-                        : "I can check room availability, create bookings, cancel/extend reservations, and show facility details. What would you like to do?"
-        );
+        String reply = vi
+                ? "Vui lòng chọn chức năng: (1) Đặt phòng, (2) Hủy phòng, (3) Thêm giờ, (4) Tra cứu."
+                : "Please choose a function: (1) Book room, (2) Cancel room, (3) Extend time, (4) Lookup.";
 
         return ChatbotMessageResponse.builder()
                 .intent(ChatbotIntent.FALLBACK)
                 .reply(reply)
+                .menuOptions(buildMenuOptions(vi))
                 .build();
+    }
+
+    private List<ChatbotMenuOptionResponse> buildMenuOptions(boolean vi) {
+        return List.of(
+                ChatbotMenuOptionResponse.builder()
+                        .code("1")
+                        .label(vi ? "Đặt phòng" : "Book room")
+                        .intent(ChatbotIntent.BOOK_ROOM)
+                        .build(),
+                ChatbotMenuOptionResponse.builder()
+                        .code("2")
+                        .label(vi ? "Hủy phòng" : "Cancel room")
+                        .intent(ChatbotIntent.CANCEL_RESERVATION)
+                        .build(),
+                ChatbotMenuOptionResponse.builder()
+                        .code("3")
+                        .label(vi ? "Thêm giờ" : "Extend time")
+                        .intent(ChatbotIntent.EXTEND_RESERVATION)
+                        .build(),
+                ChatbotMenuOptionResponse.builder()
+                        .code("4")
+                        .label(vi ? "Tra cứu" : "Lookup")
+                        .intent(ChatbotIntent.LOOKUP)
+                        .build()
+        );
+    }
+
+    private ChatbotIntent detectMenuIntentFromHistory(List<String> recentUserMessages) {
+        if (recentUserMessages == null || recentUserMessages.isEmpty()) return null;
+        for (String msg : recentUserMessages) {
+            ChatbotIntent intent = detectMenuIntent(msg);
+            if (intent != null) return intent;
+        }
+        return null;
+    }
+
+    private ChatbotIntent detectMenuIntent(String message) {
+        if (message == null || message.isBlank()) return null;
+        String normalized = message.trim().toLowerCase(Locale.ROOT);
+        String folded = foldText(normalized);
+
+        String compact = folded.replaceAll("\\s+", " ").trim();
+        if (compact.matches("^[1-4][).]?$")) {
+            return mapMenuNumber(compact.substring(0, 1));
+        }
+
+        if (compact.matches("^(chon|choose|option|menu|lua chon)\\s*[1-4]$")
+                || compact.matches("^[1-4]\\s*(chon|choose|option|menu|lua chon)$")) {
+            String digit = compact.replaceAll("[^1-4]", "");
+            return mapMenuNumber(digit);
+        }
+
+        if (containsAnyEither(normalized, folded,
+                "đặt phòng", "dat phong", "book room", "booking", "reserve room")) {
+            return ChatbotIntent.BOOK_ROOM;
+        }
+
+        if (containsAnyEither(normalized, folded,
+                "hủy phòng", "huy phong", "cancel", "abort", "huỷ phòng")) {
+            return ChatbotIntent.CANCEL_RESERVATION;
+        }
+
+        if (containsAnyEither(normalized, folded,
+                "thêm giờ", "them gio", "gia hạn", "gia han", "extend", "add hour", "extra hour")) {
+            return ChatbotIntent.EXTEND_RESERVATION;
+        }
+
+        if (containsAnyEither(normalized, folded,
+                "tra cứu", "tra cuu", "tra cứu", "lookup", "search", "find", "kiem tra", "check")) {
+            return ChatbotIntent.LOOKUP;
+        }
+
+        return null;
+    }
+
+    private ChatbotIntent mapMenuNumber(String digit) {
+        if (digit == null || digit.isBlank()) return null;
+        return switch (digit) {
+            case "1" -> ChatbotIntent.BOOK_ROOM;
+            case "2" -> ChatbotIntent.CANCEL_RESERVATION;
+            case "3" -> ChatbotIntent.EXTEND_RESERVATION;
+            case "4" -> ChatbotIntent.LOOKUP;
+            default -> null;
+        };
+    }
+
+    private ChatbotMessageParser.ParseResult overrideIntent(ChatbotMessageParser.ParseResult parsed, ChatbotIntent intent) {
+        if (parsed == null) {
+            return new ChatbotMessageParser.ParseResult(intent, "", null, null, null, null, false, null);
+        }
+
+        return new ChatbotMessageParser.ParseResult(
+                intent,
+                parsed.normalizedMessage(),
+                parsed.roomCode(),
+                parsed.date(),
+                parsed.startTime(),
+                parsed.endTime(),
+                parsed.endTimeDefaulted(),
+                parsed.minCapacity()
+        );
     }
 
     private ChatbotMessageResponse toBookingLockedResponse(String message, ChatbotIntent intent, Object data) {
@@ -340,6 +439,71 @@ public class ChatbotServiceImpl implements ChatbotService {
                 .intent(intent != null ? intent : ChatbotIntent.FALLBACK)
                 .reply(businessMessage)
                 .build();
+    }
+
+    private ChatbotMessageResponse handleLookup(String message, ChatbotMessageParser.ParseResult parsed) {
+        ChatbotIntent lookupIntent = resolveLookupIntent(message, parsed);
+
+        return switch (lookupIntent) {
+            case CHECK_AVAILABLE_ROOMS_TODAY -> handleAvailableRoomsToday(message, parsed);
+            case SUGGEST_ROOMS_BY_CAPACITY -> handleSuggestRoomsByCapacity(message, parsed);
+            case VIEW_FACILITY_DETAILS -> handleFacilityDetails(message, parsed);
+            default -> buildLookupPrompt(message);
+        };
+    }
+
+    private ChatbotMessageResponse buildLookupPrompt(String message) {
+        boolean vi = isVietnameseMessage(message);
+        String reply = vi
+                ? "Bạn muốn tra cứu phòng trống, gợi ý theo sức chứa, hay xem chi tiết tòa/tầng/phòng?"
+                : "What would you like to look up: available rooms, capacity suggestions, or facility details?";
+
+        return ChatbotMessageResponse.builder()
+                .intent(ChatbotIntent.LOOKUP)
+                .reply(reply)
+                .menuOptions(buildMenuOptions(vi))
+                .build();
+    }
+
+    private ChatbotIntent resolveLookupIntent(String message, ChatbotMessageParser.ParseResult parsed) {
+        if (parsed != null) {
+            ChatbotIntent current = parsed.intent();
+            if (current == ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY
+                    || current == ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY
+                    || current == ChatbotIntent.VIEW_FACILITY_DETAILS) {
+                return current;
+            }
+
+            if (parsed.minCapacity() != null && parsed.minCapacity() > 0) {
+                return ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY;
+            }
+
+            if (parsed.roomCode() != null && !parsed.roomCode().isBlank()
+                    && parsed.startTime() == null && parsed.endTime() == null) {
+                return ChatbotIntent.VIEW_FACILITY_DETAILS;
+            }
+
+            if (parsed.startTime() != null || parsed.endTime() != null) {
+                return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
+            }
+        }
+
+        String normalized = parsed != null && parsed.normalizedMessage() != null
+                ? parsed.normalizedMessage()
+                : Objects.toString(message, "").trim().toLowerCase(Locale.ROOT);
+        String folded = foldText(normalized);
+
+        if (containsAnyEither(normalized, folded,
+                "phòng trống", "phong trong", "available", "free", "còn phòng", "con phong", "trống", "trong")) {
+            return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
+        }
+
+        if (containsAnyEither(normalized, folded,
+                "chi tiết", "chi tiet", "thông tin", "thong tin", "detail", "details", "info")) {
+            return ChatbotIntent.VIEW_FACILITY_DETAILS;
+        }
+
+        return ChatbotIntent.FALLBACK;
     }
 
     private ChatbotMessageResponse handleCancelReservation(

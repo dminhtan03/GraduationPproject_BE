@@ -16,17 +16,17 @@ import com.finalProject.BookingMeetingRoom.model.response.ProcessRecordingRespon
 import com.finalProject.BookingMeetingRoom.repository.*;
 import com.finalProject.BookingMeetingRoom.service.MeetingService;
 import com.finalProject.BookingMeetingRoom.service.TaskService;
+import com.finalProject.BookingMeetingRoom.service.aiplatform.AiMeetingService;
+import com.finalProject.BookingMeetingRoom.model.request.aiplatform.MeetingAnalyzeRequest;
+import com.finalProject.BookingMeetingRoom.model.response.aiplatform.ExtractedTaskItem;
+import com.finalProject.BookingMeetingRoom.model.response.aiplatform.MeetingSummaryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,10 +46,8 @@ public class MeetingServiceImpl implements MeetingService {
     private final UserRepository userRepository;
     private final ReservationRepository reservationRepository;
     private final TaskService taskService;
+    private final AiMeetingService aiMeetingService;
     private final TaskAssignmentRepository assignmentRepository;
-
-    @Value("${ai.platform.url:http://localhost:8001}")
-    private String aiPlatformUrl;
 
     @Value("${audio.dir:./audio}")
     private String audioDir;
@@ -166,27 +164,10 @@ public class MeetingServiceImpl implements MeetingService {
         meetingRepository.save(meeting);
 
         try {
-            RestTemplate rt = new RestTemplate();
-            Map<String, Object> body = new HashMap<>();
-            body.put("audio_path", effectiveAudioPath);
-            body.put("meeting_title", meeting.getTitle());
-            body.put("language", meeting.getLanguage());
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            ResponseEntity<Map> resp = rt.exchange(
-                    aiPlatformUrl + "/process-meeting",
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    Map.class
-            );
-
-            Map<String, Object> result = resp.getBody();
-            if (result != null) {
-                persistPipelineResult(meeting, result);
-            }
+            Map<String, Object> result = aiMeetingService.processForDrafts(effectiveAudioPath, meeting.getTitle());
+            persistPipelineResult(meeting, result);
         } catch (Exception ex) {
-            log.error("AI platform call failed: {}", ex.getMessage());
+            log.error("AI meeting processing failed: {}", ex.getMessage());
             meeting.setStatus("failed");
             meetingRepository.save(meeting);
         }
@@ -346,65 +327,31 @@ public class MeetingServiceImpl implements MeetingService {
         Meeting meeting = createMeetingEntity(creator, reservationId, title, savedPath);
         log.info("Meeting created: {}", meeting.getId());
 
-        // 3. Call ai-platform (no transaction open)
+        // 3. STT once + 2 LLM calls (summary + tasks) — no duplicate STT
         String summary = "";
         String transcript = "";
         List<ProcessRecordingResponse.ExtractedTask> tasks = new ArrayList<>();
 
-        RestTemplate rt = new RestTemplate();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        Map<String, Object> body = new HashMap<>();
-        body.put("meeting_title", meeting.getTitle());
-        body.put("audio_path", savedPath);
-        body.put("language", "vi");
-
         try {
-            ResponseEntity<Map<String, Object>> sumResp = rt.exchange(
-                    aiPlatformUrl + "/api/v1/meeting/summarize",
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    new ParameterizedTypeReference<>() {}
-            );
-            Map<String, Object> sumBody = sumResp.getBody();
-            if (sumBody != null) {
-                summary = String.valueOf(sumBody.getOrDefault("summary", ""));
-                transcript = String.valueOf(sumBody.getOrDefault("transcript", ""));
+            AiMeetingService.MeetingAnalysisResult result =
+                    aiMeetingService.processAudio(savedPath, meeting.getTitle());
+            summary = result.summary() != null ? result.summary() : "";
+            transcript = result.transcript() != null ? result.transcript() : "";
+            for (ExtractedTaskItem item : result.tasks()) {
+                if (item == null || item.getTitle() == null || item.getTitle().isBlank()) continue;
+                tasks.add(ProcessRecordingResponse.ExtractedTask.builder()
+                        .title(item.getTitle())
+                        .description(item.getDescription())
+                        .goal(item.getGoal())
+                        .expectedResult(item.getExpectedResult())
+                        .priority(item.getPriority() != null ? item.getPriority().toUpperCase() : "MEDIUM")
+                        .dueAt(item.getDueAt())
+                        .aiConfidence(item.getAiConfidence())
+                        .build());
             }
-            log.info("AI summarize done, summary length={}", summary.length());
+            log.info("AI done: {} tasks, summary {} chars", tasks.size(), summary.length());
         } catch (Exception ex) {
-            log.warn("AI summarize call failed (non-fatal): {}", ex.getMessage());
-        }
-
-        try {
-            ResponseEntity<List<Map<String, Object>>> analyzeResp = rt.exchange(
-                    aiPlatformUrl + "/api/v1/meeting/analyze",
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    new ParameterizedTypeReference<>() {}
-            );
-            List<Map<String, Object>> items = analyzeResp.getBody();
-            if (items != null) {
-                for (Map<String, Object> item : items) {
-                    Object titleObj = item.get("title");
-                    if (titleObj == null) continue;
-                    String t = titleObj.toString().trim();
-                    if (t.isBlank()) continue;
-                    Object priObj = item.getOrDefault("priority", "MEDIUM");
-                    tasks.add(ProcessRecordingResponse.ExtractedTask.builder()
-                            .title(t)
-                            .description(item.get("description") != null ? item.get("description").toString() : null)
-                            .goal(item.get("goal") != null ? item.get("goal").toString() : null)
-                            .expectedResult(item.get("expected_result") != null ? item.get("expected_result").toString() : null)
-                            .priority(priObj.toString().toUpperCase())
-                            .dueAt(item.get("due_at") != null ? item.get("due_at").toString() : null)
-                            .aiConfidence(item.get("ai_confidence") instanceof Number n ? n.doubleValue() : null)
-                            .build());
-                }
-            }
-            log.info("AI analyze done, {} tasks extracted", tasks.size());
-        } catch (Exception ex) {
-            log.warn("AI analyze call failed (non-fatal): {}", ex.getMessage());
+            log.warn("AI processing failed (non-fatal): {}", ex.getMessage());
         }
 
         // 4. Persist results in its own transaction
