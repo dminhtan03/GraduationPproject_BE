@@ -75,20 +75,16 @@ public class ChatbotServiceImpl implements ChatbotService {
             String message = request != null ? request.getMessage() : null;
             String sessionId = chatHistoryService.ensureSessionId(request != null ? request.getSessionId() : null);
 
-            // Fetch recent USER messages before logging the current one (avoid echoing it as context).
-            List<String> recentUserMessages = chatHistoryService.getRecentMessages(sessionId, SenderType.USER, 5);
+            // History is disabled: do not load or store prior messages for context.
+            List<String> recentUserMessages = List.of();
 
             var user = (authentication != null)
                     ? userRepository.findByEmail(authentication.getName()).orElse(null)
                     : null;
 
-            // Log USER message (best-effort)
-            chatHistoryService.log(user, sessionId, SenderType.USER, message);
-
             if (message == null || message.isBlank()) {
                 ChatbotMessageResponse res = buildMenuResponse(message);
                 res.setSessionId(sessionId);
-                chatHistoryService.log(user, sessionId, SenderType.BOT, res.getReply());
                 return res;
             }
 
@@ -127,7 +123,6 @@ public class ChatbotServiceImpl implements ChatbotService {
 
             if (response != null) {
                 response.setSessionId(sessionId);
-                chatHistoryService.log(user, sessionId, SenderType.BOT, response.getReply());
             }
             return response;
         } catch (CustomException e) {

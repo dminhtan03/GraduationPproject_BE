@@ -11,6 +11,7 @@ spring:
     username: appuser
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
+    stt-timeout-ms: 60000
   jpa:
     hibernate:
       ddl-auto: update
@@ -76,7 +77,13 @@ application:
 
 ai:
   platform:
-    url: http://localhost:8001
+    url: http://localhost:8080
+    app-name: ${APP_NAME:AI Platform}
+    app-version: ${APP_VERSION:0.1.0}
+    base-url: https://api.openai.com/v1
+    model: ${OPENAI_MODEL:gpt-4o-mini}
+    api-key: ${OPENAI_API_KEY:}
+    timeout-ms: 30000
 
 audio:
   dir: ./audio
