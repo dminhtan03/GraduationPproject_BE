@@ -2,6 +2,7 @@ package com.finalProject.BookingMeetingRoom.controller.ai;
 
 import com.finalProject.BookingMeetingRoom.common.payload.Response;
 import com.finalProject.BookingMeetingRoom.model.request.ChatbotMessageRequest;
+import com.finalProject.BookingMeetingRoom.model.response.ChatbotMessageResponse;
 import com.finalProject.BookingMeetingRoom.service.ChatHistoryService;
 import com.finalProject.BookingMeetingRoom.service.ChatbotService;
 import com.finalProject.BookingMeetingRoom.service.SpeechToTextService;
@@ -32,7 +33,10 @@ public class ChatbotController {
 
     @PostMapping("/message")
     public ResponseEntity<?> message(@RequestBody @Valid ChatbotMessageRequest request, Authentication authentication) {
-        return ResponseEntity.ok(Response.ofSucceeded(chatbotService.handleMessage(request, authentication)));
+        ChatbotMessageResponse result = chatbotService.handleMessage(request, authentication);
+        return ResponseEntity.ok()
+                .header("X-Chat-Session-Id", result != null ? result.getSessionId() : "")
+                .body(Response.ofSucceeded(result));
     }
 
     /**
@@ -57,7 +61,10 @@ public class ChatbotController {
                 .sessionId(sessionId)
                 .build();
 
-        return ResponseEntity.ok(Response.ofSucceeded(chatbotService.handleMessage(req, authentication)));
+        ChatbotMessageResponse result = chatbotService.handleMessage(req, authentication);
+        return ResponseEntity.ok()
+            .header("X-Chat-Session-Id", result != null ? result.getSessionId() : "")
+            .body(Response.ofSucceeded(result));
     }
 
     @DeleteMapping("/session/{sessionId}")
