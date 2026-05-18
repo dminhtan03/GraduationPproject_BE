@@ -15,6 +15,7 @@ import java.util.List;
 public class ChatbotMessageResponse {
     private String sessionId;
     private String reply;
+    private String message;
     private ChatbotIntent intent;
 
     // Menu options to guide user selection (optional)
@@ -28,6 +29,9 @@ public class ChatbotMessageResponse {
 
     // If a booking is created successfully
     private ReservationResponse reservation;
+
+    // For cancel flow booking selection
+    private List<ChatbotBookingItemResponse> items;
 
     // When intent is VIEW_FACILITY_DETAILS for a specific room
     private RoomDetailResponse roomDetail;
