@@ -83,6 +83,7 @@ public class ChatbotServiceImpl implements ChatbotService {
 
     private final ChatbotMessageParser parser = new ChatbotMessageParser();
     private final Map<String, BookingFlowState> bookingFlowStates = new ConcurrentHashMap<>();
+    private final Map<String, ExtendFlowState> extendFlowStates = new ConcurrentHashMap<>();
 
     @Override
     public ChatbotMessageResponse handleMessage(ChatbotMessageRequest request, Authentication authentication) {
@@ -123,6 +124,20 @@ public class ChatbotServiceImpl implements ChatbotService {
                 }
             }
 
+            ExtendFlowState extendFlowState = extendFlowStates.get(sessionId);
+            if (extendFlowState != null && menuIntent != null && menuIntent != ChatbotIntent.EXTEND_RESERVATION) {
+                extendFlowStates.remove(sessionId);
+                extendFlowState = null;
+            }
+
+            if (extendFlowState != null) {
+                ChatbotMessageResponse flowResponse = handleExtendFlow(sessionId, message, parsed, extendFlowState, authentication);
+                if (flowResponse != null) {
+                    flowResponse.setSessionId(sessionId);
+                    return flowResponse;
+                }
+            }
+
             ChatbotMessageParser.ParseResult mergedCurrent = menuIntent != null
                     ? overrideIntent(parsed, menuIntent)
                     : parsed;
@@ -136,7 +151,7 @@ public class ChatbotServiceImpl implements ChatbotService {
                     case SUGGEST_ROOMS_BY_CAPACITY -> handleSuggestRoomsByCapacity(message, effectiveParsed);
                     case BOOK_ROOM -> handleBookRoom(message, effectiveParsed, authentication, sessionId);
                     case CANCEL_RESERVATION -> handleCancelReservation(message, effectiveParsed, recentUserMessages, authentication);
-                    case EXTEND_RESERVATION -> handleExtendReservation(message, effectiveParsed, recentUserMessages, authentication);
+                    case EXTEND_RESERVATION -> handleExtendReservation(message, effectiveParsed, recentUserMessages, authentication, sessionId);
                     case RETURN_ROOM -> handleReturnRoom(message, effectiveParsed, recentUserMessages, authentication);
                     case VIEW_FACILITY_DETAILS -> handleFacilityDetails(message, effectiveParsed);
                     case LOOKUP -> handleLookup(message, effectiveParsed);
@@ -512,8 +527,69 @@ public class ChatbotServiceImpl implements ChatbotService {
         return null;
     }
 
+    private ChatbotMessageResponse handleExtendFlow(
+            String sessionId,
+            String message,
+            ChatbotMessageParser.ParseResult parsed,
+            ExtendFlowState flowState,
+            Authentication authentication
+    ) {
+        if (flowState == null) return null;
+
+        if (flowState.step == ExtendStep.ASK_ROOM) {
+            String roomCode = parsed != null ? parsed.roomCode() : null;
+            if (roomCode == null || roomCode.isBlank()) {
+                return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.EXTEND_RESERVATION)
+                        .reply("Mình chưa nhận được mã phòng. Vui lòng nhập mã phòng (ví dụ: A-203).")
+                        .build();
+            }
+
+            flowState.roomCode = roomCode;
+            flowState.step = ExtendStep.ASK_DURATION;
+
+            return ChatbotMessageResponse.builder()
+                    .intent(ChatbotIntent.EXTEND_RESERVATION)
+                    .reply("Bạn muốn thêm bao lâu?")
+                    .build();
+        }
+
+        if (flowState.step == ExtendStep.ASK_DURATION) {
+            Double hours = extractDurationHours(message);
+            if (hours == null || hours <= 0) {
+                return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.EXTEND_RESERVATION)
+                        .reply("Vui lòng nhập thời lượng (ví dụ: '30 phút' hoặc '2 tiếng').")
+                        .build();
+            }
+
+            String roomCode = flowState.roomCode;
+            if (roomCode == null || roomCode.isBlank()) {
+                extendFlowStates.remove(sessionId);
+                return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.EXTEND_RESERVATION)
+                        .reply("Mình bị thiếu mã phòng. Vui lòng bắt đầu lại: 'Thêm giờ'.")
+                        .build();
+            }
+
+            extendFlowStates.remove(sessionId);
+            return extendReservationWithRoomCode(message, roomCode, hours, authentication, sessionId);
+        }
+
+        return null;
+    }
+
     private Double extractDurationHours(String message) {
         String normalized = Objects.toString(message, "").toLowerCase(Locale.ROOT);
+
+        Pattern rangePattern = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*[-–]\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:giờ|gio|tiếng|tien)", Pattern.CASE_INSENSITIVE);
+        Matcher rangeMatcher = rangePattern.matcher(normalized);
+        if (rangeMatcher.find()) {
+            double from = parseHourOrDefault(rangeMatcher.group(1), 0.0);
+            double to = parseHourOrDefault(rangeMatcher.group(2), 0.0);
+            double pick = Math.max(from, to);
+            return pick > 0 ? pick : null;
+        }
 
         Pattern hoursPattern = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(?:giờ|gio|tiếng|tien)", Pattern.CASE_INSENSITIVE);
         Matcher hoursMatcher = hoursPattern.matcher(normalized);
@@ -671,10 +747,16 @@ public class ChatbotServiceImpl implements ChatbotService {
             String message,
             ChatbotMessageParser.ParseResult parsed,
             List<String> recentUserMessages,
-            Authentication authentication
+            Authentication authentication,
+            String sessionId
     ) {
         if (authentication == null) {
             throw new CustomException(ResponseCode.ACCESS_DENIED);
+        }
+
+        if ((parsed == null || parsed.roomCode() == null || parsed.roomCode().isBlank())
+                && extractDurationHours(message) == null) {
+            return startExtendFlow(sessionId);
         }
 
         var user = userRepository.findByEmail(authentication.getName())
@@ -704,6 +786,17 @@ public class ChatbotServiceImpl implements ChatbotService {
         return ChatbotMessageResponse.builder()
                 .intent(ChatbotIntent.EXTEND_RESERVATION)
                 .reply(reply)
+                .build();
+    }
+
+    private ChatbotMessageResponse startExtendFlow(String sessionId) {
+        ExtendFlowState state = new ExtendFlowState();
+        state.step = ExtendStep.ASK_ROOM;
+        extendFlowStates.put(sessionId, state);
+
+        return ChatbotMessageResponse.builder()
+                .intent(ChatbotIntent.EXTEND_RESERVATION)
+                .reply("Bạn muốn gia hạn phòng nào?")
                 .build();
     }
 
@@ -1597,6 +1690,47 @@ public class ChatbotServiceImpl implements ChatbotService {
             .build();
         }
 
+        private ChatbotMessageResponse extendReservationWithRoomCode(
+            String message,
+            String roomCode,
+            double hours,
+            Authentication authentication,
+            String sessionId
+        ) {
+        if (authentication == null) {
+            throw new CustomException(ResponseCode.ACCESS_DENIED);
+        }
+
+        var user = userRepository.findByEmail(authentication.getName())
+            .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
+
+        Reservation target = findTargetReservationForAction(user.getId(), roomCode);
+        if (target == null) {
+            ExtendFlowState retry = new ExtendFlowState();
+            retry.step = ExtendStep.ASK_ROOM;
+            extendFlowStates.put(sessionId, retry);
+
+            return ChatbotMessageResponse.builder()
+                .intent(ChatbotIntent.EXTEND_RESERVATION)
+                .reply("Mình chưa tìm thấy đặt phòng đang hoạt động cho phòng này. Vui lòng nhập lại mã phòng.")
+                .build();
+        }
+
+        reservationService.extendReservation(target.getId(), hours, authentication);
+
+        Reservation updated = reservationRepository.findById(target.getId()).orElse(target);
+        String updatedWindow = formatReservationWindow(updated);
+        String hourText = (Math.floor(hours) == hours) ? String.valueOf((int) hours) : String.valueOf(hours);
+
+        String reply = "Đã gia hạn thêm " + hourText + " giờ cho phòng " + roomCode + " thành công."
+            + (updatedWindow.isBlank() ? "" : " Khung giờ mới: " + updatedWindow + ".");
+
+        return ChatbotMessageResponse.builder()
+            .intent(ChatbotIntent.EXTEND_RESERVATION)
+            .reply(reply)
+            .build();
+        }
+
     private String humanizeDateVi(LocalDate date) {
         if (date == null) return "";
         LocalDate today = LocalDate.now();
@@ -1616,6 +1750,16 @@ public class ChatbotServiceImpl implements ChatbotService {
         private LocalDate date;
         private LocalTime startTime;
         private Double durationHours;
+    }
+
+    private enum ExtendStep {
+        ASK_ROOM,
+        ASK_DURATION
+    }
+
+    private static class ExtendFlowState {
+        private ExtendStep step;
+        private String roomCode;
     }
 
     private ChatbotRoomItemResponse toRoomItem(Room room, List<String> timeSlots) {
