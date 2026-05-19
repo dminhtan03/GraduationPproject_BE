@@ -41,6 +41,11 @@ public class TaskResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     // Related
+    private String sprintId;
+    private String sprintName;
+    private String parentTaskId;
+    private String parentTaskTitle;
+    private List<TaskResponse> subtasks;
     private List<AssignmentInfo> assignments;
     private List<SupporterInfo> supporters;
 

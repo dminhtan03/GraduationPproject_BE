@@ -38,4 +38,29 @@ public interface TaskRepository extends JpaRepository<Task, String> {
     long countByCreatedBy_IdAndStatus(String userId, TaskStatus status);
 
     List<Task> findByMeeting_Id(String meetingId);
+
+    List<Task> findBySprint_IdOrderByCreatedAtDesc(String sprintId);
+
+    List<Task> findByParentTask_IdOrderByCreatedAtDesc(String parentTaskId);
+
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN TaskAssignment a ON a.task = t LEFT JOIN TaskSupporter s ON s.task = t " +
+           "WHERE t.sprint IS NULL AND t.parentTask IS NULL " +
+           "AND (t.createdBy.id = :userId OR t.reviewer.id = :userId OR a.assignee.id = :userId OR s.user.id = :userId) " +
+           "ORDER BY t.createdAt DESC")
+    List<Task> findVisibleBacklogTasks(@Param("userId") String userId);
+
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN TaskAssignment a ON a.task = t LEFT JOIN TaskSupporter s ON s.task = t " +
+           "WHERE t.sprint.id = :sprintId " +
+           "AND (t.createdBy.id = :userId OR t.reviewer.id = :userId OR a.assignee.id = :userId OR s.user.id = :userId) " +
+           "ORDER BY t.createdAt DESC")
+    List<Task> findVisibleTasksBySprint(@Param("sprintId") String sprintId, @Param("userId") String userId);
+
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN TaskAssignment a ON a.task = t LEFT JOIN TaskSupporter s ON s.task = t " +
+           "WHERE (t.createdBy.id = :userId OR t.reviewer.id = :userId OR a.assignee.id = :userId OR s.user.id = :userId) " +
+           "ORDER BY t.createdAt DESC")
+    List<Task> findVisibleTasks(@Param("userId") String userId);
+
+    List<Task> findBySprintIsNullAndParentTaskIsNullOrderByCreatedAtDesc();
+
+    List<Task> findBySprint_IdAndParentTaskIsNullOrderByCreatedAtDesc(String sprintId);
 }

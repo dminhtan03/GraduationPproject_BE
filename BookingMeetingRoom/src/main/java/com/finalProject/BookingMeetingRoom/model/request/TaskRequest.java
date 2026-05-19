@@ -21,4 +21,6 @@ public class TaskRequest {
     private String assigneeId;
     private String brief;
     private String how;
+    private String sprintId;
+    private String parentTaskId;
 }

@@ -35,4 +35,9 @@ public interface TaskService {
     // Supporter
     TaskResponse addSupporter(String taskId, String supporterUserId, Authentication auth);
     TaskResponse respondSupporterInvite(String taskId, String supporterId, String response, Authentication auth);
+
+    // Comments
+    com.finalProject.BookingMeetingRoom.model.response.CommentResponse addComment(String taskId, String content, String parentId, Authentication auth);
+    List<com.finalProject.BookingMeetingRoom.model.response.CommentResponse> getComments(String taskId, Authentication auth);
+    void deleteComment(String commentId, Authentication auth);
 }
