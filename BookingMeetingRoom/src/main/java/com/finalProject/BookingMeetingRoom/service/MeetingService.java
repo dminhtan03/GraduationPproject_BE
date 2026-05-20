@@ -4,6 +4,7 @@ import com.finalProject.BookingMeetingRoom.model.request.ApproveDraftRequest;
 import com.finalProject.BookingMeetingRoom.model.request.MeetingRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AssignmentDraftResponse;
 import com.finalProject.BookingMeetingRoom.model.response.MeetingResponse;
+import com.finalProject.BookingMeetingRoom.model.response.MeetingWithTasksResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ProcessRecordingResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,4 +22,5 @@ public interface MeetingService {
     AssignmentDraftResponse updateDraft(String draftId, ApproveDraftRequest request, Authentication auth);
     Map<String, String> approveDraft(String draftId, Authentication auth);
     ProcessRecordingResponse processRecording(MultipartFile audioFile, String reservationId, String title, Authentication auth);
+    MeetingWithTasksResponse getMeetingByReservation(String reservationId);
 }

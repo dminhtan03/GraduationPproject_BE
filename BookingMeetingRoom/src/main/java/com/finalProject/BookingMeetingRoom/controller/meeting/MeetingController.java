@@ -84,6 +84,14 @@ public class MeetingController {
                 .body(Response.ofSucceeded(meetingService.approveDraft(draftId, auth)));
     }
 
+    /** GET /api/v1/meetings/by-reservation/{reservationId} — lấy meeting + tasks theo đơn đặt phòng */
+    @GetMapping("/api/v1/meetings/by-reservation/{reservationId}")
+    public ResponseEntity<?> getMeetingByReservation(@PathVariable String reservationId) {
+        var result = meetingService.getMeetingByReservation(reservationId);
+        if (result == null) return ResponseEntity.ok(Response.ofSucceeded(null));
+        return ResponseEntity.ok(Response.ofSucceeded(result));
+    }
+
     /**
      * POST /api/v1/meetings/process-recording
      * Multipart: audio file + reservationId + title

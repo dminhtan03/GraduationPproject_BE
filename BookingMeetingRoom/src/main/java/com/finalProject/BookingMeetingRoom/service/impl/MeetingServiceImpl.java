@@ -12,6 +12,7 @@ import com.finalProject.BookingMeetingRoom.model.request.TaskRequest;
 import com.finalProject.BookingMeetingRoom.model.request.AssignTaskRequest;
 import com.finalProject.BookingMeetingRoom.model.response.AssignmentDraftResponse;
 import com.finalProject.BookingMeetingRoom.model.response.MeetingResponse;
+import com.finalProject.BookingMeetingRoom.model.response.MeetingWithTasksResponse;
 import com.finalProject.BookingMeetingRoom.model.response.ProcessRecordingResponse;
 import com.finalProject.BookingMeetingRoom.repository.*;
 import com.finalProject.BookingMeetingRoom.service.MeetingService;
@@ -356,12 +357,48 @@ public class MeetingServiceImpl implements MeetingService {
 
         // 4. Persist results in its own transaction
         updateMeetingResult(meeting.getId(), summary, transcript);
+        saveDrafts(meeting, tasks);
 
         return ProcessRecordingResponse.builder()
                 .meetingId(meeting.getId())
                 .summary(summary)
                 .transcript(transcript)
                 .tasks(tasks)
+                .build();
+    }
+
+    @Override
+    public MeetingWithTasksResponse getMeetingByReservation(String reservationId) {
+        List<Meeting> meetings = meetingRepository.findByReservation_Id(reservationId);
+        if (meetings.isEmpty()) return null;
+        // Lấy meeting mới nhất
+        Meeting meeting = meetings.stream()
+                .max(java.util.Comparator.comparing(Meeting::getCreatedAt))
+                .orElse(meetings.get(0));
+
+        List<TaskAssignmentDraft> drafts = draftRepository.findByMeeting_IdOrderByCreatedAtAsc(meeting.getId());
+        List<MeetingWithTasksResponse.TaskInfo> taskInfos = drafts.stream()
+                .map(d -> MeetingWithTasksResponse.TaskInfo.builder()
+                        .draftId(d.getId())
+                        .title(d.getTitle())
+                        .description(d.getDescription())
+                        .goal(d.getGoal())
+                        .expectedResult(d.getExpectedResult())
+                        .priority(d.getPriority())
+                        .dueAt(d.getDueAt() != null ? d.getDueAt().toString() : null)
+                        .aiConfidence(d.getAiConfidence())
+                        .createdTaskId(d.getCreatedTask() != null ? d.getCreatedTask().getId() : null)
+                        .build())
+                .collect(Collectors.toList());
+
+        return MeetingWithTasksResponse.builder()
+                .meetingId(meeting.getId())
+                .title(meeting.getTitle())
+                .summary(meeting.getSummary())
+                .transcript(meeting.getTranscript())
+                .status(meeting.getStatus())
+                .createdAt(meeting.getCreatedAt())
+                .tasks(taskInfos)
                 .build();
     }
 
@@ -377,6 +414,30 @@ public class MeetingServiceImpl implements MeetingService {
             reservationRepository.findById(reservationId).ifPresent(meeting::setReservation);
         }
         return meetingRepository.save(meeting);
+    }
+
+    @Transactional
+    protected void saveDrafts(Meeting meeting, List<ProcessRecordingResponse.ExtractedTask> tasks) {
+        for (ProcessRecordingResponse.ExtractedTask t : tasks) {
+            if (t == null || t.getTitle() == null || t.getTitle().isBlank()) continue;
+            TaskAssignmentDraft draft = new TaskAssignmentDraft();
+            draft.setMeeting(meeting);
+            draft.setTitle(t.getTitle());
+            draft.setDescription(t.getDescription());
+            draft.setGoal(t.getGoal());
+            draft.setExpectedResult(t.getExpectedResult());
+            draft.setPriority(t.getPriority() != null ? t.getPriority() : "MEDIUM");
+            draft.setAiConfidence(t.getAiConfidence());
+            if (t.getDueAt() != null && !t.getDueAt().isBlank()) {
+                try {
+                    String s = t.getDueAt().endsWith("Z") ? t.getDueAt().replace("Z", "") : t.getDueAt();
+                    draft.setDueAt(LocalDateTime.parse(s.length() == 10 ? s + "T00:00:00" : s.substring(0, 19)));
+                } catch (DateTimeParseException ignored) {}
+            }
+            draft.setReviewStatus(ReviewStatus.PENDING);
+            draft.setReviewIssues("missing_assigner_user_id,missing_assignee_user_id");
+            draftRepository.save(draft);
+        }
     }
 
     @Transactional
