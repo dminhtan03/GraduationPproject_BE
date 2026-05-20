@@ -94,6 +94,16 @@ public class Task {
     @JoinColumn(name = "MEETING_ID")
     private Meeting meeting;
 
+    // Parent Task (for subtasks)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "PARENT_TASK_ID")
+    private Task parentTask;
+
+    // Associated Sprint
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "SPRINT_ID")
+    private Sprint sprint;
+
     @Column(name = "CREATED_AT")
     private LocalDateTime createdAt;
 

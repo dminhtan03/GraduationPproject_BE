@@ -30,6 +30,8 @@ public class TaskServiceImpl implements TaskService {
     private final TaskStatusHistoryRepository historyRepository;
     private final UserRepository userRepository;
     private final MeetingRepository meetingRepository;
+    private final SprintRepository sprintRepository;
+    private final TaskCommentRepository commentRepository;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -72,6 +74,10 @@ public class TaskServiceImpl implements TaskService {
     }
 
     public TaskResponse toResponse(Task task) {
+        return toResponse(task, true);
+    }
+
+    private TaskResponse toResponse(Task task, boolean includeSubtasks) {
         List<TaskAssignment> assignments = assignmentRepository.findByTask_Id(task.getId());
         List<TaskSupporter> supporters = supporterRepository.findByTask_Id(task.getId());
 
@@ -99,6 +105,14 @@ public class TaskServiceImpl implements TaskService {
                         .status(s.getStatus().name())
                         .build())
                 .collect(Collectors.toList());
+
+        List<TaskResponse> subtaskResponses = new ArrayList<>();
+        if (includeSubtasks) {
+            List<Task> subtasks = taskRepository.findByParentTask_IdOrderByCreatedAtDesc(task.getId());
+            subtaskResponses = subtasks.stream()
+                    .map(sub -> toResponse(sub, false))
+                    .collect(Collectors.toList());
+        }
 
         return TaskResponse.builder()
                 .id(task.getId())
@@ -128,6 +142,11 @@ public class TaskServiceImpl implements TaskService {
                 .updatedAt(task.getUpdatedAt())
                 .assignments(aInfos)
                 .supporters(sInfos)
+                .sprintId(task.getSprint() != null ? task.getSprint().getId() : null)
+                .sprintName(task.getSprint() != null ? task.getSprint().getName() : null)
+                .parentTaskId(task.getParentTask() != null ? task.getParentTask().getId() : null)
+                .parentTaskTitle(task.getParentTask() != null ? task.getParentTask().getTitle() : null)
+                .subtasks(subtaskResponses)
                 .build();
     }
 
@@ -165,6 +184,13 @@ public class TaskServiceImpl implements TaskService {
             });
         }
 
+        if (request.getSprintId() != null && !request.getSprintId().isBlank()) {
+            sprintRepository.findById(request.getSprintId()).ifPresent(task::setSprint);
+        }
+        if (request.getParentTaskId() != null && !request.getParentTaskId().isBlank()) {
+            taskRepository.findById(request.getParentTaskId()).ifPresent(task::setParentTask);
+        }
+
         taskRepository.save(task);
         saveHistory(task, null, TaskStatus.TODO.name(), creator);
 
@@ -187,20 +213,28 @@ public class TaskServiceImpl implements TaskService {
     // ── Read ──────────────────────────────────────────────────────────────────
 
     @Override
+    @Transactional(readOnly = true)
     public TaskResponse getTask(String taskId, Authentication auth) {
         return toResponse(findTask(taskId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<TaskResponse> listMyTasks(String taskType, Authentication auth) {
         User user = resolveUser(auth);
-        List<Task> tasks = "personal".equalsIgnoreCase(taskType)
-                ? taskRepository.findByCreatedBy_IdAndMeetingIsNullOrderByCreatedAtDesc(user.getId())
-                : taskRepository.findByCreatedBy_IdOrderByCreatedAtDesc(user.getId());
+        List<Task> tasks;
+        if ("personal".equalsIgnoreCase(taskType)) {
+            tasks = taskRepository.findByCreatedBy_IdAndMeetingIsNullOrderByCreatedAtDesc(user.getId());
+        } else if ("backlog".equalsIgnoreCase(taskType)) {
+            tasks = taskRepository.findVisibleBacklogTasks(user.getId());
+        } else {
+            tasks = taskRepository.findVisibleTasks(user.getId());
+        }
         return tasks.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<TaskResponse> listAssignedToMe(Authentication auth) {
         User user = resolveUser(auth);
         return taskRepository.findAssignedToUser(user.getId())
@@ -208,6 +242,7 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<TaskResponse> listPendingAssignments(Authentication auth) {
         User user = resolveUser(auth);
         // Tasks assigned to me that are still PENDING
@@ -216,6 +251,7 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<TaskResponse> listPendingApprovals(Authentication auth) {
         User user = resolveUser(auth);
         // Assignments I created that need my approval
@@ -275,6 +311,22 @@ public class TaskServiceImpl implements TaskService {
         }
         String dueStr = request.getDue_at() != null ? request.getDue_at() : request.getDueAt();
         if (dueStr != null) task.setDueAt(parseDueAt(dueStr));
+
+        if (request.getSprintId() != null) {
+            if (request.getSprintId().isBlank() || "backlog".equalsIgnoreCase(request.getSprintId())) {
+                task.setSprint(null);
+            } else {
+                sprintRepository.findById(request.getSprintId()).ifPresent(task::setSprint);
+            }
+        }
+        if (request.getParentTaskId() != null) {
+            if (request.getParentTaskId().isBlank()) {
+                task.setParentTask(null);
+            } else {
+                taskRepository.findById(request.getParentTaskId()).ifPresent(task::setParentTask);
+            }
+        }
+
         taskRepository.save(task);
         return toResponse(task);
     }
@@ -398,12 +450,6 @@ public class TaskServiceImpl implements TaskService {
             throw new CustomException(ResponseCode.VALIDATION_FAILED, "Assignment is not pending");
         if ("ACCEPT".equalsIgnoreCase(response)) {
             a.setStatus(AssignmentStatus.ACCEPTED);
-            Task task = a.getTask();
-            if (task.getStatus() == TaskStatus.TODO) {
-                task.setStatus(TaskStatus.DOING);
-                taskRepository.save(task);
-                saveHistory(task, TaskStatus.TODO.name(), TaskStatus.DOING.name(), user);
-            }
         } else {
             a.setStatus(AssignmentStatus.REJECTED);
         }
@@ -489,5 +535,59 @@ public class TaskServiceImpl implements TaskService {
         ts.setRespondedAt(LocalDateTime.now());
         supporterRepository.save(ts);
         return toResponse(ts.getTask());
+    }
+
+    @Override
+    @Transactional
+    public com.finalProject.BookingMeetingRoom.model.response.CommentResponse addComment(String taskId, String content, String parentId, Authentication auth) {
+        User user = resolveUser(auth);
+        Task task = findTask(taskId);
+
+        TaskComment comment = new TaskComment();
+        comment.setTask(task);
+        comment.setAuthor(user);
+        comment.setContent(content);
+
+        if (parentId != null && !parentId.isBlank()) {
+            commentRepository.findById(parentId).ifPresent(comment::setParent);
+        }
+
+        commentRepository.save(comment);
+        return mapComment(comment);
+    }
+
+    @Override
+    public List<com.finalProject.BookingMeetingRoom.model.response.CommentResponse> getComments(String taskId, Authentication auth) {
+        resolveUser(auth);
+        List<TaskComment> comments = commentRepository.findByTask_IdAndParentIsNullOrderByCreatedAtAsc(taskId);
+        return comments.stream().map(this::mapComment).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void deleteComment(String commentId, Authentication auth) {
+        User user = resolveUser(auth);
+        TaskComment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Comment not found"));
+        if (!comment.getAuthor().getId().equals(user.getId())) {
+            throw new CustomException(ResponseCode.PERMISSION_DENIED);
+        }
+        // First delete children
+        List<TaskComment> children = commentRepository.findByParent_IdOrderByCreatedAtAsc(commentId);
+        commentRepository.deleteAll(children);
+        commentRepository.delete(comment);
+    }
+
+    private com.finalProject.BookingMeetingRoom.model.response.CommentResponse mapComment(TaskComment c) {
+        return com.finalProject.BookingMeetingRoom.model.response.CommentResponse.builder()
+                .id(c.getId())
+                .taskId(c.getTask().getId())
+                .authorId(c.getAuthor().getId())
+                .authorName(fullName(c.getAuthor()))
+                .content(c.getContent())
+                .parentId(c.getParent() != null ? c.getParent().getId() : null)
+                .createdAt(c.getCreatedAt())
+                .updatedAt(c.getUpdatedAt())
+                .build();
     }
 }

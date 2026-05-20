@@ -176,4 +176,27 @@ public class TaskController {
         return ResponseEntity.ok(Response.ofSucceeded(
                 taskService.respondSupporterInvite(taskId, supporterId, response, auth)));
     }
+
+    // ── Comments ──────────────────────────────────────────────────────────────
+
+    @PostMapping("/{taskId}/comments")
+    public ResponseEntity<?> addComment(@PathVariable String taskId,
+                                        @RequestBody Map<String, String> body, Authentication auth) {
+        String content = body.get("content");
+        String parentId = body.get("parentId");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Response.ofSucceeded(taskService.addComment(taskId, content, parentId, auth)));
+    }
+
+    @GetMapping("/{taskId}/comments")
+    public ResponseEntity<?> getComments(@PathVariable String taskId, Authentication auth) {
+        return ResponseEntity.ok(Response.ofSucceeded(taskService.getComments(taskId, auth)));
+    }
+
+    @DeleteMapping("/{taskId}/comments/{commentId}")
+    public ResponseEntity<?> deleteComment(@PathVariable String taskId,
+                                           @PathVariable String commentId, Authentication auth) {
+        taskService.deleteComment(commentId, auth);
+        return ResponseEntity.ok(Response.ofSucceeded("Comment deleted"));
+    }
 }
