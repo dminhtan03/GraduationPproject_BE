@@ -7,6 +7,8 @@ import com.finalProject.BookingMeetingRoom.model.entity.*;
 import com.finalProject.BookingMeetingRoom.model.request.*;
 import com.finalProject.BookingMeetingRoom.model.response.*;
 import com.finalProject.BookingMeetingRoom.repository.*;
+import com.finalProject.BookingMeetingRoom.model.request.NotificationRequest;
+import com.finalProject.BookingMeetingRoom.service.NotificationService;
 import com.finalProject.BookingMeetingRoom.service.TaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,8 +34,23 @@ public class TaskServiceImpl implements TaskService {
     private final MeetingRepository meetingRepository;
     private final SprintRepository sprintRepository;
     private final TaskCommentRepository commentRepository;
+    private final NotificationService notificationService;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void notify(String userId, String title, String content) {
+        if (userId == null || userId.isBlank()) return;
+        try {
+            NotificationRequest req = new NotificationRequest();
+            req.setUserId(userId);
+            req.setTitle(title);
+            req.setContent(content);
+            req.setCreatedAt(LocalDateTime.now());
+            notificationService.sendNotification(List.of(req));
+        } catch (Exception e) {
+            log.warn("Failed to send task notification to {}: {}", userId, e.getMessage());
+        }
+    }
 
     private User resolveUser(Authentication auth) {
         return userRepository.findByEmail(auth.getName())
@@ -360,6 +377,16 @@ public class TaskServiceImpl implements TaskService {
         task.setSubmittedAt(LocalDateTime.now());
         taskRepository.save(task);
         saveHistory(task, old, TaskStatus.WAITING_REVIEW.name(), user);
+        // Notify reviewer
+        if (task.getReviewer() != null) {
+            notify(task.getReviewer().getId(), "Yêu cầu review nhiệm vụ",
+                    fullName(user) + " đã nộp kết quả nhiệm vụ \"" + task.getTitle() + "\". Vui lòng kiểm tra.");
+        }
+        // Notify task creator
+        if (!task.getCreatedBy().getId().equals(user.getId())) {
+            notify(task.getCreatedBy().getId(), "Nhiệm vụ đã được nộp",
+                    fullName(user) + " đã nộp kết quả cho \"" + task.getTitle() + "\".");
+        }
         return toResponse(task);
     }
 
@@ -388,6 +415,18 @@ public class TaskServiceImpl implements TaskService {
             saveHistory(task, old, TaskStatus.REWORK.name(), reviewer);
         }
         taskRepository.save(task);
+        // Notify assignees about review result
+        String reviewMsg = decision == ReviewStatus.APPROVED
+                ? "✅ Nhiệm vụ \"" + task.getTitle() + "\" đã được DUYỆT."
+                : "🔄 Nhiệm vụ \"" + task.getTitle() + "\" cần CHỈNH SỬA: " + (request.getComment() != null ? request.getComment() : "");
+        assignmentRepository.findByTask_Id(task.getId()).forEach(a -> {
+            if (a.getAssignee() != null) notify(a.getAssignee().getId(), "Kết quả review nhiệm vụ", reviewMsg);
+        });
+        // Notify creator if not reviewer
+        if (!task.getCreatedBy().getId().equals(reviewer.getId())) {
+            notify(task.getCreatedBy().getId(), "Review hoàn thành",
+                    fullName(reviewer) + " đã " + (decision == ReviewStatus.APPROVED ? "DUYỆT" : "yêu cầu chỉnh sửa") + " nhiệm vụ \"" + task.getTitle() + "\".");
+        }
         return toResponse(task);
     }
 
@@ -435,6 +474,14 @@ public class TaskServiceImpl implements TaskService {
 
         task.setAssignedBy(assignerEntity);
         taskRepository.save(task);
+        // Notify assignee
+        notify(assignee.getId(), "Bạn được giao nhiệm vụ",
+                fullName(assignerEntity) + " đã giao nhiệm vụ \"" + task.getTitle() + "\" cho bạn.");
+        // Notify task creator if different from assigner
+        if (!task.getCreatedBy().getId().equals(assignerEntity.getId())) {
+            notify(task.getCreatedBy().getId(), "Nhiệm vụ đã được giao",
+                    fullName(assignerEntity) + " đã giao \"" + task.getTitle() + "\" cho " + fullName(assignee));
+        }
         return toResponse(task);
     }
 
@@ -479,6 +526,8 @@ public class TaskServiceImpl implements TaskService {
         task.setReviewer(reviewer);
         task.setReviewerStatus(ReviewerStatus.PENDING);
         taskRepository.save(task);
+        notify(reviewer.getId(), "Lời mời làm reviewer",
+                "Bạn được mời làm reviewer cho nhiệm vụ \"" + task.getTitle() + "\".");
         return toResponse(task);
     }
 
