@@ -18,21 +18,21 @@ public class ChatbotMessageResponse {
     private String message;
     private ChatbotIntent intent;
 
-    // Menu options to guide user selection (optional)
+    // Danh sach menu goi y (tuy chon)
     private List<ChatbotMenuOptionResponse> menuOptions;
 
-    // When intent is CHECK_AVAILABLE_ROOMS_TODAY
+    // Khi intent la CHECK_AVAILABLE_ROOMS_TODAY
     private List<ChatbotRoomItemResponse> availableRooms;
 
-    // When booking conflicts
+    // Khi dat phong bi trung
     private List<ChatbotRoomItemResponse> alternativeRooms;
 
-    // If a booking is created successfully
+    // Khi tao dat phong thanh cong
     private ReservationResponse reservation;
 
-    // For cancel flow booking selection
+    // Danh sach lua chon cho luong huy
     private List<ChatbotBookingItemResponse> items;
 
-    // When intent is VIEW_FACILITY_DETAILS for a specific room
+    // Khi intent la VIEW_FACILITY_DETAILS cho mot phong cu the
     private RoomDetailResponse roomDetail;
 }

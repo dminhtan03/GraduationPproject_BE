@@ -15,10 +15,10 @@ import java.util.regex.Pattern;
 
 public class ChatbotMessageParser {
 
-    // Supports room codes like: AL-102, A-203, V5-020 (prefix may include digits).
-    // Require a real separator (- or _) to avoid false positives like "of 20" -> "OF-20".
+    // Ho tro ma phong dang: AL-102, A-203, V5-020 (tien to co the gom ca chu so).
+    // Bat buoc co dau phan cach (- hoac _) de tranh nhan nham.
     private static final Pattern ROOM_CODE_PATTERN = Pattern.compile("(?i)\\b([a-z]{1,5}\\d{0,3})\\s*[-_]\\s*(\\d{1,4})\\b");
-    private static final Pattern ROOM_CODE_WITH_KEYWORD_PATTERN = Pattern.compile("(?i)(?:phòng|phong)\\s*([a-z]{1,5}\\d{0,3})\\s*(\\d{1,4})\\b");
+    private static final Pattern ROOM_CODE_WITH_KEYWORD_PATTERN = Pattern.compile("(?i)(?:phòng)\\s*([a-z]{1,5}\\d{0,3})\\s*(\\d{1,4})\\b");
 
     private static final Set<String> ROOM_PREFIX_STOPWORDS = Set.of();
 
@@ -38,17 +38,17 @@ public class ChatbotMessageParser {
             "(?i)\\b(?:khoảng|khoang|tầm|tam)\\s*(\\d{1,3})\\s*(?:người|nguoi)?\\b"
     );
 
-    private static final Pattern RANGE_TIME_PATTERN = Pattern.compile(
-            "(?i)(?:từ|tu)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?\\s*(?:đến|den|tới|toi|-)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?");
+        private static final Pattern RANGE_TIME_PATTERN = Pattern.compile(
+            "(?i)(?:từ|tu)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(sáng|sang|chieu|chiều|toi|tối)?\\s*(?:đến|den|tới|toi|-)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(sáng|sang|chieu|chiều|toi|tối)?");
 
-    // Range expressed as: "at 6PM to 8PM" / "lúc 18h đến 20h"
+        // Khoang thoi gian: "luc 18h den 20h"
     private static final Pattern AT_RANGE_TIME_PATTERN = Pattern.compile(
-            "(?i)(?:lúc|luc|vào|vao)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?\\s*(?:đến|den|tới|toi|-)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?");
+            "(?i)(?:lúc|luc|vào|vao)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(sáng|sang|chieu|chiều|toi|tối)?\\s*(?:đến|den|tới|toi|-)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(sáng|sang|chieu|chiều|toi|tối)?");
 
     private static final Pattern SINGLE_TIME_PATTERN = Pattern.compile(
-            "(?i)(?:lúc|luc|sau|vào|vao)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?");
+            "(?i)(?:lúc|luc|sau|vào|vao)\\s*(\\d{1,2})(?:[:h](\\d{2}))?\\s*(sáng|sang|chieu|chiều|toi|tối)?");
 
-    private static final Pattern BARE_TIME_PATTERN = Pattern.compile("(?i)\\b(\\d{1,2})(?:[:h](\\d{2}))?\\s*(am|pm|sáng|sang|chieu|chiều|toi|tối)?\\b");
+        private static final Pattern BARE_TIME_PATTERN = Pattern.compile("(?i)\\b(\\d{1,2})(?:[:h](\\d{2}))?\\s*(sáng|sang|chieu|chiều|toi|tối)?\\b");
     private static final Pattern DURATION_HOURS_PATTERN = Pattern.compile("(?i)(?:trong|khoảng|khoang)?\\s*(\\d{1,2})\\s*(?:tiếng|tieng|gio|giờ)\\b");
     private static final Pattern DURATION_MINUTES_PATTERN = Pattern.compile("(?i)(?:trong|khoảng|khoang)?\\s*(\\d{1,3})\\s*(?:phút|phut)\\b");
 
@@ -111,67 +111,45 @@ public class ChatbotMessageParser {
         boolean hasDate = date != null;
 
         boolean hasDetailHint = containsAnyEither(normalized, folded,
-                "chi tiết",
-                "chi tiet",
-                "thông tin",
-                "thong tin",
+            "chi tiết",
+            "thông tin",
             "tra cứu",
-            "tra cuu",
-                "xem",
+            "xem",
             "xem giúp");
 
         boolean hasLookupHint = containsAnyEither(normalized, folded,
-            "tra cứu",
-            "tra cuu");
+            "tra cứu");
 
         boolean hasFacilityNoun = containsAnyEither(normalized, folded,
-                "tòa",
-                "toà",
-                "toa",
-                "tầng",
-                "tang",
-                "phòng",
-            "phong");
+            "tòa",
+            "toà",
+            "tầng",
+            "phòng");
 
         boolean hasBookingHint = containsAnyEither(normalized, folded,
-                "đặt",
-                "dat ",
-                "mượn",
-                "muon",
-                "đặt giúp",
-                "dat giup",
-                "giữ",
-                "giu ",
-                "chốt",
-                "chot");
+            "đặt",
+            "mượn",
+            "đặt giúp",
+            "giữ",
+            "chốt");
 
         if (hasDetailHint && hasFacilityNoun && !hasTime && minCapacity == null) {
             return ChatbotIntent.VIEW_FACILITY_DETAILS;
         }
 
         boolean hasAvailabilityHint = containsAnyEither(normalized, folded,
-                "hôm nay còn phòng",
-                "hom nay con phong",
-                "phòng trống hôm nay",
-                "phong trong hom nay",
-                "còn phòng trống",
-                "con phong trong",
-                "phòng nào trống",
-                "phong nao trong",
-                "còn phòng không",
-                "con phong khong",
-                "con trong",
-                "rảnh",
-                "ranh",
-                "trống") ;
+            "hôm nay còn phòng",
+            "phòng trống hôm nay",
+            "còn phòng trống",
+            "phòng nào trống",
+            "còn phòng không",
+            "rảnh",
+            "trống") ;
 
         boolean hasAvailabilityKeyword = containsAnyEither(normalized, folded,
-                "trống",
-                "trong",
-                "rảnh",
-                "ranh",
-                "còn",
-                "con");
+            "trống",
+            "rảnh",
+            "còn");
 
         if (!hasBookingHint && minCapacity == null && (hasAvailabilityHint || (hasAvailabilityKeyword && hasFacilityNoun))) {
             return ChatbotIntent.CHECK_AVAILABLE_ROOMS_TODAY;
@@ -190,57 +168,42 @@ public class ChatbotMessageParser {
         }
 
         boolean hasSuggestHint = containsAnyEither(normalized, folded,
-                "gợi ý",
-                "goi y",
-                "đề xuất",
-                "de xuat");
+            "gợi ý",
+            "đề xuất");
 
         if (minCapacity != null && hasSuggestHint) {
             return ChatbotIntent.SUGGEST_ROOMS_BY_CAPACITY;
         }
 
         boolean hasReturnHint = containsAnyEither(normalized, folded,
-                "trả phòng",
-                "tra phong",
-                "trả",
-                "tra",
+            "trả phòng",
+            "trả",
             "trả giúp");
 
-        if (hasReturnHint && containsAnyEither(normalized, folded, "phòng", "phong", "đặt phòng", "dat phong")) {
+        if (hasReturnHint && containsAnyEither(normalized, folded, "phòng", "đặt phòng")) {
             return ChatbotIntent.RETURN_ROOM;
         }
 
         boolean hasCancelHint = containsAnyEither(normalized, folded,
-                "hủy",
-                "huy",
-                "huỷ",
-                "bỏ đặt",
-                "bo dat",
-                "hủy đặt",
-                "huy dat");
+            "hủy",
+            "huỷ",
+            "bỏ đặt",
+            "hủy đặt");
 
-        if (hasCancelHint && (hasRoom || hasFacilityNoun || containsAnyEither(normalized, folded, "đặt phòng", "dat phong"))) {
+        if (hasCancelHint && (hasRoom || hasFacilityNoun || containsAnyEither(normalized, folded, "đặt phòng"))) {
             return ChatbotIntent.CANCEL_RESERVATION;
         }
 
         boolean hasExtendHint = containsAnyEither(normalized, folded,
-                "gia hạn",
-                "gia han",
-                "thêm",
-                "them",
-                "lên",
-                "len",
-                "kéo dài",
-            "keo dai");
+            "gia hạn",
+            "thêm",
+            "lên",
+            "kéo dài");
 
         if (hasExtendHint && containsAnyEither(normalized, folded,
-                "phòng",
-                "phong",
-                "giờ",
-                "gio",
-                "tiếng",
-                "tien",
-                "tieng")) {
+            "phòng",
+            "giờ",
+            "tiếng")) {
             return ChatbotIntent.EXTEND_RESERVATION;
         }
 
@@ -249,11 +212,11 @@ public class ChatbotMessageParser {
         }
 
         if ((RANGE_TIME_PATTERN.matcher(normalized).find() || AT_RANGE_TIME_PATTERN.matcher(normalized).find() || SINGLE_TIME_PATTERN.matcher(normalized).find())
-            && (hasRoom || minCapacity != null || containsAnyEither(normalized, folded, "phòng", "phong"))) {
+            && (hasRoom || minCapacity != null || containsAnyEither(normalized, folded, "phòng"))) {
             return ChatbotIntent.BOOK_ROOM;
         }
 
-        if (hasTime && minCapacity != null && containsAnyEither(normalized, folded, "phòng", "phong")) {
+        if (hasTime && minCapacity != null && containsAnyEither(normalized, folded, "phòng")) {
             return ChatbotIntent.BOOK_ROOM;
         }
 
@@ -266,26 +229,20 @@ public class ChatbotMessageParser {
         }
 
         if (hasFacilityNoun && containsAnyEither(normalized, folded,
-                "bao nhiêu",
-                "bao nhieu",
-                "sức chứa",
-                "suc chua",
-                "trạng thái",
-                "trang thai",
-                "ở đâu",
-                "o dau")) {
+            "bao nhiêu",
+            "sức chứa",
+            "trạng thái",
+            "ở đâu")) {
             return ChatbotIntent.VIEW_FACILITY_DETAILS;
         }
 
         if (hasFacilityNoun && containsAnyEither(normalized, folded,
-                "cho mình biết",
-                "cho toi biet",
-                "xem giúp",
-                "xem giup")) {
+            "cho mình biết",
+            "xem giúp")) {
             return ChatbotIntent.VIEW_FACILITY_DETAILS;
         }
 
-        // Heuristic: if a room code is present and a time is present, it is likely a booking request.
+        // Neu co ma phong va co thoi gian, uu tien hieu la dat phong.
         if (ROOM_CODE_PATTERN.matcher(normalized).find() && (RANGE_TIME_PATTERN.matcher(normalized).find() || SINGLE_TIME_PATTERN.matcher(normalized).find())) {
             return ChatbotIntent.BOOK_ROOM;
         }
@@ -343,7 +300,7 @@ public class ChatbotMessageParser {
             return LocalDate.now().plusDays(1);
         }
 
-        // Colloquial Vietnamese shorthand: "mai", "sang mai", "chieu mai", "toi mai".
+        // Cach noi thong dung: "mai", "sang mai", "chieu mai", "toi mai".
         if (normalized.matches(".*\\bmai\\b.*")
                 || normalized.matches(".*\\b(?:sáng|sang|chiều|chieu|tối|toi)\\s+mai\\b.*")) {
             return LocalDate.now().plusDays(1);
@@ -353,7 +310,7 @@ public class ChatbotMessageParser {
             return LocalDate.now().plusDays(2);
         }
 
-        // Minimal support for ISO date in the message: yyyy-mm-dd
+        // Ho tro don gian dinh dang yyyy-mm-dd
         Pattern iso = Pattern.compile("\\b(\\d{4})-(\\d{2})-(\\d{2})\\b");
         Matcher m = iso.matcher(normalized);
         if (m.find()) {
@@ -363,7 +320,7 @@ public class ChatbotMessageParser {
                 int d = Integer.parseInt(m.group(3));
                 return LocalDate.of(y, mo, d);
             } catch (DateTimeException ignored) {
-                // keep trying other date formats
+                // tiep tuc thu dinh dang khac
             }
         }
 
@@ -438,7 +395,7 @@ public class ChatbotMessageParser {
             return new TimeExtraction(start, start != null ? start.plusHours(1) : null, true);
         }
 
-        // Fallback: if the message contains a room code and any bare time, treat the first time as start time.
+        // Neu co ma phong va co thoi gian, lay moc dau tien lam gio bat dau.
         if (ROOM_CODE_PATTERN.matcher(normalized).find()) {
             Matcher bare = BARE_TIME_PATTERN.matcher(normalized);
             if (bare.find()) {
@@ -462,8 +419,8 @@ public class ChatbotMessageParser {
 
         String token = meridiemToken != null ? meridiemToken.toLowerCase(Locale.ROOT) : "";
 
-        boolean isPm = token.contains("pm") || token.contains("chiều") || token.contains("chieu") || token.contains("tối") || token.contains("toi");
-        boolean isAm = token.contains("am") || token.contains("sáng") || token.contains("sang");
+        boolean isPm = token.contains("chiều") || token.contains("chieu") || token.contains("tối") || token.contains("toi");
+        boolean isAm = token.contains("sáng") || token.contains("sang");
 
         if (isPm && hour < 12) hour += 12;
         if (isAm && hour == 12) hour = 0;
@@ -499,14 +456,13 @@ public class ChatbotMessageParser {
 
     private String normalize(String message) {
         String s = message == null ? "" : message.trim();
-        // Convert colloquial Vietnamese time forms to parser-friendly tokens.
+        // Chuan hoa cach ghi thoi gian de de parse.
         s = s.replaceAll("(?i)\\b(\\d{1,2})h(\\d{2})\\b", "$1:$2");
         s = s.replaceAll("(?i)\\b(\\d{1,2})h\\b", "$1:00");
         s = s.replaceAll("(?i)\\b(\\d{1,2})\\s*gi(?:o|ờ)\\s*(\\d{1,2})\\b", "$1:$2");
         s = s.replaceAll("(?i)\\b(\\d{1,2})\\s*gi(?:o|ờ)\\b", "$1h");
 
-        // Normalize Vietnamese diacritics variants minimally for matching: keep original too.
-        // Also normalize multiple spaces.
+        // Rut gon dau tieng Viet de doi chieu va chuan hoa dau cach.
         return s.replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
