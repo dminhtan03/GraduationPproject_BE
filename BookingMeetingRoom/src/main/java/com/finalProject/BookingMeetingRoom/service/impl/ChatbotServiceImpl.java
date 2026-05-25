@@ -880,7 +880,7 @@ public class ChatbotServiceImpl implements ChatbotService {
         int max = Math.max(range[0], range[1]);
 
         List<Room> rooms = roomRepository.findAllWithDetails().stream()
-                .filter(r -> r.getStatus() != RoomStatus.BROKEN)
+            .filter(r -> r.getStatus() == RoomStatus.AVAILABLE)
                 .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
                 .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
                 .filter(r -> r.getCapacity() != null && r.getCapacity() >= min && r.getCapacity() <= max)
