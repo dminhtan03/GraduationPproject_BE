@@ -667,8 +667,14 @@ public class ChatbotServiceImpl implements ChatbotService {
         }
 
         return switch (action) {
-            case HISTORY -> handleLookupHistory(authentication);
-            case AVAILABLE_NOW -> handleLookupAvailableNow();
+            case HISTORY -> {
+                lookupFlowStates.remove(sessionId);
+                yield handleLookupHistory(authentication);
+            }
+            case AVAILABLE_NOW -> {
+                lookupFlowStates.remove(sessionId);
+                yield handleLookupAvailableNow();
+            }
             case ROOM_DETAIL -> handleLookupRoomDetail(message, parsed, sessionId);
             case CAPACITY_RANGE -> handleLookupCapacityRange(message, parsed, sessionId);
             default -> buildLookupMenuResponse();
@@ -825,7 +831,7 @@ public class ChatbotServiceImpl implements ChatbotService {
             state.step = LookupStep.ASK_ROOM_CODE;
             lookupFlowStates.put(sessionId, state);
 
-            String reply = "Mình chưa nhận được mã phòng bạn cung cấp, vui lòng nhập lại.";
+                String reply = "Vui lòng nhập location code.";
             return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.LOOKUP)
                     .reply(reply)
@@ -839,7 +845,7 @@ public class ChatbotServiceImpl implements ChatbotService {
             state.step = LookupStep.ASK_ROOM_CODE;
             lookupFlowStates.put(sessionId, state);
 
-            String reply = "Không tìm thấy phòng với mã '" + roomCode + "'. Vui lòng nhập lại mã phòng.";
+                String reply = "Phòng không hợp lệ hoặc không tồn tại, vui lòng nhập lại";
             return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.LOOKUP)
                     .reply(reply)
