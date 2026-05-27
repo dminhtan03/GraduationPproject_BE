@@ -39,6 +39,14 @@ public class TaskServiceImpl implements TaskService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void notify(String userId, String title, String content) {
+        notifyInternal(userId, title, content, false);
+    }
+
+    private void notifyWithEmail(String userId, String title, String content) {
+        notifyInternal(userId, title, content, true);
+    }
+
+    private void notifyInternal(String userId, String title, String content, boolean sendEmail) {
         if (userId == null || userId.isBlank()) return;
         try {
             NotificationRequest req = new NotificationRequest();
@@ -46,6 +54,7 @@ public class TaskServiceImpl implements TaskService {
             req.setTitle(title);
             req.setContent(content);
             req.setCreatedAt(LocalDateTime.now());
+            req.sendEmail = sendEmail;
             notificationService.sendNotification(List.of(req));
         } catch (Exception e) {
             log.warn("Failed to send task notification to {}: {}", userId, e.getMessage());
@@ -237,15 +246,34 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<TaskResponse> listMyTasks(String taskType, Authentication auth) {
+    public List<TaskResponse> listMyTasks(String taskType, String search, String status, Authentication auth) {
         User user = resolveUser(auth);
+
+        TaskStatus taskStatus = null;
+        if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
+            try { taskStatus = TaskStatus.valueOf(status.toUpperCase()); } catch (IllegalArgumentException ignored) {}
+        }
+        String searchTerm = (search != null && !search.isBlank()) ? search : null;
+
         List<Task> tasks;
         if ("personal".equalsIgnoreCase(taskType)) {
             tasks = taskRepository.findByCreatedBy_IdAndMeetingIsNullOrderByCreatedAtDesc(user.getId());
         } else if ("backlog".equalsIgnoreCase(taskType)) {
             tasks = taskRepository.findVisibleBacklogTasks(user.getId());
         } else {
-            tasks = taskRepository.findVisibleTasks(user.getId());
+            tasks = taskRepository.findVisibleTasksWithFilter(user.getId(), searchTerm, taskStatus);
+            return tasks.stream().map(this::toResponse).collect(Collectors.toList());
+        }
+
+        // Apply search + status filter for personal/backlog (in-memory, lists are small)
+        if (searchTerm != null) {
+            final String lower = searchTerm.toLowerCase();
+            tasks = tasks.stream().filter(t -> t.getTitle() != null && t.getTitle().toLowerCase().contains(lower))
+                    .collect(Collectors.toList());
+        }
+        if (taskStatus != null) {
+            final TaskStatus fs = taskStatus;
+            tasks = tasks.stream().filter(t -> t.getStatus() == fs).collect(Collectors.toList());
         }
         return tasks.stream().map(this::toResponse).collect(Collectors.toList());
     }
@@ -360,6 +388,19 @@ public class TaskServiceImpl implements TaskService {
         task.setStatus(newStatus);
         taskRepository.save(task);
         saveHistory(task, old, newStatus.name(), user);
+
+        // Notify creator + assignees about status change (with email)
+        String statusMsg = "Nhiệm vụ \"" + task.getTitle() + "\" đã chuyển trạng thái từ "
+                + old.replace("_", " ") + " → " + newStatus.name().replace("_", " ");
+        if (!task.getCreatedBy().getId().equals(user.getId())) {
+            notifyWithEmail(task.getCreatedBy().getId(), "Cập nhật trạng thái nhiệm vụ", statusMsg);
+        }
+        assignmentRepository.findByTask_Id(task.getId()).forEach(a -> {
+            if (a.getAssignee() != null && !a.getAssignee().getId().equals(user.getId())) {
+                notifyWithEmail(a.getAssignee().getId(), "Cập nhật trạng thái nhiệm vụ", statusMsg);
+            }
+        });
+
         return toResponse(task);
     }
 
@@ -474,12 +515,12 @@ public class TaskServiceImpl implements TaskService {
 
         task.setAssignedBy(assignerEntity);
         taskRepository.save(task);
-        // Notify assignee
-        notify(assignee.getId(), "Bạn được giao nhiệm vụ",
+        // Notify assignee (with email)
+        notifyWithEmail(assignee.getId(), "Bạn được giao nhiệm vụ",
                 fullName(assignerEntity) + " đã giao nhiệm vụ \"" + task.getTitle() + "\" cho bạn.");
-        // Notify task creator if different from assigner
+        // Notify task creator if different from assigner (with email)
         if (!task.getCreatedBy().getId().equals(assignerEntity.getId())) {
-            notify(task.getCreatedBy().getId(), "Nhiệm vụ đã được giao",
+            notifyWithEmail(task.getCreatedBy().getId(), "Nhiệm vụ đã được giao",
                     fullName(assignerEntity) + " đã giao \"" + task.getTitle() + "\" cho " + fullName(assignee));
         }
         return toResponse(task);
