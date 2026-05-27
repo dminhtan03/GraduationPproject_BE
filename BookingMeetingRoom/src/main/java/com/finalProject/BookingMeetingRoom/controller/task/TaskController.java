@@ -64,9 +64,11 @@ public class TaskController {
     public ResponseEntity<?> listTasks(
             @RequestParam(value = "task_type", required = false) String taskType,
             @RequestParam(required = false) String type,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
             Authentication auth) {
         String resolved = taskType != null ? taskType : type;
-        return ResponseEntity.ok(Response.ofSucceeded(taskService.listMyTasks(resolved, auth)));
+        return ResponseEntity.ok(Response.ofSucceeded(taskService.listMyTasks(resolved, search, status, auth)));
     }
 
     @GetMapping("/assigned-to-me")

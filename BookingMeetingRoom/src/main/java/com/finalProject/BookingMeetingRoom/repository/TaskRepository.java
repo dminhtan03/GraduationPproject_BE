@@ -63,4 +63,13 @@ public interface TaskRepository extends JpaRepository<Task, String> {
     List<Task> findBySprintIsNullAndParentTaskIsNullOrderByCreatedAtDesc();
 
     List<Task> findBySprint_IdAndParentTaskIsNullOrderByCreatedAtDesc(String sprintId);
+
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN TaskAssignment a ON a.task = t LEFT JOIN TaskSupporter s ON s.task = t " +
+           "WHERE (t.createdBy.id = :userId OR t.reviewer.id = :userId OR a.assignee.id = :userId OR s.user.id = :userId) " +
+           "AND (:search IS NULL OR LOWER(t.title) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:status IS NULL OR t.status = :status) " +
+           "ORDER BY t.createdAt DESC")
+    List<Task> findVisibleTasksWithFilter(@Param("userId") String userId,
+                                          @Param("search") String search,
+                                          @Param("status") TaskStatus status);
 }
