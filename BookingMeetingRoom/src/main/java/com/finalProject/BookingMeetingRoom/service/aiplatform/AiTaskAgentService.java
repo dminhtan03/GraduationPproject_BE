@@ -209,7 +209,7 @@ public class AiTaskAgentService {
     }
 
     private AiTaskResult listMyTasks(Authentication auth) {
-        List<TaskResponse> tasks = taskService.listMyTasks("personal", auth);
+        List<TaskResponse> tasks = taskService.listMyTasks("personal", null, null, auth);
         if (tasks.isEmpty()) {
             return new AiTaskResult(true, "Ban khong co task ca nhan nao.", null);
         }
