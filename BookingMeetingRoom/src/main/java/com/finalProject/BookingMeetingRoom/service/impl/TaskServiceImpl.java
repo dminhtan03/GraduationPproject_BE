@@ -486,6 +486,11 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public void deleteTask(String taskId, Authentication auth) {
+        Task task = findTask(taskId);
+        User caller = resolveUser(auth);
+        if (!task.getCreatedBy().getId().equals(caller.getId())) {
+            throw new CustomException(ResponseCode.TASK_FORBIDDEN);
+        }
         deleteTaskCascade(taskId);
     }
 
