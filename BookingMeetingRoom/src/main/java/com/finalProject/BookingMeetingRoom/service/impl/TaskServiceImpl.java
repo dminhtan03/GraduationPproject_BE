@@ -503,6 +503,14 @@ public class TaskServiceImpl implements TaskService {
         User assignerEntity = assignerIdReq != null
                 ? userRepository.findById(assignerIdReq).orElse(assigner) : assigner;
 
+        // If assigning as primary, remove existing primary assignments first (reassign)
+        if (request.isPrimary()) {
+            assignmentRepository.findByTask_Id(taskId).stream()
+                    .filter(TaskAssignment::isPrimary)
+                    .forEach(assignmentRepository::delete);
+            assignmentRepository.flush();
+        }
+
         TaskAssignment a = new TaskAssignment();
         a.setTask(task);
         a.setAssignee(assignee);

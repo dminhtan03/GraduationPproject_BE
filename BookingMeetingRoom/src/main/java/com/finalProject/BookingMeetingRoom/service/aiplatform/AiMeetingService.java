@@ -53,10 +53,11 @@ public class AiMeetingService {
             """;
 
     private static final String SUMMARY_SYSTEM = """
-            Bạn là AI tóm tắt cuộc họp chuyên nghiệp.
-            Viết tóm tắt chi tiết cuộc họp (5-10 câu liên tục, không dùng bullet point).
-            Bao gồm: chủ đề chính, các quyết định quan trọng, kế hoạch và nhiệm vụ được thống nhất.
-            Không gán nhãn người nói. Viết văn xuôi tự nhiên.
+            Bạn là AI tóm tắt cuộc họp.
+            Chỉ tóm tắt đúng và đủ những gì thực sự được nói trong cuộc họp. Không thêm thắt, không phóng đại, không suy diễn.
+            Viết 3-5 câu ngắn gọn, chỉ nêu: chủ đề cuộc họp, các quyết định hoặc kết luận chính, và hành động tiếp theo được nhắc đến.
+            Nếu nội dung không rõ hoặc mờ nhạt, chỉ tóm tắt những gì nghe được rõ ràng.
+            Không gán nhãn người nói. Viết văn xuôi.
             Trả lời bằng CÙNG ngôn ngữ với transcript.
             """;
 
