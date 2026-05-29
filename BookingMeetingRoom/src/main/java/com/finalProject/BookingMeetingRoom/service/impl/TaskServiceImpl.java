@@ -485,7 +485,21 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional
     public void deleteTask(String taskId, Authentication auth) {
-        taskRepository.delete(findTask(taskId));
+        deleteTaskCascade(taskId);
+    }
+
+    private void deleteTaskCascade(String taskId) {
+        // Delete subtasks first (recursive)
+        taskRepository.findByParentTask_IdOrderByCreatedAtDesc(taskId)
+                .forEach(sub -> deleteTaskCascade(sub.getId()));
+        // Delete related records
+        assignmentRepository.deleteAll(assignmentRepository.findByTask_Id(taskId));
+        supporterRepository.deleteAll(supporterRepository.findByTask_Id(taskId));
+        historyRepository.deleteAll(historyRepository.findByTask_IdOrderByChangedAtAsc(taskId));
+        // Null out parent refs first to avoid self-referencing FK violation, then delete
+        commentRepository.clearParentsByTaskId(taskId);
+        commentRepository.deleteByTaskId(taskId);
+        taskRepository.deleteById(taskId);
     }
 
     // ── Assignment workflow ───────────────────────────────────────────────────
@@ -519,6 +533,9 @@ public class TaskServiceImpl implements TaskService {
         a.setHow(request.getHow());
         a.setPrimary(request.isPrimary());
         a.setApprovalStatus(request.isRequireApproval() ? ApprovalStatus.PENDING : ApprovalStatus.NOT_REQUIRED);
+        // Auto-accept: no need for the assignee to manually accept
+        a.setStatus(AssignmentStatus.ACCEPTED);
+        a.setRespondedAt(LocalDateTime.now());
         assignmentRepository.save(a);
 
         task.setAssignedBy(assignerEntity);
