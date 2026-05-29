@@ -34,6 +34,7 @@ public class TaskServiceImpl implements TaskService {
     private final MeetingRepository meetingRepository;
     private final SprintRepository sprintRepository;
     private final TaskCommentRepository commentRepository;
+    private final TaskAssignmentDraftRepository draftRepository;
     private final NotificationService notificationService;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -499,6 +500,8 @@ public class TaskServiceImpl implements TaskService {
         // Null out parent refs first to avoid self-referencing FK violation, then delete
         commentRepository.clearParentsByTaskId(taskId);
         commentRepository.deleteByTaskId(taskId);
+        // Nullify FK from AI drafts that reference this task as their created task
+        draftRepository.clearCreatedTaskByTaskId(taskId);
         taskRepository.deleteById(taskId);
     }
 
