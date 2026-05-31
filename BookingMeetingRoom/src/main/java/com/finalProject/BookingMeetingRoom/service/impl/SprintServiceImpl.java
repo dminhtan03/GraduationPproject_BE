@@ -32,6 +32,7 @@ public class SprintServiceImpl implements SprintService {
     private final UserRepository userRepository;
     private final TaskAssignmentRepository assignmentRepository;
     private final TaskSupporterRepository supporterRepository;
+    private final com.finalProject.BookingMeetingRoom.repository.ProjectRepository projectRepository;
 
     private User resolveUser(Authentication auth) {
         return userRepository.findByEmail(auth.getName())
@@ -125,6 +126,8 @@ public class SprintServiceImpl implements SprintService {
                 .updatedAt(sprint.getUpdatedAt())
                 .createdById(sprint.getCreatedBy() != null ? sprint.getCreatedBy().getId() : null)
                 .createdByName(sprint.getCreatedBy() != null ? fullName(sprint.getCreatedBy()) : null)
+                .projectId(sprint.getProject() != null ? sprint.getProject().getId() : null)
+                .projectName(sprint.getProject() != null ? sprint.getProject().getName() : null)
                 .tasks(taskResponses)
                 .build();
     }
@@ -146,6 +149,9 @@ public class SprintServiceImpl implements SprintService {
             try {
                 s.setStatus(SprintStatus.valueOf(request.getStatus().toUpperCase()));
             } catch (Exception ignored) {}
+        }
+        if (request.getProjectId() != null && !request.getProjectId().isBlank()) {
+            projectRepository.findById(request.getProjectId()).ifPresent(s::setProject);
         }
         sprintRepository.save(s);
         return toResponse(s, false, currentUser);

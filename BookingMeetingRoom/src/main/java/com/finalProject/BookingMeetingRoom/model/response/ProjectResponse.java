@@ -9,17 +9,27 @@ import java.util.List;
 
 @Data
 @Builder
-public class SprintResponse {
+public class ProjectResponse {
+
     private String id;
     private String name;
+    private String description;
+    private String goal;
     private LocalDate startDate;
     private LocalDate endDate;
     private String status;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
     private String createdById;
     private String createdByName;
-    private String projectId;
-    private String projectName;
-    private List<TaskResponse> tasks;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private List<MemberInfo> members;
+
+    @Data
+    @Builder
+    public static class MemberInfo {
+        private String userId;
+        private String userName;
+        private String userEmail;
+        private String role;
+    }
 }

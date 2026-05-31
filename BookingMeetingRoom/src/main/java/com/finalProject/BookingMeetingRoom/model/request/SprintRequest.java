@@ -8,4 +8,5 @@ public class SprintRequest {
     private String startDate; // LocalDate in format "YYYY-MM-DD"
     private String endDate;   // LocalDate in format "YYYY-MM-DD"
     private String status;    // PLANNED | ACTIVE | COMPLETED
+    private String projectId;
 }

@@ -1,11 +1,8 @@
 package com.finalProject.BookingMeetingRoom.model.entity;
 
-import com.finalProject.BookingMeetingRoom.common.enums.SprintStatus;
+import com.finalProject.BookingMeetingRoom.common.enums.ProjectStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -16,14 +13,20 @@ import java.util.UUID;
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "tbl_sprint")
-public class Sprint {
+@Table(name = "tbl_project")
+public class Project {
 
     @Id
     private String id;
 
     @Column(name = "NAME", nullable = false)
     private String name;
+
+    @Column(name = "DESCRIPTION", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "GOAL", columnDefinition = "TEXT")
+    private String goal;
 
     @Column(name = "START_DATE")
     private LocalDate startDate;
@@ -33,21 +36,17 @@ public class Sprint {
 
     @Column(name = "STATUS", length = 20)
     @Enumerated(EnumType.STRING)
-    private SprintStatus status = SprintStatus.PLANNED;
+    private ProjectStatus status = ProjectStatus.ACTIVE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "CREATED_BY", nullable = false)
+    private User createdBy;
 
     @Column(name = "CREATED_AT")
     private LocalDateTime createdAt;
 
     @Column(name = "UPDATED_AT")
     private LocalDateTime updatedAt;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "CREATED_BY", nullable = false)
-    private User createdBy;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "PROJECT_ID")
-    private Project project;
 
     @PrePersist
     public void prePersist() {
