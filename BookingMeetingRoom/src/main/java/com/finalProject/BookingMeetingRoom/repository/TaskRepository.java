@@ -75,4 +75,20 @@ public interface TaskRepository extends JpaRepository<Task, String> {
     List<Task> findVisibleTasksWithFilter(@Param("userId") String userId,
                                           @Param("search") String search,
                                           @Param("status") TaskStatus status);
+
+    /** All tasks visible to the user that belong to a specific project.
+     *  Uses t.project.id as the single source of truth — tasks inherit project
+     *  from their sprint at creation time, so this catches both sprint tasks
+     *  and backlog tasks tagged with the project. */
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN TaskAssignment a ON a.task = t LEFT JOIN TaskSupporter s ON s.task = t " +
+           "WHERE (t.createdBy.id = :userId OR t.reviewer.id = :userId OR a.assignee.id = :userId OR s.user.id = :userId) " +
+           "AND t.project.id = :projectId " +
+           "AND t.parentTask IS NULL " +
+           "AND (:search IS NULL OR LOWER(t.title) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:status IS NULL OR t.status = :status) " +
+           "ORDER BY t.createdAt DESC")
+    List<Task> findVisibleTasksByProject(@Param("userId") String userId,
+                                         @Param("projectId") String projectId,
+                                         @Param("search") String search,
+                                         @Param("status") TaskStatus status);
 }

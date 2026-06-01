@@ -105,6 +105,7 @@ public class SprintServiceImpl implements SprintService {
                 .supporters(sInfos)
                 .sprintId(task.getSprint() != null ? task.getSprint().getId() : null)
                 .sprintName(task.getSprint() != null ? task.getSprint().getName() : null)
+                .projectId(task.getProject() != null ? task.getProject().getId() : null)
                 .parentTaskId(task.getParentTask() != null ? task.getParentTask().getId() : null)
                 .parentTaskTitle(task.getParentTask() != null ? task.getParentTask().getTitle() : null)
                 .build();

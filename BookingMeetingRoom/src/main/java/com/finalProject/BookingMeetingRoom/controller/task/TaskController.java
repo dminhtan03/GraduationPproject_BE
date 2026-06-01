@@ -66,7 +66,12 @@ public class TaskController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String projectId,
             Authentication auth) {
+        if (projectId != null && !projectId.isBlank()) {
+            return ResponseEntity.ok(Response.ofSucceeded(
+                    taskService.listTasksByProject(projectId, search, status, auth)));
+        }
         String resolved = taskType != null ? taskType : type;
         return ResponseEntity.ok(Response.ofSucceeded(taskService.listMyTasks(resolved, search, status, auth)));
     }

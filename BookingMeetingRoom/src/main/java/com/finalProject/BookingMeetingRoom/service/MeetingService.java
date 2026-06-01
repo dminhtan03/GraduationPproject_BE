@@ -20,7 +20,7 @@ public interface MeetingService {
     List<AssignmentDraftResponse> aiExtractAssignments(String meetingId, String audioPath, Authentication auth);
     List<AssignmentDraftResponse> listDrafts(String meetingId, Authentication auth);
     AssignmentDraftResponse updateDraft(String draftId, ApproveDraftRequest request, Authentication auth);
-    Map<String, String> approveDraft(String draftId, Authentication auth);
+    Map<String, String> approveDraft(String draftId, String taskId, Authentication auth);
     ProcessRecordingResponse processRecording(MultipartFile audioFile, String reservationId, String title, Authentication auth);
     MeetingWithTasksResponse getMeetingByReservation(String reservationId);
 }

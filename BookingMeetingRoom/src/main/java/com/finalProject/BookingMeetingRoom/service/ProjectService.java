@@ -14,4 +14,5 @@ public interface ProjectService {
     void deleteProject(String projectId, Authentication auth);
     ProjectResponse addMember(String projectId, String userId, Authentication auth);
     void removeMember(String projectId, String userId, Authentication auth);
+    int repairProjectTasks(String projectId, Authentication auth);
 }

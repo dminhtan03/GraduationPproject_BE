@@ -274,40 +274,53 @@ public class MeetingServiceImpl implements MeetingService {
 
     @Override
     @Transactional
-    public Map<String, String> approveDraft(String draftId, Authentication auth) {
+    public Map<String, String> approveDraft(String draftId, String taskId, Authentication auth) {
         User approver = resolveUser(auth);
         TaskAssignmentDraft draft = draftRepository.findById(draftId)
                 .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Draft not found"));
 
-        // Create task
-        TaskRequest taskReq = new TaskRequest();
-        taskReq.setTitle(draft.getTitle());
-        taskReq.setDescription(draft.getDescription());
-        taskReq.setGoal(draft.getGoal());
-        taskReq.setExpectedResult(draft.getExpectedResult());
-        taskReq.setPriority(draft.getPriority());
-        taskReq.setMeetingId(draft.getMeeting().getId());
-        if (draft.getDueAt() != null) taskReq.setDueAt(draft.getDueAt().toString());
-        com.finalProject.BookingMeetingRoom.model.response.TaskResponse createdTask = taskService.createTask(taskReq, auth);
+        String resolvedTaskId;
 
-        // Assign task
-        if (draft.getAssigneeUserId() != null) {
-            AssignTaskRequest assignReq = new AssignTaskRequest();
-            assignReq.setAssigneeId(draft.getAssigneeUserId());
-            assignReq.setAssignerId(draft.getAssignerUserId() != null ? draft.getAssignerUserId() : approver.getId());
-            taskService.assignTask(createdTask.getId(), assignReq, auth);
+        if (taskId != null && !taskId.isBlank()) {
+            // Task already created by caller — just link draft to it
+            com.finalProject.BookingMeetingRoom.model.entity.Task taskEntity =
+                    new com.finalProject.BookingMeetingRoom.model.entity.Task();
+            taskEntity.setId(taskId);
+            draft.setCreatedTask(taskEntity);
+            resolvedTaskId = taskId;
+        } else {
+            // Create task from draft data (original behaviour)
+            TaskRequest taskReq = new TaskRequest();
+            taskReq.setTitle(draft.getTitle());
+            taskReq.setDescription(draft.getDescription());
+            taskReq.setGoal(draft.getGoal());
+            taskReq.setExpectedResult(draft.getExpectedResult());
+            taskReq.setPriority(draft.getPriority());
+            taskReq.setMeetingId(draft.getMeeting().getId());
+            if (draft.getDueAt() != null) taskReq.setDueAt(draft.getDueAt().toString());
+            com.finalProject.BookingMeetingRoom.model.response.TaskResponse createdTask =
+                    taskService.createTask(taskReq, auth);
+
+            if (draft.getAssigneeUserId() != null) {
+                AssignTaskRequest assignReq = new AssignTaskRequest();
+                assignReq.setAssigneeId(draft.getAssigneeUserId());
+                assignReq.setAssignerId(draft.getAssignerUserId() != null
+                        ? draft.getAssignerUserId() : approver.getId());
+                taskService.assignTask(createdTask.getId(), assignReq, auth);
+            }
+
+            com.finalProject.BookingMeetingRoom.model.entity.Task taskEntity =
+                    new com.finalProject.BookingMeetingRoom.model.entity.Task();
+            taskEntity.setId(createdTask.getId());
+            draft.setCreatedTask(taskEntity);
+            resolvedTaskId = createdTask.getId();
         }
 
-        // Update draft with created task reference
-        com.finalProject.BookingMeetingRoom.model.entity.Task taskEntity =
-                new com.finalProject.BookingMeetingRoom.model.entity.Task();
-        taskEntity.setId(createdTask.getId());
-        draft.setCreatedTask(taskEntity);
         draft.setReviewStatus(ReviewStatus.APPROVED);
         draftRepository.save(draft);
 
         Map<String, String> result = new HashMap<>();
-        result.put("created_task_id", createdTask.getId());
+        result.put("created_task_id", resolvedTaskId);
         return result;
     }
 

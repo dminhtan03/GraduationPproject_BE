@@ -104,6 +104,11 @@ public class Task {
     @JoinColumn(name = "SPRINT_ID")
     private Sprint sprint;
 
+    // Associated Project (set directly so backlog tasks know which project they belong to)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "PROJECT_ID")
+    private Project project;
+
     @Column(name = "CREATED_AT")
     private LocalDateTime createdAt;
 

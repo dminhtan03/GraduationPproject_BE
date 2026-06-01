@@ -77,11 +77,17 @@ public class MeetingController {
         return ResponseEntity.ok(Response.ofSucceeded(meetingService.updateDraft(draftId, request, auth)));
     }
 
-    /** POST /api/v1/assignment-drafts/{draftId}/approve — approve draft → create real task */
+    /** POST /api/v1/assignment-drafts/{draftId}/approve
+     *  Body (optional): { "taskId": "..." }
+     *  If taskId provided → just link draft to existing task (no new task created).
+     *  If taskId absent  → create a new task from draft data (original behaviour).
+     */
     @PostMapping("/api/v1/assignment-drafts/{draftId}/approve")
-    public ResponseEntity<?> approveDraft(@PathVariable String draftId, Authentication auth) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Response.ofSucceeded(meetingService.approveDraft(draftId, auth)));
+    public ResponseEntity<?> approveDraft(@PathVariable String draftId,
+                                           @RequestBody(required = false) java.util.Map<String, String> body,
+                                           Authentication auth) {
+        String taskId = body != null ? body.get("taskId") : null;
+        return ResponseEntity.ok(Response.ofSucceeded(meetingService.approveDraft(draftId, taskId, auth)));
     }
 
     /** GET /api/v1/meetings/by-reservation/{reservationId} — lấy meeting + tasks theo đơn đặt phòng */

@@ -43,6 +43,7 @@ public class TaskResponse {
     // Related
     private String sprintId;
     private String sprintName;
+    private String projectId;
     private String parentTaskId;
     private String parentTaskTitle;
     private List<TaskResponse> subtasks;

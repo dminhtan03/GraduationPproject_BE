@@ -59,4 +59,14 @@ public class ProjectController {
         projectService.removeMember(projectId, userId, auth);
         return ResponseEntity.ok(Response.ofSucceeded("Member removed"));
     }
+
+    /** POST /api/v1/projects/{projectId}/repair-tasks
+     *  Fixes existing tasks that belong to this project's sprints but have
+     *  PROJECT_ID missing or pointing to a different project. */
+    @PostMapping("/{projectId}/repair-tasks")
+    public ResponseEntity<?> repairTasks(@PathVariable String projectId, Authentication auth) {
+        int fixed = projectService.repairProjectTasks(projectId, auth);
+        return ResponseEntity.ok(Response.ofSucceeded(
+                java.util.Map.of("fixed", fixed, "message", fixed + " tasks updated")));
+    }
 }

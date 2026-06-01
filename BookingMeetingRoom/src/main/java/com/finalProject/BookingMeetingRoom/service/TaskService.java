@@ -17,6 +17,7 @@ public interface TaskService {
     void cancelTask(String taskId, Authentication auth);
     void deleteTask(String taskId, Authentication auth);
     List<TaskResponse> listMyTasks(String taskType, String search, String status, Authentication auth);
+    List<TaskResponse> listTasksByProject(String projectId, String search, String status, Authentication auth);
     List<TaskResponse> listAssignedToMe(Authentication auth);
     List<TaskResponse> listPendingAssignments(Authentication auth);
     List<TaskResponse> listPendingApprovals(Authentication auth);

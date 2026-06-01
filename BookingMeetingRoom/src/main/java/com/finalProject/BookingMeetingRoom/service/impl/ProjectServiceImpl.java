@@ -198,4 +198,26 @@ public class ProjectServiceImpl implements ProjectService {
             throw new CustomException(ResponseCode.VALIDATION_FAILED, "Cannot remove project owner");
         memberRepository.delete(m);
     }
+
+    @Override
+    @Transactional
+    public int repairProjectTasks(String projectId, Authentication auth) {
+        resolveUser(auth);
+        Project p = projectRepository.findById(projectId)
+                .orElseThrow(() -> new CustomException(ResponseCode.VALIDATION_FAILED, "Project not found"));
+        int count = 0;
+        // Fix tasks in this project's sprints that have wrong or null PROJECT_ID
+        for (com.finalProject.BookingMeetingRoom.model.entity.Sprint sprint :
+                sprintRepository.findByProject_IdOrderByCreatedAtDesc(projectId)) {
+            for (com.finalProject.BookingMeetingRoom.model.entity.Task task :
+                    taskRepository.findBySprint_IdOrderByCreatedAtDesc(sprint.getId())) {
+                if (task.getProject() == null || !task.getProject().getId().equals(projectId)) {
+                    task.setProject(p);
+                    taskRepository.save(task);
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
 }

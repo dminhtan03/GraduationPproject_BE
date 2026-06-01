@@ -35,6 +35,7 @@ public class TaskServiceImpl implements TaskService {
     private final SprintRepository sprintRepository;
     private final TaskCommentRepository commentRepository;
     private final TaskAssignmentDraftRepository draftRepository;
+    private final com.finalProject.BookingMeetingRoom.repository.ProjectRepository projectRepository;
     private final NotificationService notificationService;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -171,6 +172,7 @@ public class TaskServiceImpl implements TaskService {
                 .supporters(sInfos)
                 .sprintId(task.getSprint() != null ? task.getSprint().getId() : null)
                 .sprintName(task.getSprint() != null ? task.getSprint().getName() : null)
+                .projectId(task.getProject() != null ? task.getProject().getId() : null)
                 .parentTaskId(task.getParentTask() != null ? task.getParentTask().getId() : null)
                 .parentTaskTitle(task.getParentTask() != null ? task.getParentTask().getTitle() : null)
                 .subtasks(subtaskResponses)
@@ -212,7 +214,16 @@ public class TaskServiceImpl implements TaskService {
         }
 
         if (request.getSprintId() != null && !request.getSprintId().isBlank()) {
-            sprintRepository.findById(request.getSprintId()).ifPresent(task::setSprint);
+            sprintRepository.findById(request.getSprintId()).ifPresent(sprint -> {
+                task.setSprint(sprint);
+                // Auto-inherit project from sprint if not explicitly provided
+                if (sprint.getProject() != null && task.getProject() == null) {
+                    task.setProject(sprint.getProject());
+                }
+            });
+        }
+        if (request.getProjectId() != null && !request.getProjectId().isBlank()) {
+            projectRepository.findById(request.getProjectId()).ifPresent(task::setProject);
         }
         if (request.getParentTaskId() != null && !request.getParentTaskId().isBlank()) {
             taskRepository.findById(request.getParentTaskId()).ifPresent(task::setParentTask);
@@ -277,6 +288,19 @@ public class TaskServiceImpl implements TaskService {
             tasks = tasks.stream().filter(t -> t.getStatus() == fs).collect(Collectors.toList());
         }
         return tasks.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TaskResponse> listTasksByProject(String projectId, String search, String status, Authentication auth) {
+        User user = resolveUser(auth);
+        TaskStatus taskStatus = null;
+        if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
+            try { taskStatus = TaskStatus.valueOf(status.toUpperCase()); } catch (IllegalArgumentException ignored) {}
+        }
+        String searchTerm = (search != null && !search.isBlank()) ? search : null;
+        return taskRepository.findVisibleTasksByProject(user.getId(), projectId, searchTerm, taskStatus)
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -361,8 +385,15 @@ public class TaskServiceImpl implements TaskService {
         if (request.getSprintId() != null) {
             if (request.getSprintId().isBlank() || "backlog".equalsIgnoreCase(request.getSprintId())) {
                 task.setSprint(null);
+                // Keep existing project when moving to backlog
             } else {
-                sprintRepository.findById(request.getSprintId()).ifPresent(task::setSprint);
+                sprintRepository.findById(request.getSprintId()).ifPresent(sprint -> {
+                    task.setSprint(sprint);
+                    // Sync project with sprint's project so task always appears in the right project
+                    if (sprint.getProject() != null) {
+                        task.setProject(sprint.getProject());
+                    }
+                });
             }
         }
         if (request.getParentTaskId() != null) {
