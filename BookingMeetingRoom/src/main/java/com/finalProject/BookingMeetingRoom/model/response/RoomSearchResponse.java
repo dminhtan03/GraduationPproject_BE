@@ -18,4 +18,5 @@ public class RoomSearchResponse {
     private String building;
     private String floor;
     private Integer capacity;
+    private String thumbnailUrl;
 }

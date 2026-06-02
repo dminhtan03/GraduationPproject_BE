@@ -102,6 +102,12 @@ public class RoomServiceImpl implements RoomService {
 
             List<Room> rooms = roomRepository.findByFloor(floor);
 
+            // Batch fetch thumbnails
+            List<String> roomIds = rooms.stream().map(Room::getId).toList();
+            Map<String, String> thumbnailMap = new java.util.HashMap<>();
+            roomImageRepository.findByRoom_IdIn(roomIds).forEach(img ->
+                    thumbnailMap.putIfAbsent(img.getRoom().getId(), img.getImageUrl()));
+
             return rooms.stream()
                     .map(room -> {
                         // [HYBRID] Kiểm tra đồng thời cả Reservation (đặt phòng thật) và AcademicSchedule (lịch học cố định)
@@ -143,7 +149,8 @@ public class RoomServiceImpl implements RoomService {
                             status,
                             buildingName,
                             floorName,
-                            room.getCapacity()
+                            room.getCapacity(),
+                            thumbnailMap.get(room.getId())
                         );
                     })
                     .filter(roomResponse -> roomResponse.getStatus() == RoomStatus.AVAILABLE || roomResponse.getStatus() == RoomStatus.LEARNING)
@@ -276,6 +283,9 @@ public class RoomServiceImpl implements RoomService {
             ? room.getFloor().getBuilding().getName()
             : null;
 
+        String thumbnail = roomImageRepository.findByRoom_IdIn(List.of(room.getId()))
+                .stream().findFirst().map(img -> img.getImageUrl()).orElse(null);
+
         return new RoomSearchResponse(
             room.getId(),
             room.getLocationCode(),
@@ -283,7 +293,8 @@ public class RoomServiceImpl implements RoomService {
             finalStatus,
             buildingName,
             floorName,
-            room.getCapacity()
+            room.getCapacity(),
+            thumbnail
         );
     }
 
@@ -366,6 +377,9 @@ public class RoomServiceImpl implements RoomService {
                     ? room.getFloor().getBuilding().getName()
                     : null;
 
+                String thumbnail = roomImageRepository.findByRoom_IdIn(List.of(room.getId()))
+                        .stream().findFirst().map(img -> img.getImageUrl()).orElse(null);
+
                 return new RoomSearchResponse(
                     room.getId(),
                     room.getLocationCode(),
@@ -373,7 +387,8 @@ public class RoomServiceImpl implements RoomService {
                     room.getStatus(),
                     buildingName,
                     floorName,
-                    room.getCapacity()
+                    room.getCapacity(),
+                    thumbnail
                 );
         } catch (CustomException e) {
             throw e;
