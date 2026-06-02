@@ -411,8 +411,16 @@ public class MeetingServiceImpl implements MeetingService {
                 .transcript(meeting.getTranscript())
                 .status(meeting.getStatus())
                 .createdAt(meeting.getCreatedAt())
+                .hasAudio(meeting.getAudioPath() != null && !meeting.getAudioPath().isBlank())
                 .tasks(taskInfos)
                 .build();
+    }
+
+    @Override
+    public String getAudioPath(String meetingId, Authentication auth) {
+        Meeting meeting = meetingRepository.findById(meetingId).orElse(null);
+        if (meeting == null) return null;
+        return meeting.getAudioPath();
     }
 
     @Transactional

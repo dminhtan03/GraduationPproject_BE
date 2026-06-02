@@ -5,6 +5,9 @@ import com.finalProject.BookingMeetingRoom.model.request.ApproveDraftRequest;
 import com.finalProject.BookingMeetingRoom.model.request.MeetingRequest;
 import com.finalProject.BookingMeetingRoom.service.MeetingService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 
 /**
@@ -96,6 +101,27 @@ public class MeetingController {
         var result = meetingService.getMeetingByReservation(reservationId);
         if (result == null) return ResponseEntity.ok(Response.ofSucceeded(null));
         return ResponseEntity.ok(Response.ofSucceeded(result));
+    }
+
+    /** GET /api/v1/meetings/{meetingId}/audio — stream audio file */
+    @GetMapping("/api/v1/meetings/{meetingId}/audio")
+    public ResponseEntity<Resource> getAudio(@PathVariable String meetingId, Authentication auth) {
+        String audioPath = meetingService.getAudioPath(meetingId, auth);
+        if (audioPath == null || audioPath.isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+        Path file = Paths.get(audioPath);
+        Resource resource = new FileSystemResource(file);
+        if (!resource.exists()) return ResponseEntity.notFound().build();
+
+        String filename = file.getFileName().toString();
+        MediaType mediaType = filename.endsWith(".ogg") ? MediaType.parseMediaType("audio/ogg")
+                : MediaType.parseMediaType("audio/webm");
+
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                .body(resource);
     }
 
     /**

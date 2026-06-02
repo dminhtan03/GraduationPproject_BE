@@ -33,6 +33,7 @@ import com.finalProject.BookingMeetingRoom.model.request.FloorCreateRequest;
 import com.finalProject.BookingMeetingRoom.repository.BuildingRepository;
 import com.finalProject.BookingMeetingRoom.repository.FloorRepository;
 import com.finalProject.BookingMeetingRoom.repository.ReservationRepository;
+import com.finalProject.BookingMeetingRoom.repository.RoomImageRepository;
 import com.finalProject.BookingMeetingRoom.repository.RoomRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
 import com.finalProject.BookingMeetingRoom.service.AcademicScheduleService;
@@ -50,6 +51,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final BuildingRepository buildingRepository;
     private final FloorRepository floorRepository;
     private final RoomRepository roomRepository;
+    private final RoomImageRepository roomImageRepository;
     private final AcademicScheduleService academicScheduleService;
 
     /**
@@ -73,6 +75,15 @@ public class DashboardServiceImpl implements DashboardService {
     public RoomMapDashboardResponse getRoomsMapDashboard() {
         try {
             var roomMap = buildingRepository.findRoomMapDashBoard();
+
+            // Batch fetch first image per room (1 query)
+            List<String> roomIds = roomMap.stream()
+                    .map(com.finalProject.BookingMeetingRoom.model.projection.RoomMapDashboardProjection::getRoomId)
+                    .distinct().toList();
+            Map<String, String> thumbnailMap = new java.util.HashMap<>();
+            roomImageRepository.findByRoom_IdIn(roomIds).forEach(img -> {
+                thumbnailMap.putIfAbsent(img.getRoom().getId(), img.getImageUrl());
+            });
 
             Map<String, RoomMapBuildingResponse> buildingMap = new LinkedHashMap<>();
 
@@ -139,6 +150,7 @@ public class DashboardServiceImpl implements DashboardService {
                 roomDto.setWidth(room.getWidth());
                 roomDto.setHeight(room.getHeight());
                 roomDto.setPositioned(room.getPositioned() != null && room.getPositioned());
+                roomDto.setThumbnailUrl(thumbnailMap.get(room.getRoomId()));
 
                 floorResponse.getRooms().add(roomDto);
             }

@@ -15,6 +15,7 @@ public class MeetingWithTasksResponse {
     private String transcript;
     private String status;
     private LocalDateTime createdAt;
+    private boolean hasAudio;
     private List<TaskInfo> tasks;
 
     @Data

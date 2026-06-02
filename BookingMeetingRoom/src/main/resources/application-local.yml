@@ -5,7 +5,11 @@ cloudinary:
 
 spring:
   config:
-    import: optional:file:.env[.properties]
+    import: >-
+      optional:file:.env[.properties],
+      optional:file:BookingMeetingRoom/.env[.properties],
+      optional:file:env.properties,
+      optional:file:BookingMeetingRoom/env.properties
   datasource:
     url: jdbc:mysql://localhost:3307/finalproject
     username: appuser

@@ -23,4 +23,5 @@ public interface MeetingService {
     Map<String, String> approveDraft(String draftId, String taskId, Authentication auth);
     ProcessRecordingResponse processRecording(MultipartFile audioFile, String reservationId, String title, Authentication auth);
     MeetingWithTasksResponse getMeetingByReservation(String reservationId);
+    String getAudioPath(String meetingId, Authentication auth);
 }

@@ -30,6 +30,8 @@ public class RoomDto {
         private String name;
     }
 
+    private String thumbnailUrl;
+
     // start add layout fields
     private Double xPosition;
     private Double yPosition;
