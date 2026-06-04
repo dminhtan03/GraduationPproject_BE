@@ -23,6 +23,9 @@ public class ExtractedTaskItem {
     @JsonAlias("due_at")
     private String dueAt;
 
+    @JsonAlias("due_at_raw")
+    private String dueAtRaw;
+
     @JsonAlias("assigner_user_id")
     private String assignerUserId;
 

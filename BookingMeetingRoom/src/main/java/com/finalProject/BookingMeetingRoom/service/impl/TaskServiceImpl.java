@@ -209,7 +209,7 @@ public class TaskServiceImpl implements TaskService {
         if (request.getReviewerUserId() != null) {
             userRepository.findById(request.getReviewerUserId()).ifPresent(reviewer -> {
                 task.setReviewer(reviewer);
-                task.setReviewerStatus(ReviewerStatus.PENDING);
+                task.setReviewerStatus(ReviewerStatus.ACCEPTED);
             });
         }
 
@@ -629,10 +629,10 @@ public class TaskServiceImpl implements TaskService {
         User reviewer = userRepository.findById(reviewerUserId)
                 .orElseThrow(() -> new CustomException(ResponseCode.USER_NOT_FOUND));
         task.setReviewer(reviewer);
-        task.setReviewerStatus(ReviewerStatus.PENDING);
+        task.setReviewerStatus(ReviewerStatus.ACCEPTED);
         taskRepository.save(task);
-        notify(reviewer.getId(), "Lời mời làm reviewer",
-                "Bạn được mời làm reviewer cho nhiệm vụ \"" + task.getTitle() + "\".");
+        notify(reviewer.getId(), "Bạn được chỉ định làm reviewer",
+                "Bạn đã được chỉ định làm reviewer cho nhiệm vụ \"" + task.getTitle() + "\".");
         return toResponse(task);
     }
 

@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,7 +38,7 @@ public class AiMeetingService {
 
     // ── System prompts ────────────────────────────────────────────────────────
 
-    private static final String TASK_SYSTEM = """
+    private static final String TASK_SYSTEM_BASE = """
             Bạn là AI chuyên gia phân tích cuộc họp và trích xuất nhiệm vụ công việc.
 
             Từ transcript cuộc họp, trích xuất TẤT CẢ nhiệm vụ, hành động, yêu cầu công việc được đề cập.
@@ -48,8 +50,14 @@ public class AiMeetingService {
             - Trích xuất càng nhiều nhiệm vụ công việc càng tốt (mục tiêu 10-20 nhiệm vụ)
             - Trả lời bằng CÙNG ngôn ngữ với transcript
 
+            TRƯỜNG due_at_raw:
+            - Chép NGUYÊN VĂN cụm thời hạn từ transcript, ví dụ: "thứ 6 tuần sau", "ngày 4 tháng 6 năm 2026", "trước 10h ngày 5/6/2026"
+            - KHÔNG tự tính, KHÔNG suy diễn, KHÔNG chuyển sang số
+            - Nếu không đề cập thời hạn → due_at_raw: null
+            - due_at luôn để null (hệ thống sẽ tự tính)
+
             Chỉ trả về JSON array, không giải thích, không markdown:
-            [{"title":"...","description":"...","goal":"...","expected_result":"...","priority":"low|high|urgent","due_at":null,"ai_confidence":0.85,"ai_raw_text":"..."}]
+            [{"title":"...","description":"...","goal":"...","expected_result":"...","priority":"low|high|urgent","due_at":null,"due_at_raw":"cụm thời hạn gốc hoặc null","ai_confidence":0.85,"ai_raw_text":"..."}]
             """;
 
     private static final String SUMMARY_SYSTEM = """
@@ -134,8 +142,19 @@ public class AiMeetingService {
     }
 
     private List<ExtractedTaskItem> extractTasksSingleCall(String context) {
-        String raw = aiLlmService.runText(TASK_SYSTEM, context, 0.1);
-        return parseTaskList(raw);
+        String raw = aiLlmService.runText(getTaskSystemPrompt(), context, 0.1);
+        List<ExtractedTaskItem> items = parseTaskList(raw);
+        // Resolve relative date expressions using Java (accurate 100%)
+        LocalDate today = LocalDate.now();
+        for (ExtractedTaskItem item : items) {
+            String rawDate = item.getDueAtRaw();
+            if (rawDate != null && !rawDate.isBlank() && !rawDate.equalsIgnoreCase("null")) {
+                item.setDueAt(VietnamDateResolver.resolve(rawDate, today));
+            } else {
+                item.setDueAt(null);
+            }
+        }
+        return items;
     }
 
     private List<ExtractedTaskItem> extractTasksChunked(String context) {
@@ -163,8 +182,56 @@ public class AiMeetingService {
         return result != null ? result.trim() : "";
     }
 
+    private String getTaskSystemPrompt() {
+        return TASK_SYSTEM_BASE;
+    }
+
+    private String buildCalendarHeader() {
+        LocalDate today = LocalDate.now();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        String[] viOrder = {"Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"};
+        String[] viDays = {"Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"};
+        String todayVi = viDays[today.getDayOfWeek().getValue() % 7];
+
+        LocalDate thisMonday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+        LocalDate nextMonday = thisMonday.plusWeeks(1);
+        LocalDate weekAfterMonday = thisMonday.plusWeeks(2);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== [THÔNG TIN CUỘC HỌP - BẮT BUỘC ĐỌC TRƯỚC KHI XỬ LÝ] ===\n");
+        sb.append("HÔM NAY: ").append(today.format(fmt)).append(" (").append(todayVi).append(")\n\n");
+
+        sb.append("BẢNG LỊCH - dùng để tra khi gặp 'tuần này':\n");
+        for (int i = 0; i < 7; i++) {
+            LocalDate d = thisMonday.plusDays(i);
+            String mark = d.equals(today) ? " <-- HÔM NAY" : d.isBefore(today) ? " (đã qua)" : "";
+            sb.append("  ").append(viOrder[i]).append(" tuần này = ").append(d.format(fmt)).append(mark).append("\n");
+        }
+
+        sb.append("\nBẢNG LỊCH - dùng để tra khi gặp 'tuần sau' hoặc 'tuần tới':\n");
+        for (int i = 0; i < 7; i++) {
+            LocalDate d = nextMonday.plusDays(i);
+            sb.append("  ").append(viOrder[i]).append(" tuần sau = ").append(d.format(fmt)).append("\n");
+        }
+
+        sb.append("\nBẢNG LỊCH - dùng để tra khi gặp '2 tuần nữa' hoặc 'tuần sau nữa':\n");
+        for (int i = 0; i < 7; i++) {
+            LocalDate d = weekAfterMonday.plusDays(i);
+            sb.append("  ").append(viOrder[i]).append(" 2 tuần nữa = ").append(d.format(fmt)).append("\n");
+        }
+
+        sb.append("\nCÁC NGÀY GẦN: ngày mai=").append(today.plusDays(1).format(fmt))
+          .append(", ngày kia=").append(today.plusDays(2).format(fmt))
+          .append(", cuối tuần=").append(thisMonday.plusDays(5).format(fmt))
+          .append(", tháng sau=").append(today.withDayOfMonth(1).plusMonths(1).format(fmt)).append("\n");
+
+        sb.append("=== [HẾT THÔNG TIN CUỘC HỌP] ===\n\n");
+        return sb.toString();
+    }
+
     private String buildContext(String title, String transcript) {
         StringBuilder sb = new StringBuilder();
+        sb.append(buildCalendarHeader());
         if (title != null && !title.isBlank()) sb.append("Cuộc họp: ").append(title).append("\n\n");
         sb.append("Transcript:\n").append(transcript);
         return sb.toString();
@@ -173,6 +240,7 @@ public class AiMeetingService {
     private String buildContext(MeetingAnalyzeRequest req) {
         if (req == null) return "";
         StringBuilder sb = new StringBuilder();
+        sb.append(buildCalendarHeader());
         if (req.getMeetingTitle() != null) sb.append("Cuộc họp: ").append(req.getMeetingTitle()).append("\n\n");
         if (req.getTranscript() != null && !req.getTranscript().isBlank())
             sb.append("Transcript:\n").append(req.getTranscript());
