@@ -545,8 +545,9 @@ public class ChatbotServiceImpl implements ChatbotService {
                 ReservationResponse reservation = reservationService.reserveRoom(reservationRequest, authentication);
                 bookingFlowStates.remove(sessionId);
 
-                String reply = "Đặt phòng thành công. Bạn đã có " + room.getLocationCode()
-                        + " từ " + startLabel + " đến " + endLabel + ".";
+                String reply = "Đặt phòng thành công. "
+                    + "Bạn đã có " + room.getLocationCode()
+                    + " từ " + startLabel + " đến " + endLabel + ".";
 
                 return ChatbotMessageResponse.builder()
                         .intent(ChatbotIntent.BOOK_ROOM)
