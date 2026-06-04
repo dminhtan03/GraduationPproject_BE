@@ -375,13 +375,13 @@ public class ChatbotServiceImpl implements ChatbotService {
         );
     }
 
-    private ChatbotMessageResponse handleBookingFlow(
+        private ChatbotMessageResponse handleBookingFlow(
             String sessionId,
             String message,
             ChatbotMessageParser.ParseResult parsed,
             BookingFlowState flowState,
             Authentication authentication
-    ) {
+        ) {
         if (flowState == null) return null;   
 
         if (flowState.step == BookingStep.ASK_BUILDING) {
@@ -488,39 +488,81 @@ public class ChatbotServiceImpl implements ChatbotService {
                         .build();
             }
 
-                ChatbotMessageResponse reserveResponse;
-                if (range != null) {
-                int min = Math.min(range[0], range[1]);
-                int max = Math.max(range[0], range[1]);
-                reserveResponse = autoReserveByCapacityRange(
-                    message,
-                    date,
-                    start,
-                    end,
-                    min,
-                    max,
-                    flowState.buildingId,
-                    authentication,
-                    false
-                );
-                } else {
-                reserveResponse = autoReserveByCapacity(
-                    message,
-                    date,
-                    start,
-                    end,
-                    minCapacity,
-                    flowState.buildingId,
-                    authentication,
-                    false
-                );
-                }
-
-            if (reserveResponse != null && reserveResponse.getReservation() != null) {
-                bookingFlowStates.remove(sessionId);
+            Integer min = null;
+            Integer max = null;
+            if (range != null) {
+                min = Math.min(range[0], range[1]);
+                max = Math.max(range[0], range[1]);
+            } else {
+                min = minCapacity;
             }
 
-            return reserveResponse;
+            return listAvailableRoomsForBooking(sessionId, date, start, end, min, max, flowState.buildingId);
+        }
+
+        if (flowState.step == BookingStep.ASK_ROOM) {
+            if (authentication == null) {
+                throw new CustomException(ResponseCode.ACCESS_DENIED);
+            }
+
+            String roomCode = extractRoomCodeFromMessage(message, parsed);
+            if (roomCode == null || roomCode.isBlank()) {
+                return buildRoomSelectionPrompt(flowState);
+            }
+
+            Room room = roomRepository.findByLocationCodeIgnoreCase(roomCode).orElse(null);
+            if (room == null) {
+                return buildRoomSelectionPrompt(flowState);
+            }
+
+            if (flowState.availableRoomIds != null && !flowState.availableRoomIds.isEmpty()
+                    && (room.getId() == null || !flowState.availableRoomIds.contains(room.getId()))) {
+                return buildRoomSelectionPrompt(flowState);
+            }
+
+            if (flowState.date == null || flowState.startTime == null || flowState.endTime == null) {
+                bookingFlowStates.remove(sessionId);
+                return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.BOOK_ROOM)
+                        .reply("Mình bị thiếu thông tin đặt phòng. Vui lòng bắt đầu lại: 'Đặt phòng'.")
+                        .build();
+            }
+
+            LocalDateTime startTime = LocalDateTime.of(flowState.date, flowState.startTime);
+            LocalDateTime endTime = LocalDateTime.of(flowState.date, flowState.endTime);
+
+            ReservationRequest reservationRequest = new ReservationRequest();
+            reservationRequest.setRoomId(room.getId());
+            reservationRequest.setStartTime(startTime);
+            reservationRequest.setEndTime(endTime);
+            reservationRequest.setPurpose("Họp");
+            reservationRequest.setNote("Đặt qua chatbot");
+
+            String startLabel = formatDateTime(startTime);
+            String endLabel = formatDateTime(endTime);
+
+            try {
+                ReservationResponse reservation = reservationService.reserveRoom(reservationRequest, authentication);
+                bookingFlowStates.remove(sessionId);
+
+                String reply = "Đặt phòng thành công. "
+                    + "Bạn đã có " + room.getLocationCode()
+                    + " từ " + startLabel + " đến " + endLabel + ".";
+
+                return ChatbotMessageResponse.builder()
+                        .intent(ChatbotIntent.BOOK_ROOM)
+                        .reply(reply)
+                        .reservation(reservation)
+                        .build();
+            } catch (CustomException e) {
+                if (e.getResponseCode() == ResponseCode.CANNOT_RESERVE_ROOM
+                        || e.getResponseCode() == ResponseCode.RESERVATION_TIME_OVERLAP
+                        || e.getResponseCode() == ResponseCode.USER_TIME_OVERLAP) {
+                    return listAvailableRoomsForBooking(sessionId, flowState.date, flowState.startTime,
+                            flowState.endTime, flowState.minCapacity, flowState.maxCapacity, flowState.buildingId);
+                }
+                throw e;
+            }
         }
 
         return null;
@@ -1514,11 +1556,11 @@ public class ChatbotServiceImpl implements ChatbotService {
                     .build();
         }
 
-        // Neu nguoi dung khong nhap ma phong, nhung co suc chua + thoi gian, tu chon phong va dat.
+        // Neu nguoi dung khong nhap ma phong, tra ve danh sach phong con trong de nguoi dung chon.
         if (parsed.roomCode() == null || parsed.roomCode().isBlank()) {
             Integer minCapacity = parsed.minCapacity();
             if (minCapacity != null && minCapacity > 0) {
-                return autoReserveByCapacity(message, date, start, end, minCapacity, null, authentication, parsed.endTimeDefaulted());
+            return listAvailableRoomsForBooking(sessionId, date, start, end, minCapacity, null, null);
             }
 
             return ChatbotMessageResponse.builder()
@@ -1670,41 +1712,44 @@ public class ChatbotServiceImpl implements ChatbotService {
         );
         }
        
-    private ChatbotMessageResponse autoReserveByCapacity(
-            String message,
+    private ChatbotMessageResponse listAvailableRoomsForBooking(
+            String sessionId,
             LocalDate date,
             LocalTime start,
             LocalTime end,
-            int minCapacity,
-            String buildingId,
-            Authentication authentication,
-            boolean endTimeDefaulted
+            Integer minCapacity,
+            Integer maxCapacity,
+            String buildingId
     ) {
         LocalDateTime startTime = LocalDateTime.of(date, start);
         LocalDateTime endTime = LocalDateTime.of(date, end);
 
         List<Room> candidates = roomRepository.findAllWithDetails().stream()
-                .filter(r -> r.getStatus() != RoomStatus.BROKEN)
+                .filter(r -> r.getStatus() == RoomStatus.AVAILABLE)
                 .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
                 .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
-            .filter(r -> buildingId == null || buildingId.isBlank()
-                || (r.getFloor() != null
-                && r.getFloor().getBuilding() != null
-                && Objects.equals(r.getFloor().getBuilding().getId(), buildingId)))
-                .filter(r -> r.getCapacity() != null && r.getCapacity() >= minCapacity)
+                .filter(r -> buildingId == null || buildingId.isBlank()
+                        || (r.getFloor() != null
+                        && r.getFloor().getBuilding() != null
+                        && Objects.equals(r.getFloor().getBuilding().getId(), buildingId)))
+                .filter(r -> r.getCapacity() != null
+                        && (minCapacity == null || r.getCapacity() >= minCapacity)
+                        && (maxCapacity == null || r.getCapacity() <= maxCapacity))
                 .sorted(Comparator.comparing(Room::getCapacity, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(Room::getLocationCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
 
         if (candidates.isEmpty()) {
+            String capText = (minCapacity != null && maxCapacity != null)
+                    ? (minCapacity + "-" + maxCapacity + " người")
+                    : (minCapacity != null ? (minCapacity + "+ người") : "sức chứa đã chọn");
             return ChatbotMessageResponse.builder()
                     .intent(ChatbotIntent.BOOK_ROOM)
-                .reply("Mình không tìm thấy phòng phù hợp cho " + minCapacity + "+ người. Vui lòng chọn lại số người.")
+                    .reply("Mình không tìm thấy phòng phù hợp cho " + capText + ". Vui lòng chọn lại số người.")
                     .build();
         }
 
         List<String> roomIds = candidates.stream().map(Room::getId).filter(Objects::nonNull).toList();
-
         List<ReservationStatus> blocking = List.of(ReservationStatus.PENDING, ReservationStatus.RESERVED, ReservationStatus.IN_USE);
         List<Reservation> overlaps = roomIds.isEmpty()
                 ? List.of()
@@ -1715,136 +1760,68 @@ public class ChatbotServiceImpl implements ChatbotService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        String startLabel = formatDateTime(startTime);
-        String endLabel = formatDateTime(endTime);
+        List<Room> availableRooms = candidates.stream()
+                .filter(r -> r.getId() != null)
+                .filter(r -> !busyRoomIds.contains(r.getId()))
+                .toList();
 
-        for (Room room : candidates) {
-            if (room.getId() == null) continue;
-            if (busyRoomIds.contains(room.getId())) continue;
-
-            ReservationRequest reservationRequest = new ReservationRequest();
-            reservationRequest.setRoomId(room.getId());
-            reservationRequest.setStartTime(startTime);
-            reservationRequest.setEndTime(endTime);
-            reservationRequest.setPurpose("Họp");
-            reservationRequest.setNote("Đặt qua chatbot (tự chọn theo sức chứa)");
-
-            try {
-                ReservationResponse reservation = reservationService.reserveRoom(reservationRequest, authentication);
-
-                String reply = endTimeDefaulted
-                    ? "Đã đặt phòng " + room.getLocationCode() + " lúc " + startLabel + " trong 1 giờ (sức chứa " + minCapacity + "+)."
-                    : "Đặt phòng thành công. Bạn đã có " + room.getLocationCode() + " từ " + startLabel + " đến " + endLabel + " (sức chứa " + minCapacity + "+).";
-
-                return ChatbotMessageResponse.builder()
-                        .intent(ChatbotIntent.BOOK_ROOM)
-                        .reply(reply)
-                        .reservation(reservation)
-                        .build();
-            } catch (CustomException e) {
-                if (e.getResponseCode() == ResponseCode.CANNOT_RESERVE_ROOM
-                        || e.getResponseCode() == ResponseCode.RESERVATION_TIME_OVERLAP
-                        || e.getResponseCode() == ResponseCode.USER_TIME_OVERLAP) {
-                    // Trung lich do phong vua bi dat boi nguoi khac, thu phong tiep theo.
-                    continue;
-                }
-                throw e;
-            }
+        if (availableRooms.isEmpty()) {
+            String startLabel = formatDateTime(startTime);
+            String endLabel = formatDateTime(endTime);
+            return ChatbotMessageResponse.builder()
+                    .intent(ChatbotIntent.BOOK_ROOM)
+                    .reply("Không còn phòng trống cho khung giờ " + startLabel + "–" + endLabel + ". Vui lòng chọn lại thời gian.")
+                    .build();
         }
 
+        String timeSlot = formatDateTime(startTime) + "–" + formatDateTime(endTime);
+        List<ChatbotRoomItemResponse> availableResponses = availableRooms.stream()
+                .map(r -> toRoomItem(r, List.of(timeSlot)))
+                .toList();
+
+        BookingFlowState state = bookingFlowStates.getOrDefault(sessionId, new BookingFlowState());
+        state.step = BookingStep.ASK_ROOM;
+        state.buildingId = buildingId;
+        state.date = date;
+        state.startTime = start;
+        state.endTime = end;
+        state.minCapacity = minCapacity;
+        state.maxCapacity = maxCapacity;
+        state.availableRoomIds = availableRooms.stream()
+                .map(Room::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        state.availableRooms = availableResponses;
+        bookingFlowStates.put(sessionId, state);
+
         return ChatbotMessageResponse.builder()
-            .intent(ChatbotIntent.BOOK_ROOM)
-            .reply("Mình không tìm thấy phòng trống cho khung giờ " + startLabel + "–" + endLabel + " với sức chứa " + minCapacity + "+. Vui lòng chọn lại số người.")
-            .build();
+                .intent(ChatbotIntent.BOOK_ROOM)
+                .reply("Danh sách phòng còn trống. Vui lòng chọn phòng trong danh sách: ")
+                .availableRooms(availableResponses)
+                .build();
     }
 
-        private ChatbotMessageResponse autoReserveByCapacityRange(
-            String message,
-            LocalDate date,
-            LocalTime start,
-            LocalTime end,
-            int minCapacity,
-            int maxCapacity,
-            String buildingId,
-            Authentication authentication,
-            boolean endTimeDefaulted
-        ) {
-        LocalDateTime startTime = LocalDateTime.of(date, start);
-        LocalDateTime endTime = LocalDateTime.of(date, end);
-
-        List<Room> candidates = roomRepository.findAllWithDetails().stream()
-            .filter(r -> r.getStatus() != RoomStatus.BROKEN)
-            .filter(r -> r.getFloor() == null || !r.getFloor().isDeleted())
-            .filter(r -> r.getFloor() == null || r.getFloor().getBuilding() == null || !r.getFloor().getBuilding().isDeleted())
-            .filter(r -> buildingId == null || buildingId.isBlank()
-                || (r.getFloor() != null
-                && r.getFloor().getBuilding() != null
-                && Objects.equals(r.getFloor().getBuilding().getId(), buildingId)))
-            .filter(r -> r.getCapacity() != null && r.getCapacity() >= minCapacity && r.getCapacity() <= maxCapacity)
-            .sorted(Comparator.comparing(Room::getCapacity, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(Room::getLocationCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
-            .toList();
-
-        if (candidates.isEmpty()) {
-            return ChatbotMessageResponse.builder()
-                .intent(ChatbotIntent.BOOK_ROOM)
-                .reply("Mình không tìm thấy phòng phù hợp cho khoảng " + minCapacity + "-" + maxCapacity + " người. Vui lòng chọn lại số người.")
-                .build();
-        }
-
-        List<String> roomIds = candidates.stream().map(Room::getId).filter(Objects::nonNull).toList();
-
-        List<ReservationStatus> blocking = List.of(ReservationStatus.PENDING, ReservationStatus.RESERVED, ReservationStatus.IN_USE);
-        List<Reservation> overlaps = roomIds.isEmpty()
-            ? List.of()
-            : reservationRepository.findOverlappingReservationsForRooms(roomIds, blocking, startTime, endTime);
-
-        Set<String> busyRoomIds = overlaps.stream()
-            .map(r -> r.getRoom() != null ? r.getRoom().getId() : null)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-
-        String startLabel = formatDateTime(startTime);
-        String endLabel = formatDateTime(endTime);
-
-        for (Room room : candidates) {
-            if (room.getId() == null) continue;
-            if (busyRoomIds.contains(room.getId())) continue;
-
-            ReservationRequest reservationRequest = new ReservationRequest();
-            reservationRequest.setRoomId(room.getId());
-            reservationRequest.setStartTime(startTime);
-            reservationRequest.setEndTime(endTime);
-            reservationRequest.setPurpose("Họp");
-            reservationRequest.setNote("Đặt qua chatbot (tự chọn theo sức chứa)");
-
-            try {
-            ReservationResponse reservation = reservationService.reserveRoom(reservationRequest, authentication);
-
-                String reply = endTimeDefaulted
-                    ? "Đã đặt phòng " + room.getLocationCode() + " lúc " + startLabel + " trong 1 giờ (" + minCapacity + "-" + maxCapacity + " người)."
-                    : "Đặt phòng thành công. Bạn đã có " + room.getLocationCode() + " từ " + startLabel + " đến " + endLabel + " (" + minCapacity + "-" + maxCapacity + " người).";
-
-            return ChatbotMessageResponse.builder()
-                .intent(ChatbotIntent.BOOK_ROOM)
-                .reply(reply)
-                .reservation(reservation)
-                .build();
-            } catch (CustomException e) {
-            if (e.getResponseCode() == ResponseCode.CANNOT_RESERVE_ROOM
-                || e.getResponseCode() == ResponseCode.RESERVATION_TIME_OVERLAP
-                || e.getResponseCode() == ResponseCode.USER_TIME_OVERLAP) {
-                continue;
-            }
-            throw e;
-            }
-        }
-
+    private ChatbotMessageResponse buildRoomSelectionPrompt(BookingFlowState flowState) {
         return ChatbotMessageResponse.builder()
-            .intent(ChatbotIntent.BOOK_ROOM)
-            .reply("Mình không tìm thấy phòng trống cho khung giờ " + startLabel + "–" + endLabel + " với khoảng " + minCapacity + "-" + maxCapacity + " người. Vui lòng chọn lại số người.")
-            .build();
+                .intent(ChatbotIntent.BOOK_ROOM)
+                .reply("Vui lòng chọn phòng trong danh sách: ")
+                .availableRooms(flowState != null ? flowState.availableRooms : List.of())
+                .build();
+    }
+
+    private String extractRoomCodeFromMessage(String message, ChatbotMessageParser.ParseResult parsed) {
+        if (parsed != null && parsed.roomCode() != null && !parsed.roomCode().isBlank()) {
+            return parsed.roomCode();
         }
+
+        String normalized = Objects.toString(message, "");
+        Matcher matcher = ROOM_CODE_VALIDATION_PATTERN.matcher(normalized);
+        if (matcher.find()) {
+            String raw = matcher.group();
+            return raw.replaceAll("\\s+", "").replace('_', '-');
+        }
+        return null;
+    }
 
         private ChatbotMessageResponse autoReserveAny(
             String message,
@@ -2054,7 +2031,8 @@ public class ChatbotServiceImpl implements ChatbotService {
         ASK_BUILDING,
         ASK_TIME,
         ASK_DURATION,
-        ASK_CAPACITY
+        ASK_CAPACITY,
+        ASK_ROOM
     }
 
     private static class BookingFlowState {
@@ -2063,6 +2041,11 @@ public class ChatbotServiceImpl implements ChatbotService {
         private LocalDate date;
         private LocalTime startTime;
         private Double durationHours;
+        private LocalTime endTime;
+        private Integer minCapacity;
+        private Integer maxCapacity;
+        private List<String> availableRoomIds;
+        private List<ChatbotRoomItemResponse> availableRooms;
     }
 
     private enum ExtendStep {
