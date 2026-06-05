@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,17 +51,20 @@ public class TaskServiceImpl implements TaskService {
 
     private void notifyInternal(String userId, String title, String content, boolean sendEmail) {
         if (userId == null || userId.isBlank()) return;
-        try {
-            NotificationRequest req = new NotificationRequest();
-            req.setUserId(userId);
-            req.setTitle(title);
-            req.setContent(content);
-            req.setCreatedAt(LocalDateTime.now());
-            req.sendEmail = sendEmail;
-            notificationService.sendNotification(List.of(req));
-        } catch (Exception e) {
-            log.warn("Failed to send task notification to {}: {}", userId, e.getMessage());
-        }
+        // Run async so it never blocks the HTTP response
+        CompletableFuture.runAsync(() -> {
+            try {
+                NotificationRequest req = new NotificationRequest();
+                req.setUserId(userId);
+                req.setTitle(title);
+                req.setContent(content);
+                req.setCreatedAt(LocalDateTime.now());
+                req.sendEmail = sendEmail;
+                notificationService.sendNotification(List.of(req));
+            } catch (Exception e) {
+                log.warn("Failed to send task notification to {}: {}", userId, e.getMessage());
+            }
+        });
     }
 
     private User resolveUser(Authentication auth) {
@@ -421,15 +425,15 @@ public class TaskServiceImpl implements TaskService {
         taskRepository.save(task);
         saveHistory(task, old, newStatus.name(), user);
 
-        // Notify creator + assignees about status change (with email)
+        // Notify creator + assignees about status change (real-time only)
         String statusMsg = "Nhiệm vụ \"" + task.getTitle() + "\" đã chuyển trạng thái từ "
                 + old.replace("_", " ") + " → " + newStatus.name().replace("_", " ");
         if (!task.getCreatedBy().getId().equals(user.getId())) {
-            notifyWithEmail(task.getCreatedBy().getId(), "Cập nhật trạng thái nhiệm vụ", statusMsg);
+            notify(task.getCreatedBy().getId(), "Cập nhật trạng thái nhiệm vụ", statusMsg);
         }
         assignmentRepository.findByTask_Id(task.getId()).forEach(a -> {
             if (a.getAssignee() != null && !a.getAssignee().getId().equals(user.getId())) {
-                notifyWithEmail(a.getAssignee().getId(), "Cập nhật trạng thái nhiệm vụ", statusMsg);
+                notify(a.getAssignee().getId(), "Cập nhật trạng thái nhiệm vụ", statusMsg);
             }
         });
 
@@ -579,12 +583,12 @@ public class TaskServiceImpl implements TaskService {
 
         task.setAssignedBy(assignerEntity);
         taskRepository.save(task);
-        // Notify assignee (with email)
-        notifyWithEmail(assignee.getId(), "Bạn được giao nhiệm vụ",
+        // Notify assignee (real-time only — email avoided to prevent blocking HTTP response)
+        notify(assignee.getId(), "Bạn được giao nhiệm vụ",
                 fullName(assignerEntity) + " đã giao nhiệm vụ \"" + task.getTitle() + "\" cho bạn.");
-        // Notify task creator if different from assigner (with email)
+        // Notify task creator if different from assigner
         if (!task.getCreatedBy().getId().equals(assignerEntity.getId())) {
-            notifyWithEmail(task.getCreatedBy().getId(), "Nhiệm vụ đã được giao",
+            notify(task.getCreatedBy().getId(), "Nhiệm vụ đã được giao",
                     fullName(assignerEntity) + " đã giao \"" + task.getTitle() + "\" cho " + fullName(assignee));
         }
         return toResponse(task);
