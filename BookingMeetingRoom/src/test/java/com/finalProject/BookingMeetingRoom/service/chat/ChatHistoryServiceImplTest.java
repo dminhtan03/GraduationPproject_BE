@@ -11,6 +11,7 @@ import com.finalProject.BookingMeetingRoom.model.response.ChatbotHistoryResponse
 import com.finalProject.BookingMeetingRoom.repository.AiRepository;
 import com.finalProject.BookingMeetingRoom.repository.ChatHistoryRepository;
 import com.finalProject.BookingMeetingRoom.repository.UserRepository;
+import com.finalProject.BookingMeetingRoom.service.impl.ChatHistoryServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
